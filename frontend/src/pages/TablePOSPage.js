@@ -618,7 +618,7 @@ ${footer}
                   <p className="font-semibold">No products found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                   {filtered.map((product) => (
                     <button
                       key={product.id}
@@ -643,8 +643,8 @@ ${footer}
             </div>
           </div>
 
-          {/* Current Order — hidden on phones, visible on tablet/desktop */}
-          <div className="hidden md:flex md:w-72 lg:w-80 flex-col bg-white dark:bg-gray-800 flex-shrink-0">
+          {/* Current Order — hidden on phones+tablets, visible on desktop only */}
+          <div className="hidden xl:flex xl:w-80 flex-col bg-white dark:bg-gray-800 flex-shrink-0">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="font-black text-gray-900 dark:text-white text-lg">Current Order</h2>
             </div>
@@ -754,7 +754,7 @@ ${footer}
         return (
           <button
             onClick={() => setShowCart(true)}
-            className="fixed bottom-6 right-6 z-30 md:hidden w-14 h-14 bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-full shadow-2xl shadow-blue-900/40 flex items-center justify-center transition-all"
+            className="fixed bottom-6 right-6 z-30 xl:hidden w-14 h-14 bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-full shadow-2xl shadow-blue-900/40 flex items-center justify-center transition-all"
           >
             <ShoppingCart size={22} className="text-white" />
             {cartItemCount > 0 && (
@@ -768,7 +768,7 @@ ${footer}
 
       {/* Mobile cart sheet (phones only) */}
       {showCart && (
-        <div className="fixed inset-0 z-40 bg-white dark:bg-gray-900 flex flex-col md:hidden">
+        <div className="fixed inset-0 z-40 bg-white dark:bg-gray-900 flex flex-col xl:hidden">
           <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
             <div>
               <h2 className="font-black text-xl text-gray-900 dark:text-white tracking-tight">
