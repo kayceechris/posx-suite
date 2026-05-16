@@ -11,6 +11,64 @@ from models import (
 )
 router = APIRouter(prefix="/api")
 
+_U = "https://images.unsplash.com/"
+_PRODUCT_IMAGES = {
+    "Spring Rolls (4pcs)":   _U + "photo-1606491956689-2ea866880c84?w=400&h=300&fit=crop&auto=format",
+    "Peppered Gizzard":      _U + "photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop&auto=format",
+    "Chicken Wings":         _U + "photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop&auto=format",
+    "Calamari":              _U + "photo-1559847844-5315695dadae?w=400&h=300&fit=crop&auto=format",
+    "Mozzarella Sticks":     _U + "photo-1548340748-6d2b7d7da280?w=400&h=300&fit=crop&auto=format",
+    "Grilled Tilapia":       _U + "photo-1519708227418-a8d869a5fbf9?w=400&h=300&fit=crop&auto=format",
+    "Jollof Rice & Chicken": _U + "photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&auto=format",
+    "Fried Rice & Turkey":   _U + "photo-1512058564366-18510be2db19?w=400&h=300&fit=crop&auto=format",
+    "Pepper Soup (Goat)":    _U + "photo-1547592166-23ac45744acd?w=400&h=300&fit=crop&auto=format",
+    "Egusi Soup & Eba":      _U + "photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop&auto=format",
+    "Ofe Onugbu & Semo":     _U + "photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop&auto=format",
+    "Classic Beef Burger":   _U + "photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&auto=format",
+    "Double Smash Burger":   _U + "photo-1594212699903-ec8a3eca50f5?w=400&h=300&fit=crop&auto=format",
+    "Chicken Burger":        _U + "photo-1553979459-d2229ba7433b?w=400&h=300&fit=crop&auto=format",
+    "Veggie Burger":         _U + "photo-1520072959219-c595dc870360?w=400&h=300&fit=crop&auto=format",
+    "Mixed Grill Platter":   _U + "photo-1544025162-d76694265947?w=400&h=300&fit=crop&auto=format",
+    "Pork Ribs":             _U + "photo-1529193591184-b1d58069ecdd?w=400&h=300&fit=crop&auto=format",
+    "BBQ Chicken":           _U + "photo-1598103442097-8b74394b95c8?w=400&h=300&fit=crop&auto=format",
+    "Grilled Prawns":        _U + "photo-1565680018434-b513d5e5fd47?w=400&h=300&fit=crop&auto=format",
+    "Spaghetti Bolognese":   _U + "photo-1555949258-eb67b1ef0ceb?w=400&h=300&fit=crop&auto=format",
+    "Pasta Alfredo":         _U + "photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop&auto=format",
+    "Coconut Rice":          _U + "photo-1596560548464-f010549b84d7?w=400&h=300&fit=crop&auto=format",
+    "Coca-Cola":             _U + "photo-1554866585-cd94860890b7?w=400&h=300&fit=crop&auto=format",
+    "Fanta Orange":          _U + "photo-1613478223719-2ab802602423?w=400&h=300&fit=crop&auto=format",
+    "Bottled Water":         _U + "photo-1548839140-29a749e1cf4d?w=400&h=300&fit=crop&auto=format",
+    "Fresh Orange Juice":    _U + "photo-1600271886742-f049cd451bba?w=400&h=300&fit=crop&auto=format",
+    "Malt Drink":            _U + "photo-1575367439058-6096bb9cf5e2?w=400&h=300&fit=crop&auto=format",
+    "Chapman":               _U + "photo-1544145945-f90425340c7e?w=400&h=300&fit=crop&auto=format",
+    "Mojito":                _U + "photo-1551538827-9c037cb4f32a?w=400&h=300&fit=crop&auto=format",
+    "Sex on the Beach":      _U + "photo-1582106245687-1afde369f5d1?w=400&h=300&fit=crop&auto=format",
+    "Long Island Ice Tea":   _U + "photo-1536935338788-846bb9981813?w=400&h=300&fit=crop&auto=format",
+    "Pina Colada":           _U + "photo-1607446045875-ef7cd69e1e4c?w=400&h=300&fit=crop&auto=format",
+    "Chocolate Lava Cake":   _U + "photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop&auto=format",
+    "Ice Cream (2 scoops)":  _U + "photo-1567206563114-c179706f6b3f?w=400&h=300&fit=crop&auto=format",
+    "Cheesecake":            _U + "photo-1533134242443-d4fd215305ad?w=400&h=300&fit=crop&auto=format",
+    "Fruit Salad":           _U + "photo-1568158879083-c42860933ed7?w=400&h=300&fit=crop&auto=format",
+}
+
+
+@router.post("/patch-product-images")
+async def patch_product_images():
+    """One-time migration: sets demo images on existing products that have no image."""
+    updated = skipped = unmatched = 0
+    products = await db.products.find({}, {"_id": 0, "id": 1, "name": 1, "image": 1}).to_list(None)
+    for p in products:
+        img = _PRODUCT_IMAGES.get(p.get("name", ""))
+        if not img:
+            unmatched += 1
+            continue
+        if p.get("image"):
+            skipped += 1
+            continue
+        await db.products.update_one({"id": p["id"]}, {"$set": {"image": img}})
+        updated += 1
+    return {"updated": updated, "skipped_already_has_image": skipped, "unmatched": unmatched}
+
 
 # ── TEMPORARY RESET ENDPOINT — remove after use ───────────────────────────────
 @router.get("/admin-reset")
