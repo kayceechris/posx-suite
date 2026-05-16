@@ -102,17 +102,27 @@ export default function AdminPage() {
       });
     } else {
       setExpandedSection(null);
+      if (window.innerWidth < 1024) setSidebarOpen(false);
     }
   };
 
   const handleSubClick = (section, subId) => {
     setSubViews((prev) => ({ ...prev, [section]: subId }));
+    if (window.innerWidth < 1024) setSidebarOpen(false);
   };
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
+      {/* Mobile backdrop */}
       {sidebarOpen && (
-        <aside className="w-60 bg-gray-900 dark:bg-gray-950 flex flex-col flex-shrink-0 z-30">
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {sidebarOpen && (
+        <aside className="fixed inset-y-0 left-0 w-60 bg-gray-900 dark:bg-gray-950 flex flex-col z-50 lg:relative lg:z-30 lg:flex-shrink-0">
           <div className="px-5 py-5 border-b border-gray-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
