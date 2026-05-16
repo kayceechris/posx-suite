@@ -36,6 +36,16 @@ async def reset_admin_pin(secret: str = Query(...), pin: str = Query("123456")):
         return {"ok": False, "error": str(e), "trace": traceback.format_exc()}
 # ─────────────────────────────────────────────────────────────────────────────
 
+@router.get("/db-test")
+async def test_db_connection():
+    import traceback
+    try:
+        result = await db.command("ping")
+        return {"ok": True, "ping": str(result)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "trace": traceback.format_exc()}
+
+
 # Pre-computed bcrypt hashes — no runtime hashing needed (each hash takes 3-5s on shared hosting)
 _H = {
     "123456": "$2b$12$T8ULFAbLU4KVsydmQhDNXuBkXebZe.LN0z/vqiRtK4RRAUNxTinf.",
@@ -159,56 +169,57 @@ async def seed_data(force: bool = Query(False)):
     for c in cats:
         await db.categories.insert_one(_insert(c.model_dump()))
 
+    _U = "https://images.unsplash.com/"
     products_data = [
         # Starters
-        ("Spring Rolls (4pcs)", cat_starters, 2500),
-        ("Peppered Gizzard", cat_starters, 3500),
-        ("Chicken Wings", cat_starters, 4500),
-        ("Calamari", cat_starters, 3800),
-        ("Mozzarella Sticks", cat_starters, 2800),
+        ("Spring Rolls (4pcs)", cat_starters, 2500, _U + "photo-1606491956689-2ea866880c84?w=400&h=300&fit=crop&auto=format"),
+        ("Peppered Gizzard",    cat_starters, 3500, _U + "photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop&auto=format"),
+        ("Chicken Wings",       cat_starters, 4500, _U + "photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop&auto=format"),
+        ("Calamari",            cat_starters, 3800, _U + "photo-1559847844-5315695dadae?w=400&h=300&fit=crop&auto=format"),
+        ("Mozzarella Sticks",   cat_starters, 2800, _U + "photo-1548340748-6d2b7d7da280?w=400&h=300&fit=crop&auto=format"),
         # Mains
-        ("Grilled Tilapia", cat_mains, 7500),
-        ("Jollof Rice & Chicken", cat_mains, 5500),
-        ("Fried Rice & Turkey", cat_mains, 5800),
-        ("Pepper Soup (Goat)", cat_mains, 6500),
-        ("Egusi Soup & Eba", cat_mains, 4500),
-        ("Ofe Onugbu & Semo", cat_mains, 4800),
+        ("Grilled Tilapia",        cat_mains, 7500, _U + "photo-1519708227418-a8d869a5fbf9?w=400&h=300&fit=crop&auto=format"),
+        ("Jollof Rice & Chicken",  cat_mains, 5500, _U + "photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&auto=format"),
+        ("Fried Rice & Turkey",    cat_mains, 5800, _U + "photo-1512058564366-18510be2db19?w=400&h=300&fit=crop&auto=format"),
+        ("Pepper Soup (Goat)",     cat_mains, 6500, _U + "photo-1547592166-23ac45744acd?w=400&h=300&fit=crop&auto=format"),
+        ("Egusi Soup & Eba",       cat_mains, 4500, _U + "photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop&auto=format"),
+        ("Ofe Onugbu & Semo",      cat_mains, 4800, _U + "photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop&auto=format"),
         # Burgers
-        ("Classic Beef Burger", cat_burgers, 4200),
-        ("Double Smash Burger", cat_burgers, 5800),
-        ("Chicken Burger", cat_burgers, 4500),
-        ("Veggie Burger", cat_burgers, 3800),
+        ("Classic Beef Burger", cat_burgers, 4200, _U + "photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&auto=format"),
+        ("Double Smash Burger", cat_burgers, 5800, _U + "photo-1594212699903-ec8a3eca50f5?w=400&h=300&fit=crop&auto=format"),
+        ("Chicken Burger",      cat_burgers, 4500, _U + "photo-1553979459-d2229ba7433b?w=400&h=300&fit=crop&auto=format"),
+        ("Veggie Burger",       cat_burgers, 3800, _U + "photo-1520072959219-c595dc870360?w=400&h=300&fit=crop&auto=format"),
         # Grill
-        ("Mixed Grill Platter", cat_grill, 12500),
-        ("Pork Ribs", cat_grill, 9500),
-        ("BBQ Chicken", cat_grill, 7000),
-        ("Grilled Prawns", cat_grill, 9000),
+        ("Mixed Grill Platter", cat_grill, 12500, _U + "photo-1544025162-d76694265947?w=400&h=300&fit=crop&auto=format"),
+        ("Pork Ribs",           cat_grill,  9500, _U + "photo-1529193591184-b1d58069ecdd?w=400&h=300&fit=crop&auto=format"),
+        ("BBQ Chicken",         cat_grill,  7000, _U + "photo-1598103442097-8b74394b95c8?w=400&h=300&fit=crop&auto=format"),
+        ("Grilled Prawns",      cat_grill,  9000, _U + "photo-1565680018434-b513d5e5fd47?w=400&h=300&fit=crop&auto=format"),
         # Pasta & Rice
-        ("Spaghetti Bolognese", cat_pasta, 4500),
-        ("Pasta Alfredo", cat_pasta, 4200),
-        ("Coconut Rice", cat_pasta, 3500),
+        ("Spaghetti Bolognese", cat_pasta, 4500, _U + "photo-1555949258-eb67b1ef0ceb?w=400&h=300&fit=crop&auto=format"),
+        ("Pasta Alfredo",       cat_pasta, 4200, _U + "photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop&auto=format"),
+        ("Coconut Rice",        cat_pasta, 3500, _U + "photo-1596560548464-f010549b84d7?w=400&h=300&fit=crop&auto=format"),
         # Drinks
-        ("Coca-Cola", cat_drinks, 500),
-        ("Fanta Orange", cat_drinks, 500),
-        ("Bottled Water", cat_drinks, 300),
-        ("Fresh Orange Juice", cat_drinks, 1800),
-        ("Malt Drink", cat_drinks, 700),
-        ("Chapman", cat_drinks, 2000),
+        ("Coca-Cola",          cat_drinks,  500, _U + "photo-1554866585-cd94860890b7?w=400&h=300&fit=crop&auto=format"),
+        ("Fanta Orange",       cat_drinks,  500, _U + "photo-1613478223719-2ab802602423?w=400&h=300&fit=crop&auto=format"),
+        ("Bottled Water",      cat_drinks,  300, _U + "photo-1548839140-29a749e1cf4d?w=400&h=300&fit=crop&auto=format"),
+        ("Fresh Orange Juice", cat_drinks, 1800, _U + "photo-1600271886742-f049cd451bba?w=400&h=300&fit=crop&auto=format"),
+        ("Malt Drink",         cat_drinks,  700, _U + "photo-1575367439058-6096bb9cf5e2?w=400&h=300&fit=crop&auto=format"),
+        ("Chapman",            cat_drinks, 2000, _U + "photo-1544145945-f90425340c7e?w=400&h=300&fit=crop&auto=format"),
         # Cocktails
-        ("Mojito", cat_cocktails, 4500),
-        ("Sex on the Beach", cat_cocktails, 5000),
-        ("Long Island Ice Tea", cat_cocktails, 5500),
-        ("Pina Colada", cat_cocktails, 4800),
+        ("Mojito",               cat_cocktails, 4500, _U + "photo-1551538827-9c037cb4f32a?w=400&h=300&fit=crop&auto=format"),
+        ("Sex on the Beach",     cat_cocktails, 5000, _U + "photo-1582106245687-1afde369f5d1?w=400&h=300&fit=crop&auto=format"),
+        ("Long Island Ice Tea",  cat_cocktails, 5500, _U + "photo-1536935338788-846bb9981813?w=400&h=300&fit=crop&auto=format"),
+        ("Pina Colada",          cat_cocktails, 4800, _U + "photo-1607446045875-ef7cd69e1e4c?w=400&h=300&fit=crop&auto=format"),
         # Desserts
-        ("Chocolate Lava Cake", cat_desserts, 3500),
-        ("Ice Cream (2 scoops)", cat_desserts, 2500),
-        ("Cheesecake", cat_desserts, 3000),
-        ("Fruit Salad", cat_desserts, 2200),
+        ("Chocolate Lava Cake",  cat_desserts, 3500, _U + "photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop&auto=format"),
+        ("Ice Cream (2 scoops)", cat_desserts, 2500, _U + "photo-1567206563114-c179706f6b3f?w=400&h=300&fit=crop&auto=format"),
+        ("Cheesecake",           cat_desserts, 3000, _U + "photo-1533134242443-d4fd215305ad?w=400&h=300&fit=crop&auto=format"),
+        ("Fruit Salad",          cat_desserts, 2200, _U + "photo-1568158879083-c42860933ed7?w=400&h=300&fit=crop&auto=format"),
     ]
 
     products = []
-    for name, cat, price in products_data:
-        p = Product(name=name, category_id=cat.id, price=price, active=True)
+    for name, cat, price, img in products_data:
+        p = Product(name=name, category_id=cat.id, price=price, active=True, image=img)
         await db.products.insert_one(_insert(p.model_dump()))
         products.append(p)
         # Stock in both outlets
