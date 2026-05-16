@@ -157,7 +157,7 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onCli
               className="flex-1 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-1"
             >
               <ArrowLeftRight size={11} />
-              Transfer
+              <span className="truncate">Move</span>
             </button>
           )}
         </div>
