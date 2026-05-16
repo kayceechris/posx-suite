@@ -1,0 +1,89 @@
+{
+  "theme": "light""Dark",
+  "archetype": "Archetype 6 (Vibrant Play) combined with Archetype 4 (High-Contrast for Data)",
+  "typography": {
+    "fonts": {
+      "headings": "Nunito",
+      "body": "Figtree",
+      "mono": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-black tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "h4": "text-lg sm:text-xl font-semibold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm uppercase tracking-[0.2em] font-bold"
+    }
+  },
+  "colors": {
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "surface_alt": "#F1F5F9",
+    "foreground": "#0F172A",
+    "foreground_muted": "#64748B",
+    "primary": "#3B82F6",
+    "primary_hover": "#2563EB",
+    "secondary": "#EAB308",
+    "accent_1": "#F97316",
+    "accent_2": "#10B981",
+    "destructive": "#F43F5E",
+    "border": "#E2E8F0"
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous spacing but optimized for POS touch accuracy. Large hit targets.",
+    "pos_grid": "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4",
+    "bento_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "padding": "p-6 or p-8 for containers, p-4 for cards",
+    "radius": "rounded-2xl or rounded-3xl for playful, tactile feel"
+  },
+  "components": {
+    "buttons": "Tactile style: Use flat backgrounds with a darker border-b-4 to mimic a physical button. On active/press, translate-y-1 and reduce border-b to 0 for a pressed effect.",
+    "cards": "Flat background (#FFFFFF), rounded-3xl, 2px border (#E2E8F0), no massive drop shadow. Subtle shadow-sm on hover.",
+    "cart_sidebar": "Glassmorphism if floating, or solid white with a 1px border-l if fixed.",
+    "inputs": "Shadcn UI customized with rounded-full or rounded-2xl, border-2 focus:ring-4 focus:ring-primary/20",
+    "pincode": "Large touchable keypad with circular or rounded-2xl buttons, high contrast."
+  },
+  "motion_and_interactions": {
+    "hover": "Scale up slightly (scale-105) or physical button press effect.",
+    "transitions": "transition-all duration-200 ease-out",
+    "page_load": "Staggered fade-in for product grids"
+  },
+  "icons_and_assets": {
+    "library": "lucide-react",
+    "style": "Stroke width 2.5 or 3 for a bolder, playful look",
+    "images": [
+      {
+        "category": "product_burger",
+        "url": "https://images.unsplash.com/photo-1602345730639-1c04eec20594?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwyfHxkZWxpY2lvdXMlMjBidXJnZXIlMjBmYXN0JTIwZm9vZHxlbnwwfHx8fDE3NzU0NzU0MjZ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Burger with lettuce and tomato"
+      },
+      {
+        "category": "product_drink",
+        "url": "https://images.unsplash.com/photo-1655279561970-77bac4e6296d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwyfHxmcmVzaCUyMGNhZmUlMjBjb2ZmZWUlMjBkcmlua3xlbnwwfHx8fDE3NzU0NzU0MjZ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Cafe coffee drink"
+      },
+      {
+        "category": "product_salad",
+        "url": "https://images.unsplash.com/photo-1711464805084-14be617f2a5e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwyfHxhcHBldGl6ZXIlMjBzYWxhZCUyMHBsYXRlfGVufDB8fHx8MTc3NTQ3NTQyNnww&ixlib=rb-4.1.0&q=85",
+        "description": "Salad plate"
+      }
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure text over primary buttons is white or very dark for APCA standards.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"checkout-button\"`)."
+  },
+  "instructions_to_main_agent": [
+    "Build a Multi-user POS and Admin Dashboard application.",
+    "Set the overall theme to LIGHT. Use a vibrant, colorful, and playful aesthetic suitable for a fast-paced environment (touch-friendly targets, rounded shapes).",
+    "Use 'Nunito' for headings and 'Figtree' for body text.",
+    "Layout should be dense but padded properly to ensure clear touch targets (Control Room Grid).",
+    "Implement tactile buttons (e.g., border-b-4 mimicking a real button) for key POS actions.",
+    "Do NOT use raw HTML selects or date inputs. Use Shadcn customized components.",
+    "Include 'data-testid' on ALL interactive elements.",
+    "The interface should have distinct areas: Left/Center for Product Grid, Right for Cart/Billing.",
+    "For the Admin area, use vibrant accents for KPIs (e.g., bright orange/blue cards on off-white backgrounds).",
+    "Use lucide-react icons heavily, with stroke-width: 2.5 or 3 for a chunkier, friendly feel."
+  ]
+}
