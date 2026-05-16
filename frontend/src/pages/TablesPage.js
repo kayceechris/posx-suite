@@ -97,7 +97,7 @@ function TransferModal({ entityId, isBarTab, currentOwnerId, onClose, onTransfer
 function tableStatus(entity, userId, isBarTab) {
   if (entity.status === "occupied") {
     const ownerKey = isBarTab ? "staff_id" : "waiter_id";
-    return entity[ownerKey] === userId ? "mine" : "occupied";
+    return String(entity[ownerKey]) === String(userId) ? "mine" : "occupied";
   }
   if (entity.status === "reserved") return "reserved";
   return "available";

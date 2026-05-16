@@ -55,11 +55,11 @@ export default function LoginPage() {
   const dots = Array.from({ length: 6 }).map((_, i) => ({ filled: i < pin.length }));
 
   return (
-    <div className="h-screen bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center p-3 overflow-hidden">
-      <div className="w-full max-w-sm h-full flex flex-col bg-white dark:bg-gray-800 rounded-3xl shadow-2xl px-6 py-6 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm flex flex-col bg-white dark:bg-gray-800 rounded-3xl shadow-2xl px-6 py-6">
 
         {/* Logo + Title */}
-        <div className="flex flex-col items-center justify-center flex-1">
+        <div className="flex flex-col items-center justify-center py-4">
           <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
             <Store size={30} className="text-white" />
           </div>
