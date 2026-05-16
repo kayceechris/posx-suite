@@ -2,6 +2,7 @@
 import { ChevronDown, Plus, Printer, Trash2, Check, X, Wifi, Usb, Globe, Bluetooth, Monitor, ExternalLink, Cpu } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
+import MobilePrinterScanner from "./MobilePrinterScanner";
 import { useAuth } from "../context/AuthContext";
 
 const TABS = ["Terminal", "Printers", "Display", "Peripherals"];
@@ -181,8 +182,14 @@ export default function TerminalSettingsModal({
     if (!isAdmin) return;
     setAddLoading(true);
     try {
-      const res = await api.getWindowsPrinters();
-      setWinPrinters(res.printers || []);
+      const bridgeUrl = localStorage.getItem("print_bridge_url") || "";
+      if (bridgeUrl) {
+        const res = await fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) });
+        const data = res.ok ? await res.json() : { printers: [] };
+        setWinPrinters(data.printers || []);
+      } else {
+        setWinPrinters([]);
+      }
     } catch {
       setWinPrinters([]);
     } finally {
@@ -400,6 +407,22 @@ export default function TerminalSettingsModal({
                         </select>
                       </div>
                     </div>
+
+                    {/* Mobile scanner — appears on tablet/phone only */}
+                    {printerForm.mode === "network" && (
+                      <MobilePrinterScanner
+                        mode="wifi"
+                        forceShow={isMobile}
+                        onSelectWifi={(ip) => { setPrinterForm((f) => ({ ...f, ip_address: ip })); setPingStatus(null); }}
+                      />
+                    )}
+                    {printerForm.mode === "bluetooth" && (
+                      <MobilePrinterScanner
+                        mode="bluetooth"
+                        forceShow={isMobile}
+                        onSelectBluetooth={(name) => setPrinterForm((f) => ({ ...f, name: f.name || name, windows_printer_name: name }))}
+                      />
+                    )}
 
                     {/* Network settings */}
                     {printerForm.mode === "network" && (

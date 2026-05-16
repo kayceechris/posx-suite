@@ -11,15 +11,15 @@ import { Wifi, Bluetooth, Loader2, AlertCircle } from "lucide-react";
  *   onSelectWifi(ip)      called when user picks a WiFi printer IP
  *   onSelectBluetooth(name) called when user pairs a BT device
  */
-export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSelectBluetooth }) {
+export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSelectBluetooth, forceShow = false }) {
   const [wifiScanning, setWifiScanning] = useState(false);
   const [wifiFound,    setWifiFound]    = useState([]);
   const [btScanning,   setBtScanning]   = useState(false);
   const [error,        setError]        = useState("");
 
-  const bridgeUrl   = localStorage.getItem("print_bridge_url") || "";
+  const bridgeUrl    = localStorage.getItem("print_bridge_url") || "";
   const hasBluetooth = typeof navigator !== "undefined" && !!navigator.bluetooth;
-  const isMobile     = typeof window !== "undefined" && window.innerWidth < 1024;
+  const isMobile     = forceShow || (typeof window !== "undefined" && window.innerWidth < 1024);
 
   const showWifi = isMobile && (mode === "wifi" || mode === "both") && !!bridgeUrl;
   const showBT   = isMobile && (mode === "bluetooth" || mode === "both") && hasBluetooth;
