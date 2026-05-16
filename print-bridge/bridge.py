@@ -8,11 +8,36 @@ POSx Suite Local Print Bridge
 """
 import json
 import socket
+import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 8765
 SECRET_TOKEN = "posx-bridge-2025"  # Change this in production!
+
+
+def _list_windows_printers():
+    """Return installed Windows printers via wmic."""
+    try:
+        result = subprocess.run(
+            ["wmic", "printer", "get", "Name,PortName"],
+            capture_output=True, text=True, timeout=8,
+        )
+        lines = [l.rstrip() for l in result.stdout.splitlines() if l.strip()]
+        if len(lines) < 2:
+            return []
+        header = lines[0]
+        name_col = header.index("Name")
+        port_col = header.index("PortName") if "PortName" in header else None
+        printers = []
+        for row in lines[1:]:
+            name = row[name_col:port_col].strip() if port_col else row[name_col:].strip()
+            port = row[port_col:].strip() if port_col else ""
+            if name:
+                printers.append({"name": name, "port": port})
+        return printers
+    except Exception:
+        return []
 
 
 class PrintBridgeHandler(BaseHTTPRequestHandler):
@@ -21,10 +46,12 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send_cors(200)
 
-    # ── Health check ──────────────────────────────────────────────────────────
+    # ── Health check / Printer list ───────────────────────────────────────────
     def do_GET(self):
         if self.path == "/health":
             self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.0"})
+        elif self.path == "/printers":
+            self._json(200, {"printers": _list_windows_printers()})
         else:
             self._json(404, {"error": "Not found"})
 
@@ -100,6 +127,7 @@ def main():
     print("=" * 50)
     print(f"  Listening on  : http://0.0.0.0:{PORT}")
     print(f"  Health check  : http://localhost:{PORT}/health")
+    print(f"  Printer list  : http://localhost:{PORT}/printers")
     print(f"  Print endpoint: http://localhost:{PORT}/print")
     print(f"  Auth token    : {SECRET_TOKEN}")
     print()

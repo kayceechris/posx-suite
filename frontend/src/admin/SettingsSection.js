@@ -1211,7 +1211,14 @@ function PrinterGroupsSettings() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getPrinterGroups(), api.getCategories(), api.getProducts(), api.getWindowsPrinters()])
+    const bridgeUrl = localStorage.getItem("print_bridge_url") || "";
+    const printersFetch = bridgeUrl
+      ? fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) })
+          .then((r) => (r.ok ? r.json() : { printers: [] }))
+          .catch(() => ({ printers: [] }))
+      : Promise.resolve({ printers: [] });
+
+    Promise.all([api.getPrinterGroups(), api.getCategories(), api.getProducts(), printersFetch])
       .then(([g, c, p, sys]) => {
         setGroups(g);
         setCategories(c);
@@ -1268,16 +1275,36 @@ function PrinterGroupsSettings() {
       </div>
       <div>
         <label className={LABEL}>Assigned Printer</label>
-        <select value={form.printer_id} onChange={(e) => setForm({ ...form, printer_id: e.target.value })} className={INPUT}>
-          <option value="">Not assigned</option>
-          {systemPrinters.map((p) => (
-            <option key={p.name} value={p.name}>{p.name}{p.port ? ` (${p.port})` : ""}</option>
-          ))}
-        </select>
-        {systemPrinters.length === 0 && (
-          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-            <AlertCircle size={12} /> No printers detected on this computer
-          </p>
+        {systemPrinters.length > 0 ? (
+          <select
+            value={form.printer_id}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                printer_id: val,
+                name: prev.name || val,
+              }));
+            }}
+            className={INPUT}
+          >
+            <option value="">Not assigned</option>
+            {systemPrinters.map((p) => (
+              <option key={p.name} value={p.name}>{p.name}{p.port ? ` (${p.port})` : ""}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              value={form.printer_id}
+              onChange={(e) => setForm({ ...form, printer_id: e.target.value })}
+              className={INPUT}
+              placeholder="Enter printer name (e.g. EPSON TM-T82II)"
+            />
+            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+              <AlertCircle size={12} /> Start Print Bridge to auto-detect printers, or type the name manually
+            </p>
+          </>
         )}
       </div>
       <div>
@@ -1403,7 +1430,14 @@ function LabelPrinterSettings() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getPrinters(), api.getOutlets(), api.getWindowsPrinters()])
+    const bridgeUrl = localStorage.getItem("print_bridge_url") || "";
+    const printersFetch = bridgeUrl
+      ? fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) })
+          .then((r) => (r.ok ? r.json() : { printers: [] }))
+          .catch(() => ({ printers: [] }))
+      : Promise.resolve({ printers: [] });
+
+    Promise.all([api.getPrinters(), api.getOutlets(), printersFetch])
       .then(([p, o, sys]) => { setPrinters(p); setOutlets(o); setSystemPrinters(sys?.printers || []); })
       .catch(console.error)
       .finally(() => setLoading(false));
