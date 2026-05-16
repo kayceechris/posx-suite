@@ -2,7 +2,7 @@
 import requests, json, sys
 
 import os
-BASE = os.getenv("TEST_BASE_URL", "https://marvellatech.com.ng/api") + "/api"
+BASE = os.getenv("TEST_BASE_URL", "https://posx-suite.vercel.app/api") + "/api"
 PASS = FAIL = WARN = 0
 
 def check(label, resp, expected_status, extra_check=None):

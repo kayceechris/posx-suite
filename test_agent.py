@@ -9,7 +9,7 @@ Usage:
     python test_agent.py
 
 Override target URL:
-    set TEST_BASE_URL=https://marvellatech.com.ng/api
+    set TEST_BASE_URL=https://posx-suite.vercel.app/api
     python test_agent.py
 """
 

@@ -1,5 +1,5 @@
 const BASE_URL =
-  process.env.REACT_APP_BACKEND_URL || "https://marvellatech.com.ng";
+  process.env.REACT_APP_BACKEND_URL || "https://posx-suite.vercel.app";
 
 function getToken() {
   return localStorage.getItem("posx_token");

@@ -70,7 +70,7 @@ if db.currencies.count_documents({}) == 0:
     print("✓ Currency created")
 
 client.close()
-print("\n✅ Done! Open https://marvellatech.com.ng — it should show the PIN login.")
+print("\n✅ Done! Open https://posx-suite.vercel.app — it should show the PIN login.")
 print("\nLogin PINs:")
 print("  Admin:   123456")
 print("  Manager: 9999")
