@@ -3,6 +3,7 @@ import { Plus, Trash2, Check, X, Pencil, ToggleLeft, ToggleRight, Printer, Alert
 import { api } from "../lib/api";
 import { useBusiness } from "../context/BusinessContext";
 import PrintBridgeSettings from "../components/PrintBridgeSettings";
+import MobilePrinterScanner from "../components/MobilePrinterScanner";
 
 const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500";
 const LABEL = "block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5";
@@ -1306,6 +1307,11 @@ function PrinterGroupsSettings() {
             </p>
           </>
         )}
+        <MobilePrinterScanner
+          mode="both"
+          onSelectWifi={(ip) => setForm((prev) => ({ ...prev, printer_id: ip, name: prev.name || ip }))}
+          onSelectBluetooth={(name) => setForm((prev) => ({ ...prev, printer_id: name, name: prev.name || name }))}
+        />
       </div>
       <div>
         <label className={LABEL}>Categories</label>
@@ -1537,6 +1543,18 @@ function LabelPrinterSettings() {
                 <option value="network">Network / IP</option>
                 <option value="bluetooth">Bluetooth</option>
               </select>
+              {form.connection === "network" && (
+                <MobilePrinterScanner
+                  mode="wifi"
+                  onSelectWifi={(ip) => setForm((prev) => ({ ...prev, name: prev.name || ip }))}
+                />
+              )}
+              {form.connection === "bluetooth" && (
+                <MobilePrinterScanner
+                  mode="bluetooth"
+                  onSelectBluetooth={(name) => setForm((prev) => ({ ...prev, name: prev.name || name }))}
+                />
+              )}
             </div>
             <div>
               <label className={LABEL}>Outlet</label>

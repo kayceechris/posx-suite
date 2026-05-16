@@ -10,10 +10,45 @@ import json
 import socket
 import subprocess
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 8765
 SECRET_TOKEN = "posx-bridge-2025"  # Change this in production!
+
+
+def _scan_network(port=9100, timeout=0.4):
+    """Scan the local /24 subnet for devices listening on port (thermal printers use 9100)."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        return []
+
+    subnet = ".".join(local_ip.split(".")[:3])
+    found = []
+    lock = threading.Lock()
+
+    def check(ip):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            if sock.connect_ex((ip, port)) == 0:
+                with lock:
+                    found.append(ip)
+            sock.close()
+        except Exception:
+            pass
+
+    threads = [threading.Thread(target=check, args=(f"{subnet}.{i}",), daemon=True) for i in range(1, 255)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=timeout + 1)
+
+    return sorted(found)
 
 
 def _list_windows_printers():
@@ -52,6 +87,11 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.0"})
         elif self.path == "/printers":
             self._json(200, {"printers": _list_windows_printers()})
+        elif self.path == "/scan":
+            print("  [scan] Scanning subnet for printers on port 9100...")
+            found = _scan_network()
+            print(f"  [scan] Found: {found}")
+            self._json(200, {"found": found})
         else:
             self._json(404, {"error": "Not found"})
 
@@ -128,6 +168,7 @@ def main():
     print(f"  Listening on  : http://0.0.0.0:{PORT}")
     print(f"  Health check  : http://localhost:{PORT}/health")
     print(f"  Printer list  : http://localhost:{PORT}/printers")
+    print(f"  Network scan  : http://localhost:{PORT}/scan")
     print(f"  Print endpoint: http://localhost:{PORT}/print")
     print(f"  Auth token    : {SECRET_TOKEN}")
     print()
