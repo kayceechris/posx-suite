@@ -50,7 +50,7 @@ const EXPANDABLE = {
     { id: "company", label: "Company" }, { id: "receipt", label: "Receipt & Bill" },
     { id: "currencies", label: "Currencies" }, { id: "payment-types", label: "Payment Types" },
     { id: "tax", label: "Tax" }, { id: "printer-groups", label: "Printer Groups" },
-    { id: "label-printer", label: "Label Printer" },
+    { id: "label-printer", label: "Label Printer" }, { id: "print-bridge", label: "Print Bridge" },
   ],
   accounts: [
     { id: "dashboard", label: "Dashboard" }, { id: "profit-loss", label: "Profit & Loss" },
