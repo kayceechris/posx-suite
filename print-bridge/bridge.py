@@ -17,6 +17,12 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+try:
+    import win32print
+    _HAS_WIN32PRINT = True
+except ImportError:
+    _HAS_WIN32PRINT = False
+
 PORT         = 8765
 SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
 
@@ -25,15 +31,34 @@ SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
 
 def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
     """Send raw ESC/POS bytes to a named Windows printer.
-    Tries two methods in order:
-      1. Windows spooler API via ctypes (clean, works with most drivers)
-      2. Direct port write via 'copy /b' (fallback for stubborn drivers)
+    Method 1: win32print (pywin32) — most reliable
+    Method 2: ctypes winspool — no extra packages needed
+    Method 3: copy /b to printer port — last resort
     """
-    import ctypes, tempfile, os
-
     last_error = ""
 
-    # ── Method 1: spooler API ────────────────────────────────────────────────
+    # ── Method 1: win32print (pywin32) ───────────────────────────────────────
+    if _HAS_WIN32PRINT:
+        try:
+            hPrinter = win32print.OpenPrinter(printer_name)
+            try:
+                hJob = win32print.StartDocPrinter(hPrinter, 1, ("Receipt", None, "RAW"))
+                try:
+                    win32print.StartPagePrinter(hPrinter)
+                    win32print.WritePrinter(hPrinter, raw_bytes)
+                    win32print.EndPagePrinter(hPrinter)
+                finally:
+                    win32print.EndDocPrinter(hPrinter)
+            finally:
+                win32print.ClosePrinter(hPrinter)
+            print(f"  [OK] win32print: {len(raw_bytes)} bytes -> '{printer_name}'")
+            return
+        except Exception as e:
+            last_error = f"win32print: {e}"
+            print(f"  [!] win32print failed: {e}")
+
+    # ── Method 2: ctypes winspool ────────────────────────────────────────────
+    import ctypes
     try:
         class DOC_INFO_1(ctypes.Structure):
             _fields_ = [
@@ -41,20 +66,16 @@ def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
                 ("pOutputFile", ctypes.c_wchar_p),
                 ("pDatatype",   ctypes.c_wchar_p),
             ]
-
         winspool = ctypes.WinDLL("winspool.drv", use_last_error=True)
         handle   = ctypes.c_void_p()
-
         ok = winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None)
         if not ok or not handle.value:
             raise OSError(f"OpenPrinter failed (code {ctypes.get_last_error()})")
-
         doc    = DOC_INFO_1("Receipt", None, "RAW")
         job_id = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc))
         if not job_id:
             winspool.ClosePrinter(handle)
             raise OSError(f"StartDocPrinter failed (code {ctypes.get_last_error()})")
-
         winspool.StartPagePrinter(handle)
         buf     = ctypes.create_string_buffer(raw_bytes, len(raw_bytes))
         written = ctypes.c_ulong(0)
@@ -62,16 +83,17 @@ def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
         winspool.EndPagePrinter(handle)
         winspool.EndDocPrinter(handle)
         winspool.ClosePrinter(handle)
-
         if ok and written.value > 0:
-            print(f"  [OK] Spooler: {written.value} bytes -> '{printer_name}'")
+            print(f"  [OK] ctypes: {written.value} bytes -> '{printer_name}'")
             return
-        last_error = f"WritePrinter wrote {written.value}/{len(raw_bytes)} bytes"
+        raise OSError(f"WritePrinter wrote {written.value}/{len(raw_bytes)} bytes")
     except Exception as e:
-        last_error = str(e)
-        print(f"  [!] Spooler method failed: {e}")
+        err2 = str(e)
+        last_error = (last_error + " | " if last_error else "") + f"ctypes: {err2}"
+        print(f"  [!] ctypes failed: {err2}")
 
-    # ── Method 2: direct port write via copy /b ──────────────────────────────
+    # ── Method 3: copy /b to printer port ────────────────────────────────────
+    import tempfile, os
     try:
         r = subprocess.run(
             ["wmic", "printer", "where", f"Name='{printer_name}'", "get", "PortName", "/value"],
@@ -82,10 +104,8 @@ def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
             if line.strip().upper().startswith("PORTNAME="):
                 port = line.strip().split("=", 1)[1].strip()
                 break
-
         if not port:
-            raise OSError(f"Could not find port for printer '{printer_name}'")
-
+            raise OSError("Port not found via wmic")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".prn", mode="wb") as f:
             f.write(raw_bytes)
             tmp = f.name
@@ -96,13 +116,13 @@ def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
             )
             if r.returncode != 0:
                 raise OSError(r.stderr.strip() or r.stdout.strip() or "copy /b failed")
-            print(f"  [OK] Port write: {len(raw_bytes)} bytes -> {port} ('{printer_name}')")
+            print(f"  [OK] copy/b: {len(raw_bytes)} bytes -> {port}")
             return
         finally:
             try: os.unlink(tmp)
             except Exception: pass
     except Exception as e:
-        raise OSError(f"Both print methods failed. Spooler: {last_error} | Port: {e}")
+        raise OSError(f"All methods failed — {last_error} | port: {e}")
 
 
 # ── Networking helpers ─────────────────────────────────────────────────────────
@@ -199,7 +219,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.3"})
+            self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.4", "win32print": _HAS_WIN32PRINT})
         elif self.path == "/printers":
             self._json(200, {"printers": _list_windows_printers()})
         elif self.path == "/scan":
