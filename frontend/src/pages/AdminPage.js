@@ -102,28 +102,28 @@ export default function AdminPage() {
       });
     } else {
       setExpandedSection(null);
-      if (window.innerWidth < 768) setSidebarOpen(false);
+      if (window.innerWidth < 1024) setSidebarOpen(false);
     }
   };
 
   const handleSubClick = (section, subId) => {
     setSubViews((prev) => ({ ...prev, [section]: subId }));
-    if (window.innerWidth < 768) setSidebarOpen(false);
+    if (window.innerWidth < 1024) setSidebarOpen(false);
   };
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
-      {/* Mobile-only backdrop */}
+      {/* Backdrop for mobile + tablet */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside className={cn(
         "fixed inset-y-0 left-0 w-60 bg-gray-900 dark:bg-gray-950 flex flex-col z-50 transition-transform duration-200",
-        "md:relative md:translate-x-0 md:z-30 md:flex-shrink-0",
+        "lg:relative lg:translate-x-0 lg:z-30 lg:flex-shrink-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
           <div className="px-5 py-5 border-b border-gray-800">
