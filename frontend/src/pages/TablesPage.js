@@ -183,7 +183,7 @@ export default function TablesPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [transferTarget, setTransferTarget] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [terminals, setTerminals] = useState([]);
   const [outlets, setOutlets] = useState([]);

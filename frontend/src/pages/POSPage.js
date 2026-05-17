@@ -287,7 +287,7 @@ export default function POSPage() {
   const [showPay, setShowPay] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [showTerminalModal, setShowTerminalModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });

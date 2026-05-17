@@ -201,7 +201,7 @@ export default function TablePOSPage() {
   const [showPay, setShowPay] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCart, setShowCart] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
