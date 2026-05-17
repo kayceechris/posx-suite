@@ -51,7 +51,7 @@ export default function TerminalSettingsModal({
   const [terminal, setTerminal] = useState(selectedTerminal);
   const [outlet, setOutlet] = useState(selectedOutlet);
 
-  // â”€â”€ Printers state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Printers state â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const [savedPrinters, setSavedPrinters]   = useState([]);
   const [winPrinters, setWinPrinters]       = useState([]);
   const [printerGroups, setPrinterGroups]   = useState([]);
@@ -59,11 +59,11 @@ export default function TerminalSettingsModal({
   const [showAdd, setShowAdd]               = useState(false);
   const [addLoading, setAddLoading]         = useState(false);
   const [saving, setSaving]                 = useState(false);
-  const [printerErr, setPrinterErr]         = useState(“”);
+  const [printerErr, setPrinterErr]         = useState("");
   const [printerForm, setPrinterForm]       = useState({
-    name: “”, windows_printer_name: “”, type: “receipt”,
-    mode: isMobile ? “network” : “usb”, outlet_id: outlets[0]?.id || “”,
-    ip_address: “”, port: “”, printer_group_ids: [],
+    name: "", windows_printer_name: "", type: "receipt",
+    mode: isMobile ? "network" : "usb", outlet_id: outlets[0]?.id || "",
+    ip_address: "", port: "", printer_group_ids: [],
   });
   const [pingStatus, setPingStatus] = useState(null); // null | "testing" | "ok" | "fail"
   const [pingError, setPingError]   = useState("");
@@ -301,7 +301,7 @@ export default function TerminalSettingsModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* â”€â”€ Terminal tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* â"€â"€ Terminal tab â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
           {tab === "terminal" && (
             <div className="border border-gray-200 dark:border-gray-700 rounded-2xl p-5 space-y-4">
               <div>
@@ -331,7 +331,7 @@ export default function TerminalSettingsModal({
             </div>
           )}
 
-          {/* â”€â”€ Printers tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* â"€â"€ Printers tab â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
           {tab === "printers" && (
             <div className="space-y-5">
               {/* Installed Printers */}
@@ -643,7 +643,7 @@ export default function TerminalSettingsModal({
             </div>
           )}
 
-          {/* â”€â”€ Display tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* â"€â"€ Display tab â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
           {tab === "display" && (
             <div className="space-y-4">
               {/* Customer-Facing Display toggle */}
@@ -736,7 +736,7 @@ export default function TerminalSettingsModal({
             </div>
           )}
 
-          {/* â”€â”€ Peripherals tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* â"€â"€ Peripherals tab â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
           {tab === "peripherals" && (
             <div className="space-y-4">
               {/* Add Peripheral modal */}
