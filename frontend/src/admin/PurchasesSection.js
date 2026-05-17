@@ -708,6 +708,7 @@ export default function PurchasesSection({ view = "pending" }) {
   if (view === "approved") {
     return (
       <OrdersView
+        key="approved"
         statusFilter={["approved", "received"]}
         title="Approved Orders"
         emptyMsg="No approved orders yet"
@@ -719,6 +720,7 @@ export default function PurchasesSection({ view = "pending" }) {
   if (view === "suppliers") return <SuppliersView />;
   return (
     <OrdersView
+      key="pending"
       statusFilter={["pending", "draft"]}
       title="Pending Orders"
       emptyMsg="No pending orders"

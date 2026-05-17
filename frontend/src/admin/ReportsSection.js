@@ -52,9 +52,9 @@ function DateFilter({ onApply }) {
 
 function StatCard({ label, value, color, bg }) {
   return (
-    <div className={cn("rounded-2xl p-6 shadow-sm", bg)}>
-      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{label}</p>
-      <p className={cn("text-3xl font-black", color)}>{value}</p>
+    <div className={cn("rounded-2xl p-4 shadow-sm", bg)}>
+      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 leading-tight">{label}</p>
+      <p className={cn("text-lg sm:text-2xl font-black break-all leading-tight", color)}>{value}</p>
     </div>
   );
 }
@@ -97,20 +97,19 @@ function SalesTab() {
               </div>
               <div className="px-6 py-4 space-y-3">
                 {data.daily_sales.map((d, i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 w-24 flex-shrink-0">{d.date}</span>
-                    <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-7 relative overflow-hidden">
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{d.date}</span>
+                    <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-5 relative">
                       <div
-                        className="h-full bg-green-500 rounded-full flex items-center justify-end pr-2 transition-all"
+                        className="h-full bg-green-500 rounded-full transition-all"
                         style={{ width: `${Math.max(((d.revenue || 0) / maxRevenue) * 100, 2)}%` }}
-                      >
-                        <span className="text-white text-xs font-bold whitespace-nowrap">
-                          {formatCurrency(d.revenue)}
-                        </span>
-                      </div>
+                      />
                     </div>
-                    <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0">
-                      {d.orders} order{d.orders !== 1 ? "s" : ""}
+                    <span className="text-xs font-bold text-green-600 dark:text-green-400 w-28 text-right flex-shrink-0 whitespace-nowrap">
+                      {formatCurrency(d.revenue)}
+                    </span>
+                    <span className="text-xs text-gray-400 w-12 text-right flex-shrink-0">
+                      {d.orders}×
                     </span>
                   </div>
                 ))}
