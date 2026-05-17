@@ -81,9 +81,10 @@ function CompanySettings() {
     }
   }, [settings]);
 
-  const handleLogoChange = (e) => {
+  const handleLogoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    e.target.value = "";
     setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
   };
@@ -93,13 +94,13 @@ function CompanySettings() {
     try {
       let payload = { ...form };
       if (logoFile) {
-        const fd = new FormData();
-        fd.append("file", logoFile);
         try {
-          const res = await fetch("/api/upload", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }, body: fd });
-          const data = await res.json();
-          if (data.url) payload.logo_url = data.url;
-        } catch {}
+          const result = await api.uploadImage(logoFile);
+          payload.logo_url = result.url;
+        } catch (uploadErr) {
+          setError("Logo upload failed: " + uploadErr.message);
+          return;
+        }
       }
       await api.updateSettings(payload);
       await refreshSettings();
@@ -160,7 +161,6 @@ function CompanySettings() {
               </div>
               {logoPreview && (
                 <div className="mt-2">
-                  <input value={logoPreview} readOnly className={`${INPUT} text-xs text-gray-400 mb-2`} />
                   <img src={logoPreview} alt="Logo" className="h-20 object-contain border-2 border-gray-300 dark:border-gray-700 rounded-xl p-2" />
                 </div>
               )}

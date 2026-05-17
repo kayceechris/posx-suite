@@ -321,9 +321,31 @@ const EMPTY_FORM = {
   name: "", category_id: "", brand_id: "", unit_id: "",
   outlet_id: "", terminal_id: "",
   cost_price: "", markup_percentage: "", price: "",
-  barcode: "", image: "", imageUrl: "", description: "",
+  barcode: "", image: "", description: "",
   active: true, terminal_prices: [],
 };
+
+function resizeImageFile(file, maxPx = 800, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        if (width >= height) { height = Math.round(height * maxPx / width); width = maxPx; }
+        else { width = Math.round(width * maxPx / height); height = maxPx; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
 
 function ProductModal({ mode, product, categories, brands, units, outlets, terminals, onClose, onSaved }) {
   const [form, setForm] = useState(() => {
@@ -340,7 +362,6 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
         price: product.price ?? "",
         barcode: product.barcode || "",
         image: product.image || "",
-        imageUrl: product.image || "",
         description: product.description || "",
         active: product.active !== false,
         terminal_prices: product.terminal_prices || [],
@@ -379,23 +400,18 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
     setUploading(true);
     try {
-      const result = await api.uploadImage(file);
+      const resized = await resizeImageFile(file);
+      const result = await api.uploadImage(resized);
       f("image", result.url);
       setImagePreview(result.fullUrl);
-      f("imageUrl", result.url);
     } catch (err) {
       setError("Image upload failed: " + err.message);
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleImageUrlChange = (val) => {
-    f("imageUrl", val);
-    f("image", val);
-    setImagePreview(val || null);
   };
 
   // Terminal prices helpers
@@ -568,20 +584,18 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
           <label className={label}>Product Image</label>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm hover:border-gray-300 transition-colors flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <Upload size={14} /> {uploading ? "Uploading…" : "Choose File"}
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm hover:border-gray-300 transition-colors flex items-center gap-2 text-gray-600 dark:text-gray-300 disabled:opacity-50">
+                <Upload size={14} /> {uploading ? "Uploading…" : "Upload Image"}
               </button>
-              <span className="text-sm text-gray-400">{uploading ? "Uploading…" : "No file chosen"}</span>
+              {uploading && <span className="text-sm text-gray-400">Compressing &amp; uploading…</span>}
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             </div>
-            <input value={form.imageUrl} onChange={(e) => handleImageUrlChange(e.target.value)}
-              className={input} placeholder="Or paste image URL" />
             {imagePreview && (
               <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-gray-300 dark:border-gray-700">
                 <img src={imagePreview} alt="preview" className="w-full h-full object-cover"
                   onError={() => setImagePreview(null)} />
-                <button type="button" onClick={() => { setImagePreview(null); f("image", ""); f("imageUrl", ""); }}
+                <button type="button" onClick={() => { setImagePreview(null); f("image", ""); }}
                   className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70">
                   <X size={10} />
                 </button>
