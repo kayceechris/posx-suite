@@ -298,7 +298,9 @@ export default function TablePOSPage() {
     setCart((prev) => prev.filter((i) => i.product_id !== productId));
 
   const subtotal = cart.reduce((s, i) => s + i.total, 0);
-  const total = subtotal;
+  const taxRate = parseFloat(settings?.tax_rate || 0);
+  const tax = settings?.tax_enabled ? subtotal * taxRate / 100 : 0;
+  const total = subtotal + tax;
 
   const filtered = products.filter((p) => {
     const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
@@ -317,7 +319,7 @@ export default function TablePOSPage() {
     customer_name: customerName.trim() || null,
     items: cart,
     subtotal,
-    tax: 0,
+    tax,
     discount: 0,
     total,
     payment_method: paymentMethod,
@@ -349,7 +351,7 @@ export default function TablePOSPage() {
       cashier: user?.name || "",
       items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
       subtotal,
-      taxAmount: total - subtotal,
+      taxAmount: tax,
       discount: 0,
       total,
       docType: "BILL",
@@ -371,7 +373,7 @@ export default function TablePOSPage() {
       cashier: user?.name || "",
       items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
       subtotal,
-      taxAmount: total - subtotal,
+      taxAmount: tax,
       discount: 0,
       total,
       paymentMethod: method,
