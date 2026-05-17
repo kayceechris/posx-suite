@@ -52,7 +52,7 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
       if (e.name === "AbortError") {
         setError("Scan timed out — check bridge.py is running");
       } else if (!e.message || e.message === "Failed to fetch" || e.message.includes("fetch")) {
-        setError("Cannot reach bridge — verify bridge.py is running on your PC and the URL is correct");
+        setError("Cannot reach bridge. Check: (1) bridge.py is running, (2) Windows Firewall allows port 8765, (3) phone is on the same Wi-Fi, (4) use https:// URL if app is on HTTPS");
       } else {
         setError(e.message);
       }
