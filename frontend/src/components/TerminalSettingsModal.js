@@ -246,7 +246,26 @@ export default function TerminalSettingsModal({
   const handleTestPrint = async (printer) => {
     setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "loading", msg: "" } }));
     try {
-      await api.testPrint(printer.id);
+      if (printer.mode === "usb") {
+        const bridgeUrl = (localStorage.getItem("print_bridge_url") || "").trim();
+        if (!bridgeUrl) {
+          throw new Error("Set a Bridge URL in printer settings to test USB printers");
+        }
+        const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
+        const printerName = (printer.windows_printer_name || printer.name || "").trim();
+        const res = await fetch(`${bridgeUrl}/test-usb`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
+          body: JSON.stringify({ printer_name: printerName }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Bridge error ${res.status}`);
+        }
+      } else {
+        await api.testPrint(printer.id);
+      }
       setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "ok", msg: "Printed!" } }));
       setTimeout(() => setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "idle", msg: "" } })), 3000);
     } catch (err) {

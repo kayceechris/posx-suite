@@ -127,7 +127,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path != "/print":
+        if self.path not in ("/print", "/test-usb"):
             self._json(404, {"error": "Not found"})
             return
         token = self.headers.get("X-Bridge-Token", "")
@@ -140,6 +140,28 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
         except Exception:
             self._json(400, {"error": "Invalid JSON"})
             return
+
+        if self.path == "/test-usb":
+            printer_name = body.get("printer_name", "").strip()
+            if not printer_name:
+                self._json(400, {"error": "Missing 'printer_name'"})
+                return
+            try:
+                r = subprocess.run(
+                    ["wmic", "printer", "where", f'Name="{printer_name}"', "call", "PrintTestPage"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                ok = r.returncode == 0 or "ReturnValue = 0" in r.stdout
+                if ok:
+                    print(f"  [OK] USB test page sent to '{printer_name}'")
+                    self._json(200, {"ok": True})
+                else:
+                    err = (r.stderr or r.stdout).strip() or "Printer not found or unavailable"
+                    self._json(502, {"error": err})
+            except Exception as e:
+                self._json(500, {"error": str(e)})
+            return
+
         printer_ip   = body.get("ip", "")
         printer_port = int(body.get("port", 9100))
         data         = body.get("data", [])
