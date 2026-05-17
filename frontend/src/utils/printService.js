@@ -97,7 +97,6 @@ function buildReceiptBytes(data) {
   } = data;
 
   // Resolve layout toggles (default true for most)
-  console.log('[PrintService] layoutSettings received:', JSON.stringify(layoutSettings));
   const S = layoutSettings;
   const showStoreName = S.show_store_name !== false;
   const showAddress   = S.show_address   !== false;
@@ -109,13 +108,27 @@ function buildReceiptBytes(data) {
   const showTax       = S.show_tax       !== false;
   const showDiscount  = S.show_discount  !== false;
   const showNote      = S.show_note      !== false;
+  const showPaid      = S.show_paid      !== false;
+  const showDue       = S.show_due       !== false;
   const printedFooter = S.receipt_footer || footer;
   const printedHeader = S.receipt_header || "";
   const noteText      = S.note_to_customer || "";
 
+  // Paper width: 80mm → 42 chars, 58mm → 32 chars
+  const PW = S.paper_size === "80mm" ? 42 : 32;
+  const COL_NAME  = PW === 42 ? 22 : 16;
+  const COL_QTY   = PW === 42 ? 4  : 3;
+  const COL_PRICE = PW === 42 ? 12 : 9;
+
   const b = [];
   const add = (...bytes) => b.push(...bytes);
   const line = (text) => { b.push(...enc(text)); b.push(0x0a); };
+  // pad a value to fill a line: label left, value right
+  const tl = (lbl, val) => {
+    const v = typeof val === 'string' ? val : fmtCurrency(val);
+    const sp = Math.max(1, PW - lbl.length - v.length);
+    return lbl + ' '.repeat(sp) + v;
+  };
 
   add(...CMD.INIT);
   if (openDrawer) add(...CMD.OPEN_DRAWER);
@@ -129,13 +142,13 @@ function buildReceiptBytes(data) {
   if (showAddress && address) { add(...CMD.ALIGN_CENTER); line(address); }
   if (showPhone   && phone)   { add(...CMD.ALIGN_CENTER); line(`Tel: ${phone}`); }
   if (printedHeader)          { add(...CMD.ALIGN_CENTER); line(printedHeader); }
-  line(divider("="));
+  line(divider("=", PW));
 
   // Document type label
   add(...CMD.ALIGN_CENTER, ...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
   line(docType);
   add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
-  line(divider());
+  line(divider("-", PW));
 
   // Order info
   add(...CMD.ALIGN_LEFT);
@@ -143,40 +156,32 @@ function buildReceiptBytes(data) {
   if (showReference && orderNo)   line(`Order  : ${orderNo}`);
   if (showSeller    && cashier)   line(`Cashier: ${cashier}`);
   if (showDate)                   line(`Date   : ${new Date().toLocaleString()}`);
-  line(divider());
+  line(divider("-", PW));
 
-  // Items — 16 + 1 + 3 + 1 + 9 = 30 chars (fits 32-char 58 mm paper)
+  // Items
   add(...CMD.ALIGN_LEFT);
-  line(`${"ITEM".padEnd(16)} ${"QTY".padEnd(3)} ${"PRICE".padStart(9)}`);
-  line(divider());
+  line(`${"ITEM".padEnd(COL_NAME)} ${"QTY".padEnd(COL_QTY)} ${"PRICE".padStart(COL_PRICE)}`);
+  line(divider("-", PW));
   for (const item of items) {
-    const name  = pad(item.name, 16);
-    const qty   = pad(`x${item.quantity}`, 3);
-    const price = rpad(fmtCurrency((item.price || 0) * (item.quantity || 1)), 9);
+    const name  = pad(item.name, COL_NAME);
+    const qty   = pad(`x${item.quantity}`, COL_QTY);
+    const price = rpad(fmtCurrency((item.price || 0) * (item.quantity || 1)), COL_PRICE);
     line(`${name} ${qty} ${price}`);
     if (item.note) line(`  * ${item.note}`);
   }
 
-  // Totals — left-align + manual padding so values always sit flush at col 32
-  line(divider());
+  // Totals
+  line(divider("-", PW));
   add(...CMD.ALIGN_LEFT);
-  const LW = 32;
-  const tl = (lbl, val) => {
-    const v = typeof val === 'string' ? val : fmtCurrency(val);
-    const sp = Math.max(1, LW - lbl.length - v.length);
-    return lbl + ' '.repeat(sp) + v;
-  };
   line(tl("Subtotal", subtotal));
   if (showDiscount && discount > 0)  line(tl("Discount", `-${fmtCurrency(discount)}`));
   if (showTax      && taxAmount > 0) line(tl("Tax", taxAmount));
   add(...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
   line(tl("TOTAL", total));
   add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
-  if (amountPaid > 0) {
-    line(tl("Paid", amountPaid));
-    line(tl("Change", change));
-  }
-  if (paymentMethod) line(tl("Method", paymentMethod.toUpperCase()));
+  if (amountPaid > 0 && showPaid) line(tl("Paid", amountPaid));
+  if (amountPaid > 0 && showDue)  line(tl("Change", change));
+  if (paymentMethod)               line(tl("Method", paymentMethod.toUpperCase()));
 
   // Note to customer
   if (showNote && noteText) {
