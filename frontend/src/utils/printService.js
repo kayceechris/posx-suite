@@ -305,31 +305,34 @@ export const printService = {
 
     // Try USB printers via bridge /print-usb
     try {
-      const printers = await api.getAssignedPrinters();
+      // Use cached list (set when Printers tab is opened); fall back to API
+      let printers = [];
+      try {
+        const cached = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+        printers = cached.length ? cached : await api.getAssignedPrinters();
+      } catch (_) {
+        printers = await api.getAssignedPrinters();
+      }
+
       const usbPrinter = printers.find((p) => p.mode === "usb" && p.type === type);
       if (usbPrinter) {
         const effectiveBridgeUrl = bridgeUrl || "http://localhost:8765";
         const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
         if (printerName) {
-          console.info("[PrintService] Sending to USB printer:", printerName, "via", effectiveBridgeUrl);
           const res = await fetch(`${effectiveBridgeUrl}/print-usb`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
             body: JSON.stringify({ printer_name: printerName, data: bytes }),
             signal: AbortSignal.timeout(15000),
           });
-          if (res.ok) {
-            console.info("[PrintService] USB print OK");
-            return { success: true, method: "usb" };
-          }
+          if (res.ok) return { success: true, method: "usb" };
           const errData = await res.json().catch(() => ({}));
-          const msg = errData.error || `Bridge error ${res.status}`;
-          throw new Error(`USB print failed: ${msg}`);
+          throw new Error(`USB print failed: ${errData.error || `Bridge error ${res.status}`}`);
         }
       }
     } catch (err) {
       if (err.message.startsWith("USB print failed:")) throw err;
-      console.warn("[PrintService] USB lookup failed:", err.message);
+      console.warn("[PrintService] USB print skipped:", err.message);
     }
 
     // Try network printer via bridge /print

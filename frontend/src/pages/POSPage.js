@@ -313,18 +313,22 @@ export default function POSPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [prods, cats, terms, outs, ptypes] = await Promise.all([
+        const [prods, cats, terms, outs, ptypes, assignedPrinters] = await Promise.all([
           api.getProducts(),
           api.getCategories(),
           api.getTerminals(),
           api.getOutlets(),
           api.getPaymentTypes().catch(() => []),
+          api.getAssignedPrinters().catch(() => []),
         ]);
         setProducts(prods.filter((p) => p.active !== false));
         setCategories(cats);
         setTerminals(terms);
         setOutlets(outs);
         setPaymentTypes(ptypes);
+        if (assignedPrinters.length) {
+          localStorage.setItem("pos_saved_printers", JSON.stringify(assignedPrinters));
+        }
       } catch {
         showToast("Failed to load data", "error");
       } finally {
