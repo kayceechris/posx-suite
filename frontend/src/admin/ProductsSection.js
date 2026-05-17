@@ -1220,7 +1220,7 @@ function PrintLabelsView() {
         }
       />
 
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Product list */}
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100 dark:border-gray-700">
@@ -1257,7 +1257,7 @@ function PrintLabelsView() {
         </div>
 
         {/* Settings panel */}
-        <div className="w-72 flex-shrink-0 space-y-4">
+        <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-5">
             <h3 className="font-bold text-gray-900 dark:text-white mb-4">Label Settings</h3>
             <div className="space-y-4">

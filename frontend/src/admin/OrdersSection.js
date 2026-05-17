@@ -59,26 +59,28 @@ function OrderDetailModal({ order, outlets, terminals, onClose, onVoid, onDelete
 
           {/* Items table */}
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
                   <th className="text-left px-4 py-2.5">Item</th>
-                  <th className="text-center px-4 py-2.5">Qty</th>
-                  <th className="text-right px-4 py-2.5">Unit Price</th>
-                  <th className="text-right px-4 py-2.5">Total</th>
+                  <th className="text-center px-3 py-2.5 w-10">Qty</th>
+                  <th className="text-right px-3 py-2.5 whitespace-nowrap">Unit Price</th>
+                  <th className="text-right px-4 py-2.5 whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {(order.items || []).map((item, i) => (
                   <tr key={i}>
                     <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{item.product_name}</td>
-                    <td className="px-4 py-2.5 text-center text-gray-600 dark:text-gray-300">{item.quantity}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">{formatCurrency(item.price)}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-green-600">{formatCurrency(item.total)}</td>
+                    <td className="px-3 py-2.5 text-center text-gray-600 dark:text-gray-300">{item.quantity}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-300 whitespace-nowrap">{formatCurrency(item.price)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-green-600 whitespace-nowrap">{formatCurrency(item.total)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
             <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 space-y-1 text-sm">
               {order.discount > 0 && (
                 <div className="flex justify-between text-gray-500 dark:text-gray-400">
