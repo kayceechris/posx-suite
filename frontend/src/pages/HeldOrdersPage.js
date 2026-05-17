@@ -368,7 +368,13 @@ export default function HeldOrdersPage() {
   };
 
   const handleLoad = (order) => {
-    navigate("/pos", { state: { loadOrder: order } });
+    if (order.table_id) {
+      navigate(`/table/${order.table_id}`);
+    } else if (order.bar_tab_id) {
+      navigate(`/bar-tab/${order.bar_tab_id}`);
+    } else {
+      navigate("/pos", { state: { loadOrder: order } });
+    }
   };
 
   const displayedOrders = hasTableAndBarSupport

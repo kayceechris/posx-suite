@@ -189,6 +189,7 @@ class Order(BaseModel):
     terminal_id: Optional[str] = None
     table_id: Optional[str] = None
     table_number: Optional[str] = None
+    bar_tab_id: Optional[str] = None
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     items: List[OrderItem]
@@ -210,6 +211,7 @@ class OrderCreate(BaseModel):
     terminal_id: Optional[str] = None
     table_id: Optional[str] = None
     table_number: Optional[str] = None
+    bar_tab_id: Optional[str] = None
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     items: List[OrderItem]

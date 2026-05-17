@@ -313,6 +313,7 @@ export default function TablePOSPage() {
     terminal_id: selectedTerminal || null,
     table_id: isBarTab ? null : entityId,
     table_number: isBarTab ? null : entity?.number,
+    bar_tab_id: isBarTab ? entityId : null,
     customer_name: customerName.trim() || null,
     items: cart,
     subtotal,
@@ -321,7 +322,7 @@ export default function TablePOSPage() {
     total,
     payment_method: paymentMethod,
     status,
-    service_mode: "table_service",
+    service_mode: isBarTab ? "bar_tab" : "table_service",
   });
 
   const hasWaiterModule = !settings?.service_mode || settings.service_mode !== "quick_service";
