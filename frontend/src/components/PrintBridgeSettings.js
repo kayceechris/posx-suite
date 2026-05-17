@@ -58,7 +58,7 @@ export default function PrintBridgeSettings({ onClose }) {
         <p>3. Add printers in Terminal Settings → Printers tab</p>
         <div className="mt-1 pt-2 border-t border-blue-200 dark:border-blue-700 space-y-1">
           <p className="font-bold text-green-700 dark:text-green-400">Using this app on the same PC as the bridge?</p>
-          <p>Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">http://localhost:8765</code> as the Bridge URL — no certificate needed.</p>
+          <p>Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">https://localhost:8765</code> as the Bridge URL.</p>
           <p className="text-blue-500 dark:text-blue-400">Use the IP address (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://192.168.1.10:8765</code>) only when connecting from a tablet or different device.</p>
         </div>
       </div>
