@@ -51,13 +51,16 @@ export default function PrintBridgeSettings({ onClose }) {
       </div>
 
       {/* How it works */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1">
-        <p className="font-bold mb-1">How to set up:</p>
-        <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC (click <strong>Yes</strong> on the UAC prompt — this installs the certificate)</p>
-        <p>2. Note the IP shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://192.168.1.10:8765</code>)</p>
-        <p>3. Enter the bridge URL below, click Save, then Test Bridge</p>
-        <p>4. Add printers in Terminal Settings → Printers tab</p>
-        <p className="text-blue-600 dark:text-blue-400 font-semibold pt-1">If Test Bridge still fails after step 1–3, restart Chrome completely and try again.</p>
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-2">
+        <p className="font-bold">How to set up:</p>
+        <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC — click <strong>Yes</strong> on the UAC prompt to trust the certificate</p>
+        <p>2. Enter the bridge URL below, click <strong>Save Settings</strong>, then <strong>Test Bridge</strong></p>
+        <p>3. Add printers in Terminal Settings → Printers tab</p>
+        <div className="mt-1 pt-2 border-t border-blue-200 dark:border-blue-700 space-y-1">
+          <p className="font-bold text-green-700 dark:text-green-400">Using this app on the same PC as the bridge?</p>
+          <p>Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">http://localhost:8765</code> as the Bridge URL — no certificate needed.</p>
+          <p className="text-blue-500 dark:text-blue-400">Use the IP address (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://192.168.1.10:8765</code>) only when connecting from a tablet or different device.</p>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -87,21 +90,12 @@ export default function PrintBridgeSettings({ onClose }) {
 
       {/* HTTPS cert hint shown whenever URL is https and not yet confirmed working */}
       {isHttps && status !== "ok" && (
-        <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300">
-          <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" />
-          <span>
-            <strong>Required one-time step:</strong> Open{" "}
-            <a
-              href={`${bridgeUrl.trim().replace(/\/+$/, "")}/health`}
-              target="_blank"
-              rel="noreferrer"
-              className="underline font-semibold hover:text-amber-600"
-            >
-              {bridgeUrl.trim().replace(/\/+$/, "")}/health
-            </a>{" "}
-            in this browser and click <strong>Advanced → Proceed</strong> to accept the self-signed certificate.
-            Then click Test Bridge.
-          </span>
+        <div className="px-4 py-3 rounded-xl text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 space-y-1.5">
+          <div className="flex items-start gap-2">
+            <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" />
+            <span><strong>HTTPS certificate required.</strong> If the app is running on the same PC as the bridge, switch to <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded font-bold">http://localhost:8765</code> — no certificate needed.</span>
+          </div>
+          <p>If using a tablet or remote device: run <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">start.bat</code> on the bridge PC and click <strong>Yes</strong> on the UAC prompt to trust the certificate, then fully restart Chrome.</p>
         </div>
       )}
 
