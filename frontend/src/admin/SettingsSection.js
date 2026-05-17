@@ -327,7 +327,8 @@ const DEMO = {
   due:      0,
   sym:      "$",
 };
-const fmt = (n) => { const v = Number(n); return `${DEMO.sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
+const fmt      = (n) => { const v = Number(n); return `${DEMO.sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
+const fmtTotal = (n) => `${DEMO.sym}${Number(n).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // --- Layout 1  - Standard ---
 function PreviewStandard({ rs, logoPx, logoUrl }) {
@@ -362,7 +363,7 @@ function PreviewStandard({ rs, logoPx, logoUrl }) {
       {rs.show_shipping && <Row label="Shipping" val={fmt(DEMO.shipping)} />}
       {rs.show_tax && <Row label="Tax (7.5%)" val={fmt(DEMO.tax)} />}
       <div className="flex justify-between font-bold border-t border-gray-500 pt-0.5 mt-0.5">
-        <span>TOTAL</span><span>{fmt(DEMO.total)}</span>
+        <span>TOTAL</span><span>{fmtTotal(DEMO.total)}</span>
       </div>
       {rs.show_paid && <Row label="Cash" val={fmt(DEMO.paid)} cls="text-green-600" />}
       {rs.show_due && <Row label="Change" val={fmt(DEMO.due)} />}
@@ -407,7 +408,7 @@ function PreviewCompact({ rs, logoPx, logoUrl }) {
       {rs.show_discount && <Row label="Disc." val={`-${fmt(DEMO.discount)}`} cls="text-red-400 text-[9px]" />}
       {rs.show_tax && <Row label="Tax" val={fmt(DEMO.tax)} cls="text-[9px]" />}
       <div className="flex justify-between font-bold border-t border-gray-400 pt-0.5 mt-0.5">
-        <span>TOTAL</span><span>{fmt(DEMO.total)}</span>
+        <span>TOTAL</span><span>{fmtTotal(DEMO.total)}</span>
       </div>
       {rs.show_paid && <Row label="Cash" val={fmt(DEMO.paid)} cls="text-green-600 text-[9px]" />}
       {rs.show_payments_table && <Row label="Payment" val="Cash" cls="text-[8px] text-gray-400" />}
@@ -462,7 +463,7 @@ function PreviewDetailed({ rs, logoPx, logoUrl, tab }) {
       {rs.show_shipping && <Row label="Shipping" val={fmt(DEMO.shipping)} />}
       {rs.show_tax && <Row label="VAT (7.5%)" val={fmt(DEMO.tax)} cls="text-gray-500 dark:text-gray-400" />}
       <div className="flex justify-between font-bold text-[11px] border-t-2 border-gray-600 pt-0.5 mt-0.5">
-        <span>TOTAL</span><span>{fmt(DEMO.total)}</span>
+        <span>TOTAL</span><span>{fmtTotal(DEMO.total)}</span>
       </div>
       {rs.show_payments_table && (
         <><HR />
@@ -519,7 +520,7 @@ function PreviewBilingual({ rs, logoPx, logoUrl }) {
       {rs.show_discount && <BiRow en="Discount" ar={AR.discount} val={`-${fmt(DEMO.discount)}`} cls="text-red-500" />}
       {rs.show_tax && <BiRow en="Tax" ar={AR.tax} val={fmt(DEMO.tax)} />}
       <div className="flex justify-between font-bold border-t-2 border-gray-600 pt-0.5 mt-0.5">
-        <span>TOTAL</span><span>{fmt(DEMO.total)}</span><span dir="rtl" className="text-gray-500 dark:text-gray-400 font-normal">{AR.total}</span>
+        <span>TOTAL</span><span>{fmtTotal(DEMO.total)}</span><span dir="rtl" className="text-gray-500 dark:text-gray-400 font-normal">{AR.total}</span>
       </div>
       {rs.show_paid && <BiRow en="Paid" ar={AR.paid} val={fmt(DEMO.paid)} cls="text-green-600" />}
       {rs.show_due && <BiRow en="Change" ar={AR.change} val={fmt(DEMO.due)} />}
@@ -633,7 +634,8 @@ function ReceiptBillSettings() {
     const phone    = settings?.phone         || DEMO.phone;
     const logoUrl  = settings?.logo_url      || null;
     const sym      = localStorage.getItem("pos_currency_symbol") || "$";
-    const f = (n) => { const v = Number(n); return `${sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
+    const f      = (n) => { const v = Number(n); return `${sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
+    const fTotal = (n) => `${sym}${Number(n).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const rows = DEMO.items.map(it =>
       `<tr><td>${it.name}</td><td style="text-align:center;padding:0 8px">${it.qty}</td><td style="text-align:right;padding:0 8px">${f(it.price)}</td><td style="text-align:right">${f(it.total)}</td></tr>`
     ).join("");
@@ -668,7 +670,7 @@ ${data.show_customer  ? `<div class="row"><span class="g">Customer</span><span>$
 ${data.show_discount ? `<div class="row" style="color:#c00"><span>Discount</span><span>-${f(DEMO.discount)}</span></div>` : ""}
 ${data.show_shipping ? `<div class="row g"><span>Shipping</span><span>${f(DEMO.shipping)}</span></div>` : ""}
 ${data.show_tax      ? `<div class="row g"><span>Tax (7.5%)</span><span>${f(DEMO.tax)}</span></div>` : ""}
-<hr class="s"><div class="row b" style="font-size:15px"><span>TOTAL</span><span>${f(DEMO.total)}</span></div>
+<hr class="s"><div class="row b" style="font-size:15px"><span>TOTAL</span><span>${fTotal(DEMO.total)}</span></div>
 ${data.show_paid  ? `<div class="row" style="color:#090"><span>Paid</span><span>${f(DEMO.paid)}</span></div>` : ""}
 ${data.show_due   ? `<div class="row g"><span>Change</span><span>${f(DEMO.due)}</span></div>` : ""}
 ${data.show_note && data.note_to_customer ? `<hr><p class="c" style="font-style:italic">${esc(data.note_to_customer)}</p>` : ""}
