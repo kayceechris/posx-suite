@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Lock, Store } from "lucide-react";
+import { Lock, Store, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
+import { useTheme } from "../context/ThemeContext";
 
 const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "←"];
 
 export default function LoginPage() {
   const { login } = useAuth();
   const { settings } = useBusiness();
+  const { theme, toggleTheme } = useTheme();
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +57,15 @@ export default function LoginPage() {
   const dots = Array.from({ length: 6 }).map((_, i) => ({ filled: i < pin.length }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center p-4 relative">
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+      >
+        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
       <div className="w-full max-w-sm flex flex-col bg-white dark:bg-gray-800 rounded-3xl shadow-2xl px-6 py-6">
 
         {/* Logo + Title */}
