@@ -9,6 +9,7 @@ import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import { printService } from "../utils/printService";
 
 const DEFAULT_METHODS = [
   { name: "cash", label: "Cash", emoji: "💵" },
@@ -93,64 +94,33 @@ function PaymentModal({ order, onClose, onConfirm }) {
   );
 }
 
-function printOrderBill(order, settings) {
-  const bizName = settings?.business_name || "Restaurant";
-  const currency = settings?.currency_symbol || "$";
-  const now = new Date();
-  const dateStr = now.toLocaleDateString();
-  const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  const rows = (order.items || []).map((item) => `
-    <tr>
-      <td style="padding:2px 0">${item.product_name || item.name || ""}</td>
-      <td style="padding:2px 0;text-align:center">${item.quantity || item.qty || 0}</td>
-      <td style="padding:2px 0;text-align:right">${currency}${(item.total || 0).toFixed(2)}</td>
-    </tr>`).join("");
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill - ${bizName}</title>
-<style>
-  body{font-family:monospace;font-size:12px;margin:0;padding:12px;width:280px}
-  h2{text-align:center;margin:0 0 4px;font-size:14px}
-  .doc-type{text-align:center;font-size:13px;font-weight:bold;letter-spacing:3px;margin:4px 0 2px}
-  p{margin:2px 0;text-align:center;font-size:11px}
-  table{width:100%;border-collapse:collapse;margin:8px 0}
-  th{text-align:left;font-size:11px;border-bottom:1px solid #000;padding-bottom:3px}
-  .divider{border-top:1px dashed #000;margin:6px 0}
-  .total{font-weight:bold;font-size:13px}
-  td{vertical-align:top}
-</style></head><body>
-<h2>${bizName}</h2>
-<p class="doc-type">*** BILL ***</p>
-<p>${dateStr} ${timeStr}</p>
-${order.table_number ? `<p>Table: ${order.table_number}</p>` : ""}
-${order.customer_name ? `<p>Customer: ${order.customer_name}</p>` : ""}
-<p>${order.order_number}</p>
-<div class="divider"></div>
-<table>
-  <thead><tr>
-    <th style="text-align:left">Item</th>
-    <th style="text-align:center">Qty</th>
-    <th style="text-align:right">Amount</th>
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td>Subtotal</td><td style="text-align:right">${currency}${(order.subtotal || order.total || 0).toFixed(2)}</td></tr>
-  ${order.tax > 0 ? `<tr><td>Tax</td><td style="text-align:right">${currency}${order.tax.toFixed(2)}</td></tr>` : ""}
-  <tr class="total"><td>TOTAL</td><td style="text-align:right">${currency}${(order.total || 0).toFixed(2)}</td></tr>
-</table>
-<div class="divider"></div>
-<p>Thank you!</p>
-</body></html>`;
-
-  const w = window.open("", "_blank", "width=320,height=600");
-  if (!w) { alert("Allow popups to print the bill"); return; }
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.onafterprint = () => w.close();
-  setTimeout(() => w.print(), 400);
+function printOrderBill(order, settings, showToast) {
+  let usbPrinter = null;
+  try {
+    const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+    usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
+  } catch (_) {}
+  printService.printReceipt({
+    businessName: settings?.business_name || "Restaurant",
+    address: settings?.address || "",
+    phone: settings?.phone || "",
+    tableName: order.table_number ? `Table ${order.table_number}` : "",
+    orderNo: order.order_number || "",
+    cashier: order.cashier_name || "",
+    items: (order.items || []).map((i) => ({
+      name: i.product_name || i.name || "",
+      quantity: i.quantity || i.qty || 0,
+      price: i.price || (i.total / (i.quantity || i.qty || 1)),
+    })),
+    subtotal: order.subtotal || order.total || 0,
+    taxAmount: order.tax || 0,
+    discount: order.discount || 0,
+    total: order.total || 0,
+    footer: "Thank you!",
+  }, { printer: usbPrinter }).catch((e) => {
+    if (showToast) showToast(e.message, "error");
+    else alert(e.message);
+  });
 }
 
 function OrderCard({ order, canSeeAll, canDelete, onDelete, onComplete, onLoad, onPrint, isActing }) {
@@ -486,7 +456,7 @@ export default function HeldOrdersPage() {
                   onDelete={handleDelete}
                   onComplete={handleComplete}
                   onLoad={handleLoad}
-                  onPrint={(o) => printOrderBill(o, settings)}
+                  onPrint={(o) => printOrderBill(o, settings, showToast)}
                   isActing={actingId === order.id}
                 />
               ))}

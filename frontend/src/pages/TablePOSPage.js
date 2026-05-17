@@ -79,7 +79,7 @@ function TransferModal({ tableId, currentWaiterId, onClose, onTransferred }) {
             </button>
             <button onClick={handleConfirm} disabled={!selected || saving}
               className="flex-[2] py-2.5 bg-violet-600 text-white rounded-2xl font-bold hover:bg-violet-700 disabled:opacity-40 transition-colors text-sm">
-              {saving ? "Transferring…" : "Transfer Table"}
+              {saving ? "Transferring..." : "Transfer Table"}
             </button>
           </div>
         </div>
@@ -448,7 +448,7 @@ export default function TablePOSPage() {
             </button>
             <div>
               <h1 className="font-black text-gray-900 dark:text-white text-base leading-tight">
-                {isBarTab ? "Bar Tab" : "Table"} {entity?.number || "—"}
+                {isBarTab ? "Bar Tab" : "Table"} {entity?.number || ""}
               </h1>
               <p className="text-xs text-gray-400">
                 {entity?.waiter_name ? `Waiter: ${entity.waiter_name}` : entity?.staff_name ? `Staff: ${entity.staff_name}` : user?.name}

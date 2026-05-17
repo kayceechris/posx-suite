@@ -43,7 +43,8 @@ function rpad(str, len) {
 
 function fmtCurrency(amount) {
   const sym = localStorage.getItem("pos_currency_symbol") || "₦";
-  return `${sym}${Number(amount || 0).toFixed(2)}`;
+  const n = Number(amount || 0);
+  return `${sym}${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
 }
 
 function divider(char = "-", len = 32) {
