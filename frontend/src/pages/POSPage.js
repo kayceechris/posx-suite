@@ -452,7 +452,13 @@ export default function POSPage() {
         await api.createOrder(buildPayload("completed", method, name));
       }
       showToast("Order completed!");
-      const usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+      let usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+      if (!usbPrinter) {
+        try {
+          const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+          usbPrinter = saved.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+        } catch (_) {}
+      }
       printService.printReceipt(receiptData, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
       setCart([]);
       setCustomerName("");
@@ -686,7 +692,13 @@ export default function POSPage() {
                 <button
                   onClick={() => {
                     if (cart.length === 0) return;
-                    const usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+                    let usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+                    if (!usbPrinter) {
+                      try {
+                        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+                        usbPrinter = saved.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+                      } catch (_) {}
+                    }
                     printService.printReceipt({
                       businessName: settings?.business_name || "Restaurant",
                       address: settings?.address || "",
