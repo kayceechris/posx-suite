@@ -78,16 +78,8 @@ agenthub/agents/youtube/db
 
 memory/test_credentials.md
 
-# Mobile development — Android SDK (not part of source, too large)
-frontend/android/build-tools/
-frontend/android/emulator/
-frontend/android/extras/
-frontend/android/licenses/
-frontend/android/platform-tools/
-frontend/android/platforms/
-frontend/android/sources/
-frontend/android/.gradle/
-frontend/android/app/build/
+# Mobile development — entire android folder ignored
+frontend/android/
 
 # Environment and credential files
 .env
