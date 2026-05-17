@@ -131,10 +131,11 @@ async def release_table(table_id: str, current_user: User = Depends(get_current_
     if not is_privileged and not is_own_table:
         raise HTTPException(status_code=403, detail="You can only release tables assigned to you")
 
-    # Delete the held/in-progress order tied to this table
-    order_id = table.get("current_order_id")
-    if order_id:
-        await db.orders.delete_one({"id": order_id, "status": {"$in": ["held", "sent_to_kitchen", "pending"]}})
+    # Delete all held/in-progress orders tied to this table
+    await db.orders.delete_many({
+        "table_id": table_id,
+        "status": {"$in": ["held", "sent_to_kitchen", "pending"]}
+    })
 
     await db.tables.update_one(
         {"id": table_id},

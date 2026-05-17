@@ -57,9 +57,11 @@ async def release_bar_tab(tab_id: str, current_user: User = Depends(get_current_
     tab = await db.bar_tabs.find_one({"id": tab_id}, {"_id": 0})
     if not tab:
         raise HTTPException(status_code=404, detail="Bar tab not found")
-    order_id = tab.get("current_order_id")
-    if order_id:
-        await db.orders.delete_one({"id": order_id, "status": {"$in": ["held", "sent_to_kitchen", "pending"]}})
+    # Delete all held/in-progress orders tied to this bar tab
+    await db.orders.delete_many({
+        "bar_tab_id": tab_id,
+        "status": {"$in": ["held", "sent_to_kitchen", "pending"]}
+    })
     await db.bar_tabs.update_one(
         {"id": tab_id},
         {"$set": {"status": "available", "staff_id": None, "staff_name": None, "current_order_id": None}}
