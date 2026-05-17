@@ -113,44 +113,79 @@ function StockLevelsView() {
         ))}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
-        {loading ? <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
-          <table className="w-full min-w-[520px]">
-            <thead>
-              <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-4 py-3">Product</th>
-                <th className="text-left px-4 py-3 whitespace-nowrap">Outlet</th>
-                <th className="text-center px-3 py-3">Qty</th>
-                <th className="text-center px-3 py-3 whitespace-nowrap">Min Qty</th>
-                <th className="text-center px-3 py-3">Status</th>
-                <th className="text-center px-3 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
+        {loading ? (
+          <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
               {displayed.map((item, i) => {
                 const low = isLow(item);
                 return (
-                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900">
-                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap">{outletName(item.outlet_id)}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={cn("font-bold text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
-                    </td>
-                    <td className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-sm">{item.min_quantity || 10}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", low ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700")}>
-                        {low ? "Low" : "OK"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <button onClick={() => openUpdate(item)} className="text-xs font-semibold text-blue-600 hover:text-blue-800">Update</button>
-                    </td>
-                  </tr>
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{productName(item.product_id)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{outletName(item.outlet_id)}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={cn("text-sm font-bold", low ? "text-orange-500" : "text-gray-700 dark:text-gray-200")}>
+                          {item.quantity} / {item.min_quantity || 10}
+                        </span>
+                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold", low ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700")}>
+                          {low ? "Low" : "OK"}
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => openUpdate(item)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex-shrink-0">
+                      Update
+                    </button>
+                  </div>
                 );
               })}
-              {displayed.length === 0 && <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 text-sm">No stock records</td></tr>}
-            </tbody>
-          </table>
+              {displayed.length === 0 && <p className="py-10 text-center text-gray-400 text-sm">No stock records</p>}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full min-w-[520px]">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-4 py-3">Product</th>
+                    <th className="text-left px-4 py-3 whitespace-nowrap">Outlet</th>
+                    <th className="text-center px-3 py-3">Qty</th>
+                    <th className="text-center px-3 py-3 whitespace-nowrap">Min Qty</th>
+                    <th className="text-center px-3 py-3">Status</th>
+                    <th className="text-center px-3 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {displayed.map((item, i) => {
+                    const low = isLow(item);
+                    return (
+                      <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap">{outletName(item.outlet_id)}</td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={cn("font-bold text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-sm">{item.min_quantity || 10}</td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", low ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700")}>
+                            {low ? "Low" : "OK"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button onClick={() => openUpdate(item)} className="text-xs font-semibold text-blue-600 hover:text-blue-800">Update</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {displayed.length === 0 && <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 text-sm">No stock records</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
