@@ -327,7 +327,7 @@ const DEMO = {
   due:      0,
   sym:      "$",
 };
-const fmt = (n) => `${DEMO.sym}${Number(n).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n) => { const v = Number(n); return `${DEMO.sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
 
 // --- Layout 1  - Standard ---
 function PreviewStandard({ rs, logoPx, logoUrl }) {
@@ -633,7 +633,7 @@ function ReceiptBillSettings() {
     const phone    = settings?.phone         || DEMO.phone;
     const logoUrl  = settings?.logo_url      || null;
     const sym      = localStorage.getItem("pos_currency_symbol") || "$";
-    const f = (n) => `${sym}${Number(n).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const f = (n) => { const v = Number(n); return `${sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
     const rows = DEMO.items.map(it =>
       `<tr><td>${it.name}</td><td style="text-align:center;padding:0 8px">${it.qty}</td><td style="text-align:right;padding:0 8px">${f(it.price)}</td><td style="text-align:right">${f(it.total)}</td></tr>`
     ).join("");
