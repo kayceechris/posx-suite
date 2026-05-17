@@ -1548,7 +1548,7 @@ const VIEWS = {
   "print-bridge": PrintBridgeSettings,
 };
 
-export default function SettingsSection({ view = "company" }) {
+export default function SettingsSection({ view = "company", onViewChange }) {
   const Component = VIEWS[view] || CompanySettings;
-  return <Component />;
+  return <Component onClose={onViewChange ? () => onViewChange("company") : undefined} />;
 }

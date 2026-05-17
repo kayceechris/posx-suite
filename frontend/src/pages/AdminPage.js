@@ -239,7 +239,7 @@ export default function AdminPage() {
             {activeSection === "accounts" && <AccountsSection view={subViews.accounts} onViewChange={(v) => handleSubClick("accounts", v)} />}
             {activeSection === "floor" && subViews.floor === "tables" && <TablesSection />}
             {activeSection === "floor" && subViews.floor === "bar-tabs" && <BarTabsAdminSection />}
-            {activeSection === "settings" && <SettingsSection view={subViews.settings} />}
+            {activeSection === "settings" && <SettingsSection view={subViews.settings} onViewChange={(v) => handleSubClick("settings", v)} />}
             {activeSection === "purchases" && <PurchasesSection view={subViews.purchases} />}
           </div>
         </main>

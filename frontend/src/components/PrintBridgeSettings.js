@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Printer, Wifi, CheckCircle2, XCircle, Loader2, Save } from "lucide-react";
+import { Printer, Wifi, CheckCircle2, XCircle, Loader2, Save, X } from "lucide-react";
 import { printService } from "../utils/printService";
 
-export default function PrintBridgeSettings() {
+export default function PrintBridgeSettings({ onClose }) {
   const [bridgeUrl,    setBridgeUrl]    = useState(() => localStorage.getItem("print_bridge_url")    || "http://192.168.1.x:8765");
   const [printerIp,    setPrinterIp]    = useState(() => localStorage.getItem("print_printer_ip")    || "");
   const [printerPort,  setPrinterPort]  = useState(() => localStorage.getItem("print_printer_port")  || "9100");
@@ -51,13 +51,18 @@ export default function PrintBridgeSettings() {
     <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center">
+        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
           <Printer size={20} className="text-blue-600 dark:text-blue-400" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="font-bold text-gray-900 dark:text-white">Local Print Bridge</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">Connect to Wi-Fi/network thermal printers silently</p>
         </div>
+        {onClose && (
+          <button onClick={onClose} className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+            <X size={20} />
+          </button>
+        )}
       </div>
 
       {/* How it works */}
