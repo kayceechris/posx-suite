@@ -122,22 +122,25 @@ function AllProductsView({ autoOpen }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setBulkModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors"
+            title="Bulk Set Terminal Prices"
           >
-            <BarChart2 size={15} /> Bulk Set Terminal Prices
+            <BarChart2 size={15} />
+            <span className="hidden sm:inline">Bulk Set Terminal Prices</span>
           </button>
           <button
             onClick={() => setProductModal({ mode: "add" })}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors"
           >
-            <Plus size={16} /> New Product
+            <Plus size={16} />
+            <span className="hidden sm:inline">New Product</span>
           </button>
         </div>
       </div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-4 mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex-1 relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -146,22 +149,24 @@ function AllProductsView({ autoOpen }) {
               className="w-full pl-9 pr-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 min-w-[160px]">
-            <option value="">All categories</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
-            className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 min-w-[140px]">
-            <option value="">All brands</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          {clearFilters && (
-            <button onClick={() => { setSearch(""); setFilterCategory(""); setFilterBrand(""); }}
-              className="p-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-gray-700 dark:text-gray-200 hover:border-gray-300 transition-colors">
-              <X size={16} />
-            </button>
-          )}
+          <div className="flex gap-2">
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+              <option value="">All brands</option>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            {clearFilters && (
+              <button onClick={() => { setSearch(""); setFilterCategory(""); setFilterBrand(""); }}
+                className="p-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-gray-700 dark:text-gray-200 hover:border-gray-300 transition-colors flex-shrink-0">
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Category chips */}
@@ -197,7 +202,7 @@ function AllProductsView({ autoOpen }) {
                 {p.image
                   ? <img src={api.getImageUrl(p.image)} alt={p.name} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = "none"; }} />
                   : <div className="w-full h-full flex items-center justify-center"><Tag size={32} className="text-gray-300" /></div>}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <button onClick={() => setProductModal({ mode: "edit", product: p })}
                     className="w-8 h-8 bg-white dark:bg-gray-800 rounded-lg shadow flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-blue-600 transition-colors">
                     <Pencil size={14} />
