@@ -53,11 +53,11 @@ export default function PrintBridgeSettings({ onClose }) {
       {/* How it works */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1">
         <p className="font-bold mb-1">How to set up:</p>
-        <p>1. Run <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">bridge.py</code> on a Windows PC on your restaurant Wi-Fi</p>
+        <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC (click <strong>Yes</strong> on the UAC prompt — this installs the certificate)</p>
         <p>2. Note the IP shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://192.168.1.10:8765</code>)</p>
-        <p>3. Enter the bridge URL below and click Save</p>
-        <p className="font-semibold">4. Open the bridge URL in this browser and accept the certificate (see below)</p>
-        <p>5. Add printers in Terminal Settings → Printers tab</p>
+        <p>3. Enter the bridge URL below, click Save, then Test Bridge</p>
+        <p>4. Add printers in Terminal Settings → Printers tab</p>
+        <p className="text-blue-600 dark:text-blue-400 font-semibold pt-1">If Test Bridge still fails after step 1–3, restart Chrome completely and try again.</p>
       </div>
 
       <div className="space-y-4">
