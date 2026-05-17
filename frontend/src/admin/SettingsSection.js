@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useBusiness } from "../context/BusinessContext";
 import PrintBridgeSettings from "../components/PrintBridgeSettings";
 import MobilePrinterScanner from "../components/MobilePrinterScanner";
+import { printService } from "../utils/printService";
 
 const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500";
 const LABEL = "block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5";
@@ -420,7 +421,7 @@ function PreviewCompact({ rs, logoPx, logoUrl }) {
 }
 
 // ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ Layout 3  - Detailed ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬ÃÂ¢Ã¢ÂÂÃ¢ÂÂ¬
-function PreviewDetailed({ rs, logoPx, logoUrl }) {
+function PreviewDetailed({ rs, logoPx, logoUrl, tab }) {
   const HR = ({ thick }) => <div className={`my-1 ${thick ? "border-t-2 border-gray-600" : "border-t border-gray-300"}`} />;
   return (
     <div className="font-mono text-[9.5px] leading-relaxed text-gray-800 dark:text-gray-100 w-full select-none">
@@ -434,7 +435,7 @@ function PreviewDetailed({ rs, logoPx, logoUrl }) {
       )}
       {rs.receipt_header && <><HR /><p className="text-center italic text-gray-500 dark:text-gray-400 whitespace-pre-wrap">{rs.receipt_header}</p></>}
       <HR thick />
-      <p className="text-center font-bold text-[10px] tracking-widest text-gray-600 dark:text-gray-300 uppercase">Sales Receipt</p>
+      <p className="text-center font-bold text-[10px] tracking-widest text-gray-600 dark:text-gray-300 uppercase">{tab === "bill" ? "Sales Bill" : "Sales Receipt"}</p>
       <HR thick />
       {rs.show_reference && <Row label="Invoice No." val={DEMO.ref} />}
       {rs.show_date && <Row label="Date" val={`${DEMO.date}  ${DEMO.time}`} />}
@@ -572,10 +573,10 @@ function QRBlock({ small }) {
   );
 }
 
-function ReceiptPreview({ rs, settings }) {
+function ReceiptPreview({ rs, settings, tab }) {
   const logoPx = LOGO_PX[rs.logo_size] || 60;
   const logoUrl = settings?.logo_url || null;
-  const props   = { rs, logoPx, logoUrl };
+  const props   = { rs, logoPx, logoUrl, tab };
   switch (rs.layout) {
     case "compact":   return <PreviewCompact   {...props} />;
     case "detailed":  return <PreviewDetailed  {...props} />;
@@ -685,13 +686,32 @@ function ReceiptBillSettings() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-5 sticky top-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Live Preview</p>
-                <button type="button" onClick={() => window.print()}
+                <button type="button" onClick={() => {
+                  printService.printReceipt({
+                    businessName: settings?.business_name || "My Restaurant",
+                    address: settings?.address || "",
+                    phone: settings?.phone || "",
+                    orderNo: "DEMO-001",
+                    cashier: "Staff",
+                    items: [
+                      { name: "Chicken Burger", quantity: 2, price: 3500 },
+                      { name: "Jollof Rice", quantity: 1, price: 2500 },
+                      { name: "Soft Drink", quantity: 3, price: 800 },
+                    ],
+                    subtotal: 13200,
+                    taxAmount: 0,
+                    discount: 0,
+                    total: 13200,
+                    paymentMethod: "cash",
+                    footer: data.receipt_footer || "Thank you! Please come again.",
+                  }, {}).catch(console.error);
+                }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-semibold hover:bg-gray-700 transition-colors">
                   <Printer size={13} /> Print Demo
                 </button>
               </div>
               <div className="border-2 border-gray-300 dark:border-gray-700 rounded-xl p-3 bg-white dark:bg-gray-800 max-h-[640px] overflow-y-auto">
-                <ReceiptPreview rs={data} settings={settings} />
+                <ReceiptPreview rs={data} settings={settings} tab={tab} />
               </div>
             </div>
           </div>
@@ -699,7 +719,7 @@ function ReceiptBillSettings() {
           {/* Controls */}
           <div className="flex-1 space-y-5">
             <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">Header &amp; Footer</h3>
+              <h3 className="font-bold text-gray-900 dark:text-white mb-4">{label} Header &amp; Footer</h3>
               <div className="space-y-4">
                 <div>
                   <label className={LABEL}>{label} Header</label>

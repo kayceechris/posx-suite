@@ -149,8 +149,8 @@ ${order.customer_name ? `<p>Customer: ${order.customer_name}</p>` : ""}
   w.document.write(html);
   w.document.close();
   w.focus();
-  w.print();
-  w.close();
+  w.onafterprint = () => w.close();
+  setTimeout(() => w.print(), 400);
 }
 
 function OrderCard({ order, canSeeAll, onDelete, onComplete, onLoad, onPrint, isActing }) {

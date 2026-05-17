@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import {
-  CheckCircle2, ChevronDown, Menu, Minus, Monitor, Plus, Search, ShoppingCart, Trash2, X,
+  CheckCircle2, ChevronDown, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X,
 } from "lucide-react";
+import { printService } from "../utils/printService";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
@@ -428,6 +429,19 @@ export default function POSPage() {
     setSubmitting(true);
     setShowPay(false);
     if (name !== undefined) setCustomerName(name);
+    const receiptData = {
+      businessName: settings?.business_name || "Restaurant",
+      address: settings?.address || "",
+      phone: settings?.phone || "",
+      cashier: user?.name || "",
+      items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
+      subtotal,
+      taxAmount: tax,
+      discount: 0,
+      total,
+      paymentMethod: method,
+      footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
+    };
     try {
       if (loadedOrderId) {
         await api.completeOrder(loadedOrderId, method);
@@ -435,6 +449,7 @@ export default function POSPage() {
         await api.createOrder(buildPayload("completed", method, name));
       }
       showToast("Order completed!");
+      printService.printReceipt(receiptData, {}).catch(console.error);
       setCart([]);
       setCustomerName("");
       setLoadedOrderId(null);
@@ -656,13 +671,37 @@ export default function POSPage() {
               </div>
             )}
             <div className="px-4 pb-4 pt-2 space-y-2">
-              <button
-                onClick={handleHold}
-                disabled={submitting || cart.length === 0}
-                className="w-full py-3 bg-gray-800 dark:bg-gray-600 text-white rounded-2xl font-bold text-sm hover:bg-gray-900 dark:hover:bg-gray-500 disabled:opacity-40 transition-colors"
-              >
-                Hold Order
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleHold}
+                  disabled={submitting || cart.length === 0}
+                  className="flex-1 py-3 bg-gray-800 dark:bg-gray-600 text-white rounded-2xl font-bold text-sm hover:bg-gray-900 dark:hover:bg-gray-500 disabled:opacity-40 transition-colors"
+                >
+                  Hold
+                </button>
+                <button
+                  onClick={() => {
+                    if (cart.length === 0) return;
+                    printService.printReceipt({
+                      businessName: settings?.business_name || "Restaurant",
+                      address: settings?.address || "",
+                      phone: settings?.phone || "",
+                      cashier: user?.name || "",
+                      items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
+                      subtotal,
+                      taxAmount: tax,
+                      discount: 0,
+                      total,
+                      footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
+                    }, {}).catch(console.error);
+                  }}
+                  disabled={cart.length === 0}
+                  title="Print Bill"
+                  className="w-11 flex items-center justify-center rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors flex-shrink-0"
+                >
+                  <Printer size={16} />
+                </button>
+              </div>
               <button
                 onClick={() => { if (cart.length > 0) setShowPay(true); }}
                 disabled={submitting || cart.length === 0}
