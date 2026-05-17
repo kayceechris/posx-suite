@@ -9,6 +9,8 @@
  * Configure the bridge URL in Admin → Settings → Printer Groups → Bridge URL.
  */
 
+import { api } from '../lib/api';
+
 // ─── ESC/POS byte constants ───────────────────────────────────────────────────
 const ESC = 0x1b;
 const GS  = 0x1d;
@@ -303,38 +305,26 @@ export const printService = {
 
     // Try USB printers via bridge /print-usb
     try {
-      const authToken = localStorage.getItem("posx_token") || "";
-      const printersRes = await fetch("/api/printers/assigned", {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-        signal: AbortSignal.timeout(4000),
-      });
-      if (printersRes.ok) {
-        const printers = await printersRes.json();
-        const usbPrinter = printers.find((p) => p.mode === "usb" && p.type === type);
-        if (usbPrinter) {
-          if (!bridgeUrl || bridgeUrl === "http://localhost:8765") {
-            // Still try localhost but log clearly
-            console.info("[PrintService] Using bridge at", bridgeUrl || "http://localhost:8765");
+      const printers = await api.getAssignedPrinters();
+      const usbPrinter = printers.find((p) => p.mode === "usb" && p.type === type);
+      if (usbPrinter) {
+        const effectiveBridgeUrl = bridgeUrl || "http://localhost:8765";
+        const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
+        if (printerName) {
+          console.info("[PrintService] Sending to USB printer:", printerName, "via", effectiveBridgeUrl);
+          const res = await fetch(`${effectiveBridgeUrl}/print-usb`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
+            body: JSON.stringify({ printer_name: printerName, data: bytes }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (res.ok) {
+            console.info("[PrintService] USB print OK");
+            return { success: true, method: "usb" };
           }
-          const effectiveBridgeUrl = bridgeUrl || "http://localhost:8765";
-          const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
-          if (printerName) {
-            const res = await fetch(`${effectiveBridgeUrl}/print-usb`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-              body: JSON.stringify({ printer_name: printerName, data: bytes }),
-              signal: AbortSignal.timeout(15000),
-            });
-            if (res.ok) {
-              console.info("[PrintService] USB print OK via bridge");
-              return { success: true, method: "usb" };
-            }
-            const errData = await res.json().catch(() => ({}));
-            const msg = errData.error || `Bridge error ${res.status}`;
-            console.error("[PrintService] USB bridge error:", msg);
-            // Surface the error — don't silently fall back
-            throw new Error(`USB print failed: ${msg}`);
-          }
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData.error || `Bridge error ${res.status}`;
+          throw new Error(`USB print failed: ${msg}`);
         }
       }
     } catch (err) {
