@@ -18,6 +18,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("posx_token");
     if (!token) { setAuthLoading(false); return; }
+
+    // If no sessionStorage marker the app was closed and relaunched — force re-login
+    if (!sessionStorage.getItem("posx_session")) {
+      localStorage.removeItem("posx_token");
+      setAuthLoading(false);
+      return;
+    }
+
     api.getMe()
       .then(setUser)
       .catch(() => localStorage.removeItem("posx_token"))
@@ -27,12 +35,14 @@ export function AuthProvider({ children }) {
   const login = async (pincode) => {
     const data = await api.login(pincode);
     localStorage.setItem("posx_token", data.token);
+    sessionStorage.setItem("posx_session", "1");
     setUser(data.user);
     return data.user;
   };
 
   const logout = useCallback(() => {
     localStorage.removeItem("posx_token");
+    sessionStorage.removeItem("posx_session");
     setUser(null);
     setWarnCountdown(null);
     clearTimeout(warnTimer.current);
