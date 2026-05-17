@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Printer, Wifi, CheckCircle2, XCircle, Loader2, Save, X } from "lucide-react";
 import { printService } from "../utils/printService";
 
 export default function PrintBridgeSettings({ onClose }) {
-  const [bridgeUrl,    setBridgeUrl]    = useState(() => localStorage.getItem("print_bridge_url")    || "http://192.168.1.x:8765");
-  const [printerIp,    setPrinterIp]    = useState(() => localStorage.getItem("print_printer_ip")    || "");
-  const [printerPort,  setPrinterPort]  = useState(() => localStorage.getItem("print_printer_port")  || "9100");
-  const [bridgeToken,  setBridgeToken]  = useState(() => localStorage.getItem("print_bridge_token")  || "posx-bridge-2025");
-  const [testing,      setTesting]      = useState(false);
-  const [status,       setStatus]       = useState(null); // null | "ok" | "fail"
-  const [saved,        setSaved]        = useState(false);
+  const [bridgeUrl,   setBridgeUrl]   = useState(() => localStorage.getItem("print_bridge_url")   || "");
+  const [bridgeToken, setBridgeToken] = useState(() => localStorage.getItem("print_bridge_token") || "posx-bridge-2025");
+  const [testing,     setTesting]     = useState(false);
+  const [status,      setStatus]      = useState(null); // null | "ok" | "fail"
+  const [saved,       setSaved]       = useState(false);
 
   const testBridge = async () => {
     setTesting(true);
     setStatus(null);
-    const ok = await printService.testBridge(bridgeUrl);
+    const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
+    const ok = await printService.testBridge(cleanUrl);
     setStatus(ok ? "ok" : "fail");
     setTesting(false);
   };
@@ -23,27 +22,9 @@ export default function PrintBridgeSettings({ onClose }) {
     const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
     if (cleanUrl !== bridgeUrl) setBridgeUrl(cleanUrl);
     localStorage.setItem("print_bridge_url",   cleanUrl);
-    localStorage.setItem("print_printer_ip",   printerIp);
-    localStorage.setItem("print_printer_port", printerPort);
     localStorage.setItem("print_bridge_token", bridgeToken);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const testPrint = async () => {
-    await printService.printReceipt(
-      {
-        businessName : "POSx Suite",
-        orderNo      : "TEST-001",
-        tableName    : "T1",
-        items        : [{ name: "Test Item", quantity: 1, price: 1000 }],
-        subtotal     : 1000,
-        total        : 1000,
-        paymentMethod: "cash",
-        footer       : "Test print successful!",
-      },
-      { bridgeUrl, ip: printerIp, port: Number(printerPort) }
-    );
   };
 
   const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-500";
@@ -71,9 +52,9 @@ export default function PrintBridgeSettings({ onClose }) {
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1">
         <p className="font-bold mb-1">How to set up:</p>
         <p>1. Run <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">bridge.py</code> on a Windows PC on your restaurant Wi-Fi</p>
-        <p>2. Note the IP shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">192.168.1.10:8765</code>)</p>
-        <p>3. Enter the bridge URL and your printer IP below</p>
-        <p>4. Click Test Bridge → Test Print</p>
+        <p>2. Note the IP shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">http://192.168.1.10:8765</code>)</p>
+        <p>3. Enter the bridge URL below and click Save</p>
+        <p>4. Add printers in Terminal Settings → Printers tab</p>
       </div>
 
       <div className="space-y-4">
@@ -99,28 +80,6 @@ export default function PrintBridgeSettings({ onClose }) {
           />
           <p className="text-xs text-gray-400 mt-1">Must match the SECRET_TOKEN in bridge.py</p>
         </div>
-
-        {/* Printer IP + Port */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
-            <label className={LABEL}>Printer IP Address</label>
-            <input
-              className={INPUT}
-              value={printerIp}
-              onChange={(e) => setPrinterIp(e.target.value)}
-              placeholder="192.168.1.50"
-            />
-          </div>
-          <div>
-            <label className={LABEL}>Port</label>
-            <input
-              className={INPUT}
-              value={printerPort}
-              onChange={(e) => setPrinterPort(e.target.value)}
-              placeholder="9100"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Status indicator */}
@@ -132,7 +91,7 @@ export default function PrintBridgeSettings({ onClose }) {
         }`}>
           {status === "ok"
             ? <><CheckCircle2 size={16} /> Bridge is reachable! ✓</>
-            : <><XCircle size={16} /> Cannot reach bridge. Check URL and that bridge.py is running.</>}
+            : <><XCircle size={16} /> Cannot reach bridge. Check the URL and that bridge.py is running.</>}
         </div>
       )}
 
@@ -145,14 +104,6 @@ export default function PrintBridgeSettings({ onClose }) {
         >
           {testing ? <Loader2 size={15} className="animate-spin" /> : <Wifi size={15} />}
           {testing ? "Testing..." : "Test Bridge"}
-        </button>
-
-        <button
-          onClick={testPrint}
-          className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
-        >
-          <Printer size={15} />
-          Test Print
         </button>
 
         <button

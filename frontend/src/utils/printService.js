@@ -297,8 +297,8 @@ export const printService = {
     const bridgeUrl = (printerConfig.bridgeUrl
       || localStorage.getItem("print_bridge_url")
       || "http://localhost:8765").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    const printerIp   = printerConfig.ip   || localStorage.getItem("print_printer_ip")  || "";
-    const printerPort = printerConfig.port || localStorage.getItem("print_printer_port") || 9100;
+    const printerIp   = printerConfig.ip   || "";
+    const printerPort = printerConfig.port || 9100;
 
     // Try bridge first
     if (printerIp) {
