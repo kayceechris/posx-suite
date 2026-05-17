@@ -49,22 +49,24 @@ export default function CustomersSection() {
   );
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Customers</h1>
+    <div className="w-full overflow-x-hidden">
+      <div className="flex items-center justify-between mb-6 gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Customers</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{customers.length} registered customers</p>
         </div>
         <button onClick={() => { setShowAdd(true); setFormError(""); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
-          <Plus size={16} /> Add Customer
+          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
+          <Plus size={16} />
+          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">Add Customer</span>
         </button>
       </div>
 
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone or email…"
         className="w-full mb-4 px-4 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
@@ -72,16 +74,16 @@ export default function CustomersSection() {
             {/* Mobile card list */}
             <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
               {filtered.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-9 h-9 flex-shrink-0 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-sm">
+                <div key={c.id} className="flex items-center gap-2 px-3 py-3">
+                  <div className="w-8 h-8 flex-shrink-0 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-sm">
                     {c.name?.[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{c.name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{c.phone || c.email || "No contact"}</p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-green-600">{formatCurrency(c.total_spent || 0)}</p>
+                  <div className="text-right flex-shrink-0 max-w-[100px]">
+                    <p className="text-sm font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(c.total_spent || 0)}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{c.total_orders || 0} order{c.total_orders !== 1 ? "s" : ""}</p>
                   </div>
                 </div>
