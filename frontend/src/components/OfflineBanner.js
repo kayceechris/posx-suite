@@ -7,12 +7,25 @@ export default function OfflineBanner() {
   const [syncing, setSyncing] = useState(false);
   const [justCameOnline, setJustCameOnline] = useState(false);
 
+  const handleSync = () => {
+    if (syncing) return;
+    setSyncing(true);
+    triggerSync();
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
+
   useEffect(() => {
     const goOffline = () => setOffline(true);
     const goOnline = () => {
       setOffline(false);
       setJustCameOnline(true);
       setTimeout(() => setJustCameOnline(false), 4000);
+      // Auto-sync as soon as connection is restored
+      setSyncing(true);
+      triggerSync();
+      setTimeout(() => window.location.reload(), 800);
     };
     window.addEventListener("offline", goOffline);
     window.addEventListener("online", goOnline);
@@ -21,16 +34,6 @@ export default function OfflineBanner() {
       window.removeEventListener("online", goOnline);
     };
   }, []);
-
-  const handleSync = () => {
-    if (syncing) return;
-    setSyncing(true);
-    triggerSync();
-    // Reload cached API data by refreshing the page state
-    setTimeout(() => {
-      window.location.reload();
-    }, 800);
-  };
 
   if (!offline && !justCameOnline) return null;
 
@@ -51,14 +54,10 @@ export default function OfflineBanner() {
         <span className="text-red-200 text-xs">Orders will sync when connection is restored</span>
       )}
       {justCameOnline && !offline && (
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors"
-        >
-          <RefreshCw size={13} className={syncing ? "animate-spin" : ""} />
-          {syncing ? "Syncing…" : "Sync Now"}
-        </button>
+        <span className="flex items-center gap-1.5 text-xs font-bold">
+          <RefreshCw size={13} className="animate-spin" />
+          Syncing…
+        </span>
       )}
     </div>
   );
