@@ -109,6 +109,11 @@ async def release_table(table_id: str, current_user: User = Depends(get_current_
     if table.get("waiter_id") != current_user.id and current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized to release this table")
 
+    # Delete the held/in-progress order tied to this table
+    order_id = table.get("current_order_id")
+    if order_id:
+        await db.orders.delete_one({"id": order_id, "status": {"$in": ["held", "sent_to_kitchen", "pending"]}})
+
     await db.tables.update_one(
         {"id": table_id},
         {"$set": {
