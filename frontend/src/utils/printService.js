@@ -300,10 +300,18 @@ export const printService = {
     const printerPort = printerConfig.port || 9100;
     const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
-    // USB path — exact same pattern as the test-print button in Terminal Settings.
-    // printerConfig.printer is the USB printer object passed directly from POSPage
-    // React state, so no localStorage/API lookup is needed.
-    const usbPrinter = printerConfig.printer || null;
+    // USB path — find the USB printer from (in priority order):
+    //   1. printerConfig.printer  — passed directly from POSPage React state
+    //   2. pos_saved_printers     — set by Terminal Settings Printers tab
+    // Mirrors exactly what the test-print button in Terminal Settings does.
+    let usbPrinter = printerConfig.printer || null;
+    if (!usbPrinter) {
+      try {
+        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+        usbPrinter = saved.find((x) => x.mode === "usb" && x.type === type) || null;
+      } catch (_) {}
+    }
+
     if (usbPrinter) {
       if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers");
       const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
@@ -329,7 +337,12 @@ export const printService = {
       }
     }
 
-    // Browser fallback
+    // If bridge URL is configured but no USB printer found → error, not silent browser popup
+    if (bridgeUrl) {
+      throw new Error("No USB receipt printer found — open Terminal Settings → Printers tab to load printer list");
+    }
+
+    // Browser fallback (only when bridge is not configured at all)
     if (type === "receipt") {
       browserPrint(receiptToHtml(data));
     } else {
