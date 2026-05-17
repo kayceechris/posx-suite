@@ -300,10 +300,6 @@ export const printService = {
     const printerPort = printerConfig.port || 9100;
     const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
-    // USB path — find the USB printer from (in priority order):
-    //   1. printerConfig.printer  — passed directly from POSPage React state
-    //   2. pos_saved_printers     — set by Terminal Settings Printers tab
-    // Mirrors exactly what the test-print button in Terminal Settings does.
     let usbPrinter = printerConfig.printer || null;
     if (!usbPrinter) {
       try {
@@ -312,16 +308,20 @@ export const printService = {
       } catch (_) {}
     }
 
+    console.log("[PrintService._print]", { type, bridgeUrl, hasUsbPrinter: !!usbPrinter, printerName: usbPrinter?.windows_printer_name || usbPrinter?.name });
+
     if (usbPrinter) {
       if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers");
       const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
       if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
+      console.log("[PrintService] sending to bridge:", `${bridgeUrl}/print-usb`, "printer:", printerName);
       const res = await fetch(`${bridgeUrl}/print-usb`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
         body: JSON.stringify({ printer_name: printerName, data: bytes }),
         signal: AbortSignal.timeout(15000),
       });
+      console.log("[PrintService] bridge response:", res.status, res.ok);
       if (res.ok) return { success: true, method: "usb" };
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Bridge error ${res.status}`);
@@ -343,6 +343,7 @@ export const printService = {
     }
 
     // Browser fallback (only when bridge is not configured at all)
+    console.warn("[PrintService] falling back to browser print — bridgeUrl empty");
     if (type === "receipt") {
       browserPrint(receiptToHtml(data));
     } else {
