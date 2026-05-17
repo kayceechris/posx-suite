@@ -149,8 +149,8 @@ export default function LoginPage() {
           You can also type your PIN on the keyboard
         </p>
 
-        <p className="text-center text-[10px] text-gray-300 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-          Created by <span className="font-semibold text-gray-400">Whitehat Tech Solutions</span>
+        <p className="text-center text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+          Created by <span className="font-bold text-gray-600 dark:text-gray-300 tracking-wide">Whitehat Tech Solutions</span>
         </p>
       </div>
     </div>
