@@ -25,24 +25,24 @@ function DateFilter({ onApply }) {
   const [start, setStart] = useState(monthStart());
   const [end, setEnd] = useState(today());
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm px-5 py-4 mb-6 flex items-center gap-3">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3 mb-6 flex flex-wrap items-center gap-2">
       <Calendar size={18} className="text-gray-400 flex-shrink-0" />
       <input
         type="date"
         value={start}
         onChange={(e) => setStart(e.target.value)}
-        className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900"
+        className="flex-1 min-w-[130px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
       />
       <span className="text-gray-400 text-sm font-medium">to</span>
       <input
         type="date"
         value={end}
         onChange={(e) => setEnd(e.target.value)}
-        className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900"
+        className="flex-1 min-w-[130px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
       />
       <button
         onClick={() => onApply(start, end)}
-        className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex-shrink-0"
       >
         Apply
       </button>
@@ -83,7 +83,7 @@ function SalesTab() {
       <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
       {loading ? <Spinner /> : data && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600" bg="bg-green-50" />
             <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600" bg="bg-blue-50" />
             <StatCard label="Avg Order Value" value={formatCurrency(data.avg_order_value)} color="text-orange-500" bg="bg-orange-50" />
@@ -119,26 +119,26 @@ function SalesTab() {
 
           {/* Top Products */}
           {data.top_products?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="font-bold text-gray-900 dark:text-white">Top Products</h3>
               </div>
-              <table className="w-full">
+              <table className="w-full min-w-[360px]">
                 <thead>
                   <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left px-6 py-3 w-10">#</th>
-                    <th className="text-left px-6 py-3">Product</th>
-                    <th className="text-right px-6 py-3">Qty</th>
-                    <th className="text-right px-6 py-3">Revenue</th>
+                    <th className="text-left px-4 py-3 w-8">#</th>
+                    <th className="text-left px-4 py-3">Product</th>
+                    <th className="text-right px-4 py-3">Qty</th>
+                    <th className="text-right px-4 py-3">Revenue</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {data.top_products.map((p, i) => (
                     <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900">
-                      <td className="px-6 py-3 text-gray-400 text-sm">{i + 1}</td>
-                      <td className="px-6 py-3 font-semibold text-gray-900 dark:text-white text-sm">{p.name}</td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{p.quantity}</td>
-                      <td className="px-6 py-3 font-semibold text-green-600 text-sm text-right">{formatCurrency(p.revenue)}</td>
+                      <td className="px-4 py-3 text-gray-400 text-sm">{i + 1}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{p.name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{p.quantity}</td>
+                      <td className="px-4 py-3 font-semibold text-green-600 text-sm text-right whitespace-nowrap">{formatCurrency(p.revenue)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,35 +170,35 @@ function CostTab() {
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-blue-600" bg="bg-blue-50" />
             <StatCard label="Total Cost" value={formatCurrency(data.total_cost)} color="text-orange-500" bg="bg-orange-50" />
             <StatCard label="Gross Profit" value={formatCurrency(data.total_profit)} color="text-green-600" bg="bg-green-50" />
           </div>
 
           {data.products?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="font-bold text-gray-900 dark:text-white">Product Cost Breakdown</h3>
               </div>
-              <table className="w-full">
+              <table className="w-full min-w-[480px]">
                 <thead>
                   <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left px-6 py-3">Product</th>
-                    <th className="text-right px-6 py-3">Qty</th>
-                    <th className="text-right px-6 py-3">Cost</th>
-                    <th className="text-right px-6 py-3">Revenue</th>
-                    <th className="text-right px-6 py-3">Profit</th>
+                    <th className="text-left px-4 py-3">Product</th>
+                    <th className="text-right px-4 py-3">Qty</th>
+                    <th className="text-right px-4 py-3">Cost</th>
+                    <th className="text-right px-4 py-3">Revenue</th>
+                    <th className="text-right px-4 py-3">Profit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {data.products.map((p, i) => (
                     <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900">
-                      <td className="px-6 py-3 font-semibold text-gray-900 dark:text-white text-sm">{p.name}</td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{p.quantity ?? "—"}</td>
-                      <td className="px-6 py-3 text-orange-500 text-sm text-right">{formatCurrency(p.cost)}</td>
-                      <td className="px-6 py-3 text-blue-600 font-semibold text-sm text-right">{formatCurrency(p.revenue)}</td>
-                      <td className="px-6 py-3 text-green-600 font-semibold text-sm text-right">{formatCurrency(p.profit)}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{p.name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{p.quantity ?? "—"}</td>
+                      <td className="px-4 py-3 text-orange-500 text-sm text-right whitespace-nowrap">{formatCurrency(p.cost)}</td>
+                      <td className="px-4 py-3 text-blue-600 font-semibold text-sm text-right whitespace-nowrap">{formatCurrency(p.revenue)}</td>
+                      <td className="px-4 py-3 text-green-600 font-semibold text-sm text-right whitespace-nowrap">{formatCurrency(p.profit)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -227,27 +227,29 @@ function OrderItemsPanel({ order, onClose }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-300"><X size={20} /></button>
         </div>
         <div className="overflow-y-auto flex-1">
-          <table className="w-full">
-            <thead>
-              <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-6 py-3">Item</th>
-                <th className="text-right px-6 py-3">Qty</th>
-                <th className="text-right px-6 py-3">Price</th>
-                <th className="text-right px-6 py-3">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {(order.items || []).map((item, i) => (
-                <tr key={i}>
-                  <td className="px-6 py-3 font-medium text-gray-900 dark:text-white text-sm">{item.product_name || item.name}</td>
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{item.quantity}</td>
-                  <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{formatCurrency(item.price)}</td>
-                  <td className="px-6 py-3 font-semibold text-green-600 text-sm text-right">{formatCurrency((item.price || 0) * (item.quantity || 1))}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[320px]">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-4 py-3">Item</th>
+                  <th className="text-right px-4 py-3">Qty</th>
+                  <th className="text-right px-4 py-3">Price</th>
+                  <th className="text-right px-4 py-3">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {(order.items || []).map((item, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white text-sm">{item.product_name || item.name}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{item.quantity}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right whitespace-nowrap">{formatCurrency(item.price)}</td>
+                    <td className="px-4 py-3 font-semibold text-green-600 text-sm text-right whitespace-nowrap">{formatCurrency((item.price || 0) * (item.quantity || 1))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <span className="font-bold text-gray-700 dark:text-gray-200">Total</span>
             <span className="font-black text-green-600 text-lg">{formatCurrency(order.total)}</span>
           </div>
@@ -283,36 +285,38 @@ function StaffOrdersPanel({ staff, dateRange, onClose }) {
             {loading ? <Spinner /> : orders.length === 0 ? (
               <p className="px-6 py-10 text-center text-gray-400 text-sm">No orders found for this period.</p>
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left px-6 py-3">Order #</th>
-                    <th className="text-left px-6 py-3">Date</th>
-                    <th className="text-right px-6 py-3">Items</th>
-                    <th className="text-right px-6 py-3">Total</th>
-                    <th className="text-left px-6 py-3">Payment</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {orders.map((o) => (
-                    <tr
-                      key={o.id}
-                      className="hover:bg-blue-50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedOrder(o)}
-                    >
-                      <td className="px-6 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
-                      <td className="px-6 py-3 text-gray-500 dark:text-gray-400 text-sm">{new Date(o.created_at).toLocaleDateString()}</td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
-                      <td className="px-6 py-3 font-semibold text-green-600 text-sm text-right">{formatCurrency(o.total)}</td>
-                      <td className="px-6 py-3 text-sm">
-                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-xs capitalize">
-                          {o.payment_method || "pending"}
-                        </span>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[440px]">
+                  <thead>
+                    <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                      <th className="text-left px-4 py-3">Order #</th>
+                      <th className="text-left px-4 py-3">Date</th>
+                      <th className="text-right px-4 py-3">Items</th>
+                      <th className="text-right px-4 py-3">Total</th>
+                      <th className="text-left px-4 py-3">Payment</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {orders.map((o) => (
+                      <tr
+                        key={o.id}
+                        className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                        onClick={() => setSelectedOrder(o)}
+                      >
+                        <td className="px-4 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">{new Date(o.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
+                        <td className="px-4 py-3 font-semibold text-green-600 text-sm text-right whitespace-nowrap">{formatCurrency(o.total)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-xs capitalize">
+                            {o.payment_method || "pending"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -348,47 +352,47 @@ function StaffTab() {
     <div>
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
             <h3 className="font-bold text-gray-900 dark:text-white">Staff Sales Performance</h3>
           </div>
-          <table className="w-full">
+          <table className="w-full min-w-[400px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-6 py-3 w-10">#</th>
-                <th className="text-left px-6 py-3">Staff</th>
-                <th className="text-left px-6 py-3">Role</th>
-                <th className="text-right px-6 py-3">Orders</th>
-                <th className="text-right px-6 py-3">Revenue</th>
+                <th className="text-left px-4 py-3 w-8">#</th>
+                <th className="text-left px-4 py-3">Staff</th>
+                <th className="text-left px-4 py-3">Role</th>
+                <th className="text-right px-4 py-3">Orders</th>
+                <th className="text-right px-4 py-3">Revenue</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {(data.staff || []).map((s, i) => (
                 <tr
                   key={i}
-                  className="hover:bg-blue-50 cursor-pointer transition-colors"
+                  className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
                   onClick={() => setSelectedStaff(s)}
                 >
-                  <td className="px-6 py-3 text-gray-400 text-sm">{i + 1}</td>
-                  <td className="px-6 py-3 font-bold text-gray-900 dark:text-white text-sm">{s.name || "Unknown"}</td>
-                  <td className="px-6 py-3">
+                  <td className="px-4 py-3 text-gray-400 text-sm">{i + 1}</td>
+                  <td className="px-4 py-3 font-bold text-gray-900 dark:text-white text-sm">{s.name || "Unknown"}</td>
+                  <td className="px-4 py-3">
                     <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide",
                       ROLE_COLORS[s.role] || "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400")}>
                       {s.role || "unknown"}
                     </span>
                   </td>
-                  <td className="px-6 py-3 font-semibold text-gray-900 dark:text-white text-sm text-right">{s.orders}</td>
-                  <td className="px-6 py-3 font-semibold text-green-600 text-sm text-right">{formatCurrency(s.revenue)}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm text-right">{s.orders}</td>
+                  <td className="px-4 py-3 font-semibold text-green-600 text-sm text-right whitespace-nowrap">{formatCurrency(s.revenue)}</td>
                 </tr>
               ))}
               {(data.staff || []).length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-sm">No data for this period</td></tr>
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No data for this period</td></tr>
               )}
             </tbody>
           </table>
           {(data.staff || []).length > 0 && (
-            <p className="px-6 py-3 text-xs text-gray-400 border-t border-gray-50">
-              Click a row to view individual orders and items
+            <p className="px-5 py-3 text-xs text-gray-400 border-t border-gray-100 dark:border-gray-700">
+              Tap a row to view individual orders and items
             </p>
           )}
         </div>
@@ -435,32 +439,34 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
             {loading ? <Spinner /> : orders.length === 0 ? (
               <p className="px-6 py-10 text-center text-gray-400 text-sm">No orders found for this payment method.</p>
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                    <th className="text-left px-6 py-3">Order #</th>
-                    <th className="text-left px-6 py-3">Date</th>
-                    <th className="text-left px-6 py-3">Customer</th>
-                    <th className="text-right px-6 py-3">Items</th>
-                    <th className="text-right px-6 py-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {orders.map((o) => (
-                    <tr
-                      key={o.id}
-                      className="hover:bg-blue-50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedOrder(o)}
-                    >
-                      <td className="px-6 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
-                      <td className="px-6 py-3 text-gray-500 dark:text-gray-400 text-sm">{new Date(o.created_at).toLocaleDateString()}</td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in"}</td>
-                      <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
-                      <td className="px-6 py-3 font-semibold text-green-600 text-sm text-right">{formatCurrency(o.total)}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px]">
+                  <thead>
+                    <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                      <th className="text-left px-4 py-3">Order #</th>
+                      <th className="text-left px-4 py-3">Date</th>
+                      <th className="text-left px-4 py-3">Customer</th>
+                      <th className="text-right px-4 py-3">Items</th>
+                      <th className="text-right px-4 py-3">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {orders.map((o) => (
+                      <tr
+                        key={o.id}
+                        className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                        onClick={() => setSelectedOrder(o)}
+                      >
+                        <td className="px-4 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">{new Date(o.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in"}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
+                        <td className="px-4 py-3 font-semibold text-green-600 text-sm text-right whitespace-nowrap">{formatCurrency(o.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

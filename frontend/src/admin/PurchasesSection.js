@@ -175,7 +175,7 @@ function NewPOModal({ suppliers, products, units, onClose, onCreated }) {
                       placeholder="Description"
                       className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-400" />
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">QTY</label>
                       <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(i, "quantity", e.target.value)}
@@ -408,7 +408,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
           {isPending && (
             <button onClick={() => setShowNew(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors">
-              <Plus size={16} /> New Purchase Order
+              <Plus size={16} /> <span className="hidden sm:inline">New Purchase Order</span><span className="sm:hidden">New PO</span>
             </button>
           )}
         </div>
@@ -448,15 +448,15 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
         <div className="space-y-3">
           {pos.map((po) => (
             <div key={po.id}
-              className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm px-4 py-4 flex items-center gap-2 sm:gap-4 hover:shadow-md transition-shadow"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-black text-gray-900 dark:text-white text-base">{po.po_number}</span>
+                  <span className="font-black text-gray-900 dark:text-white text-sm sm:text-base">{po.po_number}</span>
                   <StatusBadge status={po.status} />
                   <TypeBadge type={po.type} />
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                   Supplier: <span className="font-medium text-gray-700 dark:text-gray-300">{supplierName(po.supplier_id)}</span>
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">{po.items?.length || 0} item{po.items?.length !== 1 ? "s" : ""} · {formatCurrency(po.total)}</p>
@@ -464,25 +464,25 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
 
               <button
                 onClick={() => setDetail(po)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
+                className="flex items-center gap-1.5 px-2.5 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
                 title="View order details"
               >
-                <Eye size={14} /> View
+                <Eye size={14} /> <span className="hidden sm:inline">View</span>
               </button>
 
               {isPending && canApprove && (
                 <button
                   onClick={() => handleApprove(po)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-colors flex-shrink-0"
+                  className="flex items-center gap-1.5 px-2.5 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-colors flex-shrink-0"
                   title="Approve this purchase order"
                 >
-                  <ShieldCheck size={14} /> Approve
+                  <ShieldCheck size={14} /> <span className="hidden sm:inline">Approve</span>
                 </button>
               )}
 
               <button
                 onClick={() => handleDelete(po.id)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors flex-shrink-0"
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors flex-shrink-0"
               >
                 <Trash2 size={14} />
               </button>

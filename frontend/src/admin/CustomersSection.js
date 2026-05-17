@@ -64,37 +64,37 @@ export default function CustomersSection() {
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone or email…"
         className="w-full mb-4 px-4 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
         {loading ? <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
-          <table className="w-full">
+          <table className="w-full min-w-[480px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-6 py-3">Customer</th>
-                <th className="text-left px-6 py-3">Phone</th>
-                <th className="text-left px-6 py-3">Email</th>
-                <th className="text-left px-6 py-3">Orders</th>
-                <th className="text-left px-6 py-3">Total Spent</th>
+                <th className="text-left px-4 py-3">Customer</th>
+                <th className="text-left px-4 py-3">Phone</th>
+                <th className="text-left px-4 py-3">Email</th>
+                <th className="text-left px-4 py-3">Orders</th>
+                <th className="text-left px-4 py-3">Total Spent</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900">
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-sm">
+                      <div className="w-8 h-8 flex-shrink-0 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-sm">
                         {c.name?.[0]?.toUpperCase()}
                       </div>
                       <span className="font-semibold text-gray-900 dark:text-white text-sm">{c.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-sm">{c.phone || "—"}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-sm">{c.email || "—"}</td>
-                  <td className="px-6 py-4 text-gray-900 dark:text-white font-semibold text-sm">{c.total_orders || 0}</td>
-                  <td className="px-6 py-4 text-green-600 font-semibold text-sm">{formatCurrency(c.total_spent || 0)}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap">{c.phone || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{c.email || "—"}</td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-white font-semibold text-sm text-center">{c.total_orders || 0}</td>
+                  <td className="px-4 py-3 text-green-600 font-semibold text-sm whitespace-nowrap">{formatCurrency(c.total_spent || 0)}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-16 text-center">
+                <tr><td colSpan={5} className="px-4 py-16 text-center">
                   <UserCircle size={40} className="mx-auto text-gray-200 mb-3" />
                   <p className="text-gray-400 text-sm">No customers found</p>
                 </td></tr>

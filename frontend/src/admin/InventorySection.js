@@ -113,36 +113,36 @@ function StockLevelsView() {
         ))}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
         {loading ? <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
-          <table className="w-full">
+          <table className="w-full min-w-[520px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-6 py-3">Product</th>
-                <th className="text-left px-6 py-3">Outlet</th>
-                <th className="text-left px-6 py-3">Qty</th>
-                <th className="text-left px-6 py-3">Min Qty</th>
-                <th className="text-left px-6 py-3">Status</th>
-                <th className="text-left px-6 py-3">Action</th>
+                <th className="text-left px-4 py-3">Product</th>
+                <th className="text-left px-4 py-3 whitespace-nowrap">Outlet</th>
+                <th className="text-center px-3 py-3">Qty</th>
+                <th className="text-center px-3 py-3 whitespace-nowrap">Min Qty</th>
+                <th className="text-center px-3 py-3">Status</th>
+                <th className="text-center px-3 py-3">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {displayed.map((item, i) => {
                 const low = isLow(item);
                 return (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900">
-                    <td className="px-6 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
-                    <td className="px-6 py-3 text-gray-600 dark:text-gray-300 text-sm">{outletName(item.outlet_id)}</td>
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap">{outletName(item.outlet_id)}</td>
+                    <td className="px-3 py-3 text-center">
                       <span className={cn("font-bold text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
                     </td>
-                    <td className="px-6 py-3 text-gray-500 dark:text-gray-400 text-sm">{item.min_quantity || 10}</td>
-                    <td className="px-6 py-3">
+                    <td className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-sm">{item.min_quantity || 10}</td>
+                    <td className="px-3 py-3 text-center">
                       <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", low ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700")}>
                         {low ? "Low" : "OK"}
                       </span>
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-3 py-3 text-center">
                       <button onClick={() => openUpdate(item)} className="text-xs font-semibold text-blue-600 hover:text-blue-800">Update</button>
                     </td>
                   </tr>
