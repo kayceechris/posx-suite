@@ -21,6 +21,41 @@ PORT         = 8765
 SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
 
 
+# ── Windows raw print via spooler ──────────────────────────────────────────────
+
+def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
+    """Send raw ESC/POS bytes directly to a named Windows printer via the spooler."""
+    import ctypes
+    import ctypes.wintypes
+
+    class DOC_INFO_1(ctypes.Structure):
+        _fields_ = [
+            ("pDocName",    ctypes.c_wchar_p),
+            ("pOutputFile", ctypes.c_wchar_p),
+            ("pDatatype",   ctypes.c_wchar_p),
+        ]
+
+    winspool = ctypes.WinDLL("winspool.drv")
+    handle   = ctypes.c_void_p()
+
+    if not winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None):
+        raise OSError(f"Cannot open printer '{printer_name}' — check the system printer name")
+
+    doc     = DOC_INFO_1("Receipt", None, "RAW")
+    job_id  = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc))
+    if not job_id:
+        winspool.ClosePrinter(handle)
+        raise OSError("StartDocPrinter failed")
+
+    winspool.StartPagePrinter(handle)
+    buf     = (ctypes.c_char * len(raw_bytes))(*raw_bytes)
+    written = ctypes.c_ulong(0)
+    winspool.WritePrinter(handle, buf, len(raw_bytes), ctypes.byref(written))
+    winspool.EndPagePrinter(handle)
+    winspool.EndDocPrinter(handle)
+    winspool.ClosePrinter(handle)
+
+
 # ── Networking helpers ─────────────────────────────────────────────────────────
 
 def _local_ip():
@@ -127,7 +162,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path not in ("/print", "/test-usb"):
+        if self.path not in ("/print", "/test-usb", "/print-usb"):
             self._json(404, {"error": "Not found"})
             return
         token = self.headers.get("X-Bridge-Token", "")
@@ -160,6 +195,20 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
                     self._json(502, {"error": err})
             except Exception as e:
                 self._json(500, {"error": str(e)})
+            return
+
+        if self.path == "/print-usb":
+            printer_name = body.get("printer_name", "").strip()
+            data         = body.get("data", [])
+            if not printer_name or not data:
+                self._json(400, {"error": "Missing 'printer_name' or 'data'"})
+                return
+            try:
+                _raw_print_windows(printer_name, bytes(data))
+                print(f"  [OK] USB raw print {len(data)} bytes -> '{printer_name}'")
+                self._json(200, {"ok": True, "bytes": len(data)})
+            except Exception as e:
+                self._json(502, {"error": str(e)})
             return
 
         printer_ip   = body.get("ip", "")

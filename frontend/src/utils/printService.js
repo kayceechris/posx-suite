@@ -299,8 +299,31 @@ export const printService = {
       || "http://localhost:8765").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
     const printerIp   = printerConfig.ip   || "";
     const printerPort = printerConfig.port || 9100;
+    const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
-    // Try bridge first
+    // Try USB printers via bridge /print-usb
+    try {
+      const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+      const usbPrinter = saved.find((p) => p.mode === "usb" && p.type === type && p.active !== false);
+      if (usbPrinter && bridgeUrl) {
+        const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
+        if (printerName) {
+          const res = await fetch(`${bridgeUrl}/print-usb`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
+            body: JSON.stringify({ printer_name: printerName, data: bytes }),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (res.ok) return { success: true, method: "usb" };
+          const err = await res.json().catch(() => ({}));
+          console.warn("[PrintService] USB bridge error:", err.error);
+        }
+      }
+    } catch (err) {
+      console.warn("[PrintService] USB print failed:", err.message);
+    }
+
+    // Try network printer via bridge /print
     if (printerIp) {
       try {
         await sendToBridge({ bridgeUrl, printerIp, printerPort, bytes });

@@ -165,7 +165,11 @@ export default function TerminalSettingsModal({
     setLoadingPrinters(true);
     const fetcher = isAdmin ? api.getPrinters() : api.getAssignedPrinters?.() ?? Promise.resolve([]);
     Promise.all([fetcher, api.getPrinterGroups().catch(() => [])])
-      .then(([printers, groups]) => { setSavedPrinters(printers); setPrinterGroups(groups); })
+      .then(([printers, groups]) => {
+        setSavedPrinters(printers);
+        setPrinterGroups(groups);
+        localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
+      })
       .catch(console.error)
       .finally(() => setLoadingPrinters(false));
   }, [tab, isAdmin]);
@@ -234,6 +238,7 @@ export default function TerminalSettingsModal({
       setShowAdd(false);
       const list = await api.getPrinters();
       setSavedPrinters(list);
+      localStorage.setItem("pos_saved_printers", JSON.stringify(list));
     } catch (err) {
       setPrinterErr(err.message);
     } finally {
@@ -245,7 +250,11 @@ export default function TerminalSettingsModal({
     if (!window.confirm(`Remove "${printer.name}"?`)) return;
     try {
       await api.deletePrinter(printer.id);
-      setSavedPrinters((prev) => prev.filter((p) => p.id !== printer.id));
+      setSavedPrinters((prev) => {
+        const updated = prev.filter((p) => p.id !== printer.id);
+        localStorage.setItem("pos_saved_printers", JSON.stringify(updated));
+        return updated;
+      });
     } catch (err) { alert(err.message); }
   };
 
@@ -301,7 +310,11 @@ export default function TerminalSettingsModal({
     setEditSaving(true);
     try {
       const updated = await api.updatePrinter(printerId, { windows_printer_name: editWinName });
-      setSavedPrinters((prev) => prev.map((p) => p.id === printerId ? { ...p, ...updated } : p));
+      setSavedPrinters((prev) => {
+        const next = prev.map((p) => p.id === printerId ? { ...p, ...updated } : p);
+        localStorage.setItem("pos_saved_printers", JSON.stringify(next));
+        return next;
+      });
       setEditingPrinterId(null);
       setTestPrintState((prev) => ({ ...prev, [printerId]: { status: "idle", msg: "" } }));
     } catch (err) {
