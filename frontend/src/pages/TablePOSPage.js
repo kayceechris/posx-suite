@@ -353,6 +353,7 @@ export default function TablePOSPage() {
       discount: 0,
       total,
       footer: bs.receipt_footer || "Thank you!",
+      docType: "BILL",
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
@@ -385,6 +386,20 @@ export default function TablePOSPage() {
     try {
       await api.createOrder(buildOrderPayload("sent_to_kitchen", "pending"));
       showToast("Order sent to kitchen!");
+      // Print kitchen/bar tickets for each configured station
+      try {
+        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+        const kitchenPrinters = saved.filter((x) => x.type === "kitchen");
+        for (const kp of kitchenPrinters) {
+          const printerConfig = kp.mode === "usb" ? { printer: kp } : { ip: kp.ip_address, port: kp.port || 9100 };
+          printService.printKitchenTicket({
+            tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
+            orderNo: "",
+            items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity })),
+            station: kp.name || "KITCHEN",
+          }, printerConfig).catch(console.warn);
+        }
+      } catch (_) {}
       setCart([]);
       setCustomerName("");
       navigate("/tables");

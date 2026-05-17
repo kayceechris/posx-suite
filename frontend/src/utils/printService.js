@@ -29,8 +29,29 @@ const CMD = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Map non-ASCII currency/special chars to printable ASCII equivalents
+const _CHAR_MAP = {
+  '₦': 'N',    // ₦ Naira
+  '€': 'EUR',  // €
+  '£': 'GBP',  // £
+  '¥': 'Y',    // ¥
+  '₹': 'Rs',   // ₹
+  '₩': 'W',    // ₩
+  '₫': 'D',    // ₫
+  '¢': 'c',    // ¢
+  '✓': 'OK',   // ✓
+  '—': '-',    // —
+  '…': '...', // …
+};
+
 function enc(text) {
-  return Array.from(new TextEncoder().encode(text));
+  let s = String(text || '');
+  for (const [sym, rep] of Object.entries(_CHAR_MAP)) {
+    s = s.split(sym).join(rep);
+  }
+  s = s.replace(/[^\x20-\x7E\n\r]/g, '?');
+  return Array.from(new TextEncoder().encode(s));
 }
 
 function pad(str, len) {
@@ -42,7 +63,8 @@ function rpad(str, len) {
 }
 
 function fmtCurrency(amount) {
-  const sym = localStorage.getItem("pos_currency_symbol") || "₦";
+  const raw = localStorage.getItem("pos_currency_symbol") || "N";
+  const sym = raw.replace(/[^\x20-\x7E]/g, (c) => _CHAR_MAP[c] || '?');
   const n = Number(amount || 0);
   return `${sym}${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
 }
@@ -70,6 +92,7 @@ function buildReceiptBytes(data) {
     paymentMethod = "",
     footer = "Thank you! Please come again.",
     openDrawer = false,
+    docType = "RECEIPT",
   } = data;
 
   const b = [];
@@ -88,6 +111,12 @@ function buildReceiptBytes(data) {
   if (address) line(address);
   if (phone)   line(`Tel: ${phone}`);
   line(divider("="));
+
+  // Document type label
+  add(...CMD.ALIGN_CENTER, ...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
+  line(docType);
+  add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
+  line(divider());
 
   // Order info
   add(...CMD.ALIGN_LEFT);
@@ -297,32 +326,32 @@ export const printService = {
   async _print(bytes, data, printerConfig, type) {
     const bridgeUrl = (printerConfig.bridgeUrl
       || localStorage.getItem("print_bridge_url") || "").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    const printerIp   = printerConfig.ip   || "";
-    const printerPort = printerConfig.port || 9100;
     const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
     let usbPrinter = printerConfig.printer || null;
+    let networkPrinter = null;
     if (!usbPrinter) {
       try {
         const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-        usbPrinter = saved.find((x) => x.mode === "usb" && x.type === type) || null;
+        const matched = saved.filter((x) => x.type === type);
+        usbPrinter = matched.find((x) => x.mode === "usb") || null;
+        if (!usbPrinter) networkPrinter = matched.find((x) => x.mode === "network" && x.ip_address) || null;
       } catch (_) {}
     }
 
-    console.log("[PrintService._print]", { type, bridgeUrl, hasUsbPrinter: !!usbPrinter, printerName: usbPrinter?.windows_printer_name || usbPrinter?.name });
+    const printerIp   = printerConfig.ip   || networkPrinter?.ip_address || "";
+    const printerPort = printerConfig.port || networkPrinter?.port || 9100;
 
     if (usbPrinter) {
       if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers");
       const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
       if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
-      console.log("[PrintService] sending to bridge:", `${bridgeUrl}/print-usb`, "printer:", printerName);
       const res = await fetch(`${bridgeUrl}/print-usb`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
         body: JSON.stringify({ printer_name: printerName, data: bytes }),
         signal: AbortSignal.timeout(15000),
       });
-      console.log("[PrintService] bridge response:", res.status, res.ok);
       if (res.ok) return { success: true, method: "usb" };
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Bridge error ${res.status}`);

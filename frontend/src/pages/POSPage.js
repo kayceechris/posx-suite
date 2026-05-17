@@ -710,6 +710,7 @@ export default function POSPage() {
                       discount: 0,
                       total,
                       footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
+                      docType: "BILL",
                     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
                   }}
                   disabled={cart.length === 0}
