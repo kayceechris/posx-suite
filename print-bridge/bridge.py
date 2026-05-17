@@ -1,30 +1,24 @@
 #!/usr/bin/env python3
 """
-POSx Suite Local Print Bridge v1.2
+POSx Suite Local Print Bridge v1.3
 - Run this on any Windows PC on the same Wi-Fi as your printers.
-- Automatically generates an HTTPS certificate on first run.
+- Serves plain HTTP — Chrome's Private Network Access headers handle security.
 - No pip packages needed — uses Python standard library only.
 
-After first run:
-  1. Open  https://<YOUR-PC-IP>:8765/health  in Chrome on your phone.
-  2. Tap Advanced → Proceed (accept the self-signed cert once).
-  3. Done — WiFi scanning now works from the POSx app.
+Setup:
+  1. Double-click start.bat (or run: python bridge.py)
+  2. Note the IP shown and enter it in the POSx app Bridge URL field.
+  3. Add printers in Terminal Settings -> Printers tab.
 """
 import json
-import os
 import socket
-import ssl
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-PORT        = 8765
+PORT         = 8765
 SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CERT_FILE   = os.path.join(SCRIPT_DIR, "cert.pem")
-KEY_FILE    = os.path.join(SCRIPT_DIR, "key.pem")
 
 
 # ── Networking helpers ─────────────────────────────────────────────────────────
@@ -92,102 +86,13 @@ def _list_windows_printers():
         return []
 
 
-# ── Certificate generation ─────────────────────────────────────────────────────
-
-def _cert_has_ip(local_ip):
-    """Return True if the existing cert.pem already includes local_ip in its SAN."""
-    if not os.path.exists(CERT_FILE):
-        return False
-    try:
-        openssl = _find_openssl()
-        if not openssl:
-            return True  # can't check, assume it's fine
-        result = subprocess.run(
-            [openssl, "x509", "-in", CERT_FILE, "-noout", "-text"],
-            capture_output=True, text=True, timeout=8,
-        )
-        return local_ip in result.stdout
-    except Exception:
-        return True  # assume fine
-
-
-def _find_openssl():
-    """Return path to openssl executable, or None."""
-    candidates = ["openssl"]
-    if sys.platform == "win32":
-        candidates += [
-            r"C:\Program Files\Git\usr\bin\openssl.exe",
-            r"C:\Program Files (x86)\Git\usr\bin\openssl.exe",
-            r"C:\Windows\System32\openssl.exe",
-        ]
-    for cmd in candidates:
-        try:
-            subprocess.run([cmd, "version"], capture_output=True, timeout=4, check=True)
-            return cmd
-        except Exception:
-            continue
-    return None
-
-
-def _gen_cert(local_ip):
-    """Generate a self-signed cert with local_ip in the SAN. Returns True on success."""
-    openssl = _find_openssl()
-    if not openssl:
-        return False
-    san = f"IP:{local_ip},IP:127.0.0.1,DNS:localhost"
-    try:
-        result = subprocess.run(
-            [
-                openssl, "req", "-x509",
-                "-newkey", "rsa:2048",
-                "-keyout", KEY_FILE,
-                "-out",    CERT_FILE,
-                "-days",   "3650",
-                "-nodes",
-                "-subj",   "/CN=POSx-Bridge",
-                "-addext", f"subjectAltName={san}",
-            ],
-            capture_output=True, timeout=30,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def _ensure_cert(local_ip):
-    """Generate cert if missing or if local_ip changed since last generation."""
-    if _cert_has_ip(local_ip):
-        return  # cert already good
-    print(f"  Generating HTTPS certificate for {local_ip}...")
-    if _gen_cert(local_ip):
-        print("  [OK] Certificate ready (cert.pem + key.pem)")
-    else:
-        print("  [!!] Could not generate certificate -- running HTTP.")
-        print("       Install Git (includes openssl) then restart, or run manually:")
-        print(f'       openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 3650 -nodes -subj "/CN=POSx-Bridge" -addext "subjectAltName=IP:{local_ip},IP:127.0.0.1,DNS:localhost"')
-
-
-def _wrap_ssl(server):
-    """Wrap the HTTPServer socket with TLS. Returns True if successful."""
-    if not (os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE)):
-        return False
-    try:
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
-        server.socket = ctx.wrap_socket(server.socket, server_side=True)
-        return True
-    except Exception as e:
-        print(f"  [!!] SSL error: {e} -- falling back to HTTP.")
-        return False
-
-
 # ── Firewall ───────────────────────────────────────────────────────────────────
 
 def _ensure_firewall_rule():
     if sys.platform != "win32":
         return
     try:
-        result = subprocess.run(
+        subprocess.run(
             [
                 "netsh", "advfirewall", "firewall", "add", "rule",
                 f"name=POSx Print Bridge port {PORT}",
@@ -196,8 +101,6 @@ def _ensure_firewall_rule():
             ],
             capture_output=True, text=True, timeout=8,
         )
-        if result.returncode == 0:
-            print(f"  [OK] Windows Firewall rule added for port {PORT}")
     except Exception:
         pass
 
@@ -212,7 +115,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.2"})
+            self._json(200, {"ok": True, "service": "POSx Print Bridge", "version": "1.3"})
         elif self.path == "/printers":
             self._json(200, {"printers": _list_windows_printers()})
         elif self.path == "/scan":
@@ -249,7 +152,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
             sock.connect((printer_ip, printer_port))
             sock.sendall(bytes(data))
             sock.close()
-            print(f"  ✓ Printed {len(data)} bytes → {printer_ip}:{printer_port}")
+            print(f"  [OK] Printed {len(data)} bytes -> {printer_ip}:{printer_port}")
             self._json(200, {"ok": True, "bytes": len(data)})
         except ConnectionRefusedError:
             self._json(503, {"error": f"Printer refused connection at {printer_ip}:{printer_port}"})
@@ -288,29 +191,20 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
 
 def main():
     local_ip = _local_ip()
-
     _ensure_firewall_rule()
-    _ensure_cert(local_ip)
 
-    server   = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
-    is_https = _wrap_ssl(server)
-    proto    = "https" if is_https else "http"
+    server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
 
     print("=" * 55)
-    print("  POSx Suite Local Print Bridge v1.2")
+    print("  POSx Suite Local Print Bridge v1.3")
     print("=" * 55)
-    print(f"  Protocol      : {'HTTPS [OK]' if is_https else 'HTTP (cert generation failed)'}")
-    print(f"  Your local IP : {proto}://{local_ip}:{PORT}")
+    print(f"  Protocol      : HTTP")
+    print(f"  Your local IP : http://{local_ip}:{PORT}")
     print(f"  -> Use this URL in the POSx app Bridge URL field")
     print()
-
-    if is_https:
-        print("  --- One-time phone setup (do this once) ----------")
-        print(f"  1. Open  {proto}://{local_ip}:{PORT}/health  in Chrome on your phone")
-        print("  2. Tap  Advanced -> Proceed  (accept the self-signed cert)")
-        print("  3. Done -- WiFi scanning will now work in the POSx app")
-        print()
-
+    print(f"  Localhost URL : http://localhost:{PORT}")
+    print(f"  -> Use this if the app runs on this same PC")
+    print()
     print("  Press Ctrl+C to stop")
     print("=" * 55)
 
