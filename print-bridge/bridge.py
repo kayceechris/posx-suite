@@ -48,7 +48,7 @@ def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
         raise OSError("StartDocPrinter failed")
 
     winspool.StartPagePrinter(handle)
-    buf     = (ctypes.c_char * len(raw_bytes))(*raw_bytes)
+    buf     = ctypes.create_string_buffer(raw_bytes, len(raw_bytes))
     written = ctypes.c_ulong(0)
     winspool.WritePrinter(handle, buf, len(raw_bytes), ctypes.byref(written))
     winspool.EndPagePrinter(handle)

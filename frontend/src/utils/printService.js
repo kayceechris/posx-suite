@@ -303,20 +303,27 @@ export const printService = {
 
     // Try USB printers via bridge /print-usb
     try {
-      const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-      const usbPrinter = saved.find((p) => p.mode === "usb" && p.type === type && p.active !== false);
-      if (usbPrinter && bridgeUrl) {
-        const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
-        if (printerName) {
-          const res = await fetch(`${bridgeUrl}/print-usb`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-            body: JSON.stringify({ printer_name: printerName, data: bytes }),
-            signal: AbortSignal.timeout(10000),
-          });
-          if (res.ok) return { success: true, method: "usb" };
-          const err = await res.json().catch(() => ({}));
-          console.warn("[PrintService] USB bridge error:", err.error);
+      const authToken = localStorage.getItem("posx_token") || "";
+      const printersRes = await fetch("/api/printers/assigned", {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        signal: AbortSignal.timeout(4000),
+      });
+      if (printersRes.ok) {
+        const printers = await printersRes.json();
+        const usbPrinter = printers.find((p) => p.mode === "usb" && p.type === type);
+        if (usbPrinter && bridgeUrl) {
+          const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
+          if (printerName) {
+            const res = await fetch(`${bridgeUrl}/print-usb`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
+              body: JSON.stringify({ printer_name: printerName, data: bytes }),
+              signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) return { success: true, method: "usb" };
+            const err = await res.json().catch(() => ({}));
+            console.warn("[PrintService] USB bridge error:", err.error);
+          }
         }
       }
     } catch (err) {
