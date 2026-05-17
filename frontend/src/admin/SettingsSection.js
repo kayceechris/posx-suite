@@ -1428,7 +1428,7 @@ function PrinterGroupsSettings() {
 
       {(showAdd || editGroup) && (
         <Modal title={editGroup ? "Edit Printer Group" : "Add Printer Group"} onClose={() => { setShowAdd(false); setEditGroup(null); }} wide>
-          <PrinterGroupForm />
+          {PrinterGroupForm()}
         </Modal>
       )}
     </div>
