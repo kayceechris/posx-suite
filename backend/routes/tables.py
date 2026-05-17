@@ -14,6 +14,22 @@ async def get_tables(outlet_id: Optional[str] = None, current_user: User = Depen
     if outlet_id:
         query["outlet_id"] = outlet_id
     tables = await db.tables.find(query, {"_id": 0}).to_list(1000)
+
+    # Backfill waiter_id/waiter_name for occupied tables that pre-date the fix
+    for table in tables:
+        if table.get("status") == "occupied" and not table.get("waiter_id") and table.get("current_order_id"):
+            order = await db.orders.find_one(
+                {"id": table["current_order_id"]},
+                {"_id": 0, "created_by": 1, "created_by_name": 1}
+            )
+            if order and order.get("created_by"):
+                table["waiter_id"]   = order["created_by"]
+                table["waiter_name"] = order.get("created_by_name", "")
+                await db.tables.update_one(
+                    {"id": table["id"]},
+                    {"$set": {"waiter_id": table["waiter_id"], "waiter_name": table["waiter_name"]}}
+                )
+
     return tables
 
 
