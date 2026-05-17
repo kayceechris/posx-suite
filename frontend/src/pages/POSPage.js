@@ -277,6 +277,7 @@ export default function POSPage() {
   const [savedTerminalName, setSavedTerminalName] = useState(
     () => localStorage.getItem("pos_terminal_name") || ""
   );
+  const [assignedPrinters, setAssignedPrinters] = useState([]);
   const [customerName, setCustomerName] = useState("");
 
   const [cart, setCart] = useState([]);
@@ -326,15 +327,7 @@ export default function POSPage() {
         setTerminals(terms);
         setOutlets(outs);
         setPaymentTypes(ptypes);
-        if (assignedPrinters.length) {
-          localStorage.setItem("pos_saved_printers", JSON.stringify(assignedPrinters));
-          ["receipt", "kitchen", "bar", "label"].forEach((t) => {
-            const p = assignedPrinters.find((x) => x.mode === "usb" && x.type === t);
-            const name = p ? (p.windows_printer_name || p.name || "").trim() : "";
-            if (name) localStorage.setItem(`pos_usb_${t}_printer`, name);
-            else localStorage.removeItem(`pos_usb_${t}_printer`);
-          });
-        }
+        setAssignedPrinters(assignedPrinters);
       } catch {
         showToast("Failed to load data", "error");
       } finally {
@@ -459,7 +452,8 @@ export default function POSPage() {
         await api.createOrder(buildPayload("completed", method, name));
       }
       showToast("Order completed!");
-      printService.printReceipt(receiptData, {}).catch((e) => showToast(e.message, "error"));
+      const usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
+      printService.printReceipt(receiptData, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
       setCart([]);
       setCustomerName("");
       setLoadedOrderId(null);
@@ -692,6 +686,7 @@ export default function POSPage() {
                 <button
                   onClick={() => {
                     if (cart.length === 0) return;
+                    const usbPrinter = assignedPrinters.find((p) => p.mode === "usb" && p.type === "receipt") || null;
                     printService.printReceipt({
                       businessName: settings?.business_name || "Restaurant",
                       address: settings?.address || "",
@@ -703,7 +698,7 @@ export default function POSPage() {
                       discount: 0,
                       total,
                       footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
-                    }, {}).catch((e) => showToast(e.message, "error"));
+                    }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
                   }}
                   disabled={cart.length === 0}
                   title="Print Bill"

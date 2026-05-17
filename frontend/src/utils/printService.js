@@ -9,8 +9,6 @@
  * Configure the bridge URL in Admin → Settings → Printer Groups → Bridge URL.
  */
 
-import { api } from '../lib/api';
-
 // ─── ESC/POS byte constants ───────────────────────────────────────────────────
 const ESC = 0x1b;
 const GS  = 0x1d;
@@ -302,51 +300,23 @@ export const printService = {
     const printerPort = printerConfig.port || 9100;
     const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
-    // USB path — same flow as the test-print button in Terminal Settings:
-    // 1. try dedicated localStorage key (set by TerminalSettings / POS startup)
-    // 2. try pos_saved_printers array
-    // 3. if bridge URL is set and still nothing found, hit the API directly
-    // 4. if bridge URL is set and no USB printer found anywhere → throw (visible toast)
-    let usbPrinterName = (localStorage.getItem(`pos_usb_${type}_printer`) || "").trim();
-    if (!usbPrinterName) {
-      try {
-        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-        const p = saved.find((x) => x.mode === "usb" && x.type === type);
-        if (p) usbPrinterName = (p.windows_printer_name || p.name || "").trim();
-      } catch (_) {}
-    }
-    if (!usbPrinterName && bridgeUrl) {
-      try {
-        const printers = await api.getAssignedPrinters();
-        if (printers.length) {
-          localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
-          ["receipt", "kitchen", "bar", "label"].forEach((t) => {
-            const up = printers.find((x) => x.mode === "usb" && x.type === t);
-            const n = up ? (up.windows_printer_name || up.name || "").trim() : "";
-            if (n) localStorage.setItem(`pos_usb_${t}_printer`, n);
-            else localStorage.removeItem(`pos_usb_${t}_printer`);
-          });
-        }
-        const p = printers.find((x) => x.mode === "usb" && x.type === type);
-        if (p) usbPrinterName = (p.windows_printer_name || p.name || "").trim();
-      } catch (_) {}
-    }
-
-    if (usbPrinterName) {
+    // USB path — exact same pattern as the test-print button in Terminal Settings.
+    // printerConfig.printer is the USB printer object passed directly from POSPage
+    // React state, so no localStorage/API lookup is needed.
+    const usbPrinter = printerConfig.printer || null;
+    if (usbPrinter) {
+      if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers");
+      const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
+      if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
       const res = await fetch(`${bridgeUrl}/print-usb`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-        body: JSON.stringify({ printer_name: usbPrinterName, data: bytes }),
+        body: JSON.stringify({ printer_name: printerName, data: bytes }),
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) return { success: true, method: "usb" };
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Bridge error ${res.status}`);
-    }
-
-    // If bridge URL is set but no USB printer found → stop here, don't silently browser-print
-    if (bridgeUrl) {
-      throw new Error(`No USB ${type} printer found. Open Terminal Settings → Printers and add one.`);
     }
 
     // Network printer via bridge /print
@@ -359,7 +329,7 @@ export const printService = {
       }
     }
 
-    // Browser fallback (only when no bridge is configured at all)
+    // Browser fallback
     if (type === "receipt") {
       browserPrint(receiptToHtml(data));
     } else {
