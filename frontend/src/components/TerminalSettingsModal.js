@@ -268,10 +268,29 @@ export default function TerminalSettingsModal({
         }
         const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
         const printerName = (printer.windows_printer_name || printer.name || "").trim();
-        const res = await fetch(`${bridgeUrl}/test-usb`, {
+
+        // Build a minimal ESC/POS test receipt to verify raw printing end-to-end
+        const e = (s) => Array.from(new TextEncoder().encode(s));
+        const testBytes = [
+          0x1b, 0x40,               // ESC @ init
+          0x1b, 0x61, 0x01,         // center
+          0x1b, 0x21, 0x30,         // double width+height
+          ...e("TEST PRINT\n"),
+          0x1b, 0x21, 0x00,         // normal
+          0x1b, 0x61, 0x00,         // left
+          ...e(`Printer : ${printerName}\n`),
+          ...e(`Time    : ${new Date().toLocaleString()}\n`),
+          ...e("--------------------------------\n"),
+          0x1b, 0x61, 0x01,
+          ...e("** ESC/POS OK **\n"),
+          0x0a, 0x0a, 0x0a,
+          0x1d, 0x56, 0x41, 0x03,   // cut
+        ];
+
+        const res = await fetch(`${bridgeUrl}/print-usb`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-          body: JSON.stringify({ printer_name: printerName }),
+          body: JSON.stringify({ printer_name: printerName, data: testBytes }),
           signal: AbortSignal.timeout(15000),
         });
         if (!res.ok) {
