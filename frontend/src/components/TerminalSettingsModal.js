@@ -266,6 +266,9 @@ export default function TerminalSettingsModal({
           signal: AbortSignal.timeout(15000),
         });
         if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error("Bridge is outdated — stop and restart bridge.py, then try again");
+          }
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `Bridge error ${res.status}`);
         }
