@@ -106,8 +106,14 @@ async def release_table(table_id: str, current_user: User = Depends(get_current_
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    if table.get("waiter_id") != current_user.id and current_user.role not in ["admin", "manager"]:
-        raise HTTPException(status_code=403, detail="Not authorized to release this table")
+    is_privileged = current_user.role in ["admin", "manager"]
+    has_perm = "release_tables" in (current_user.permissions or [])
+    is_own_table = table.get("waiter_id") == current_user.id
+
+    if not is_privileged and not has_perm:
+        raise HTTPException(status_code=403, detail="You don't have permission to release tables")
+    if not is_privileged and not is_own_table:
+        raise HTTPException(status_code=403, detail="You can only release tables assigned to you")
 
     # Delete the held/in-progress order tied to this table
     order_id = table.get("current_order_id")

@@ -153,7 +153,7 @@ ${order.customer_name ? `<p>Customer: ${order.customer_name}</p>` : ""}
   setTimeout(() => w.print(), 400);
 }
 
-function OrderCard({ order, canSeeAll, onDelete, onComplete, onLoad, onPrint, isActing }) {
+function OrderCard({ order, canSeeAll, canDelete, onDelete, onComplete, onLoad, onPrint, isActing }) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -222,7 +222,7 @@ function OrderCard({ order, canSeeAll, onDelete, onComplete, onLoad, onPrint, is
         </div>
 
         <div className="flex gap-2">
-          {showDeleteConfirm ? (
+          {canDelete && showDeleteConfirm ? (
             <div className="flex gap-1.5 flex-1">
               <button
                 onClick={() => { setShowDeleteConfirm(false); onDelete(order.id); }}
@@ -240,6 +240,7 @@ function OrderCard({ order, canSeeAll, onDelete, onComplete, onLoad, onPrint, is
             </div>
           ) : (
             <>
+              {canDelete && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={isActing}
@@ -248,6 +249,7 @@ function OrderCard({ order, canSeeAll, onDelete, onComplete, onLoad, onPrint, is
               >
                 <Trash2 size={15} />
               </button>
+              )}
               <button
                 onClick={() => onPrint(order)}
                 disabled={isActing}
@@ -306,6 +308,11 @@ export default function HeldOrdersPage() {
     user?.role === "admin" ||
     user?.role === "manager" ||
     (user?.role === "cashier" && user?.permissions?.includes("view_all_orders"));
+
+  const canDelete =
+    user?.role === "admin" ||
+    user?.role === "manager" ||
+    (user?.permissions || []).includes("delete_held_order_items");
 
   const hasTableAndBarSupport = ["restaurant", "nightclub", "cafe", "bar"].includes(
     settings?.business_type
@@ -475,6 +482,7 @@ export default function HeldOrdersPage() {
                   key={order.id}
                   order={order}
                   canSeeAll={canSeeAll}
+                  canDelete={canDelete}
                   onDelete={handleDelete}
                   onComplete={handleComplete}
                   onLoad={handleLoad}

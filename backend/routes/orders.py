@@ -144,6 +144,14 @@ async def update_order(order_id: str, order_data: dict, current_user: User = Dep
         raise HTTPException(status_code=404, detail="Order not found")
 
     update_fields = {k: v for k, v in order_data.items() if k not in ("id", "created_at", "order_number", "created_by")}
+
+    # Voiding a held/in-progress order requires explicit permission
+    if update_fields.get("status") == "voided" and existing.get("status") in ("held", "sent_to_kitchen", "pending"):
+        is_privileged = current_user.role in ["admin", "manager"]
+        has_perm = "delete_held_order_items" in (current_user.permissions or [])
+        if not is_privileged and not has_perm:
+            raise HTTPException(status_code=403, detail="You don't have permission to void held orders")
+
     await db.orders.update_one({"id": order_id}, {"$set": update_fields})
 
     # Handle status transitions
@@ -186,6 +194,11 @@ async def delete_order(order_id: str, current_user: User = Depends(get_current_u
     existing = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    is_privileged = current_user.role in ["admin", "manager"]
+    has_perm = "delete_held_order_items" in (current_user.permissions or [])
+    if not is_privileged and not has_perm:
+        raise HTTPException(status_code=403, detail="You don't have permission to delete held orders")
     # Release table if order was holding one
     if existing.get("table_id"):
         await db.tables.update_one(
