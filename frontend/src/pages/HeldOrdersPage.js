@@ -326,7 +326,7 @@ export default function HeldOrdersPage() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [terminals, setTerminals] = useState([]);
