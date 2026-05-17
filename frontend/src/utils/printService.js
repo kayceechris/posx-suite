@@ -90,26 +90,44 @@ function buildReceiptBytes(data) {
     amountPaid = 0,
     change = 0,
     paymentMethod = "",
-    footer = "Thank you! Please come again.",
+    footer = "Thank you!",
     openDrawer = false,
     docType = "RECEIPT",
+    layoutSettings = {},
   } = data;
+
+  // Resolve layout toggles (default true for most)
+  const S = layoutSettings;
+  const showStoreName = S.show_store_name !== false;
+  const showAddress   = S.show_address   !== false;
+  const showPhone     = S.show_phone     !== false;
+  const showDate      = S.show_date      !== false;
+  const showSeller    = S.show_seller    !== false;
+  const showReference = S.show_reference !== false;
+  const showCustomer  = S.show_customer  !== false;
+  const showTax       = S.show_tax       !== false;
+  const showDiscount  = S.show_discount  !== false;
+  const showNote      = S.show_note      !== false;
+  const printedFooter = S.receipt_footer || footer;
+  const printedHeader = S.receipt_header || "";
+  const noteText      = S.note_to_customer || "";
 
   const b = [];
   const add = (...bytes) => b.push(...bytes);
   const line = (text) => { b.push(...enc(text)); b.push(0x0a); };
 
   add(...CMD.INIT);
-
-  // Open cash drawer if requested
   if (openDrawer) add(...CMD.OPEN_DRAWER);
 
-  // Header
-  add(...CMD.ALIGN_CENTER, ...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
-  line(businessName);
-  add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
-  if (address) line(address);
-  if (phone)   line(`Tel: ${phone}`);
+  // Business name
+  if (showStoreName) {
+    add(...CMD.ALIGN_CENTER, ...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
+    line(businessName);
+    add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
+  }
+  if (showAddress && address) { add(...CMD.ALIGN_CENTER); line(address); }
+  if (showPhone   && phone)   { add(...CMD.ALIGN_CENTER); line(`Tel: ${phone}`); }
+  if (printedHeader)          { add(...CMD.ALIGN_CENTER); line(printedHeader); }
   line(divider("="));
 
   // Document type label
@@ -120,10 +138,10 @@ function buildReceiptBytes(data) {
 
   // Order info
   add(...CMD.ALIGN_LEFT);
-  if (tableName) line(`Table  : ${tableName}`);
-  if (orderNo)   line(`Order  : ${orderNo}`);
-  if (cashier)   line(`Cashier: ${cashier}`);
-  line(`Date   : ${new Date().toLocaleString()}`);
+  if (showCustomer  && tableName) line(`Table  : ${tableName}`);
+  if (showReference && orderNo)   line(`Order  : ${orderNo}`);
+  if (showSeller    && cashier)   line(`Cashier: ${cashier}`);
+  if (showDate)                   line(`Date   : ${new Date().toLocaleString()}`);
   line(divider());
 
   // Items
@@ -141,8 +159,8 @@ function buildReceiptBytes(data) {
   line(divider());
   add(...CMD.ALIGN_RIGHT);
   line(`Subtotal : ${fmtCurrency(subtotal)}`);
-  if (discount > 0) line(`Discount : -${fmtCurrency(discount)}`);
-  if (taxAmount > 0) line(`Tax      : ${fmtCurrency(taxAmount)}`);
+  if (showDiscount && discount > 0)  line(`Discount : -${fmtCurrency(discount)}`);
+  if (showTax      && taxAmount > 0) line(`Tax      : ${fmtCurrency(taxAmount)}`);
   add(...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
   line(`TOTAL    : ${fmtCurrency(total)}`);
   add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
@@ -152,10 +170,16 @@ function buildReceiptBytes(data) {
   }
   if (paymentMethod) line(`Method   : ${paymentMethod.toUpperCase()}`);
 
+  // Note to customer
+  if (showNote && noteText) {
+    add(...CMD.ALIGN_CENTER);
+    line(noteText);
+  }
+
   // Footer
   add(...CMD.ALIGN_CENTER);
   line(divider("="));
-  line(footer);
+  line(printedFooter);
   add(...CMD.FEED, ...CMD.FEED, ...CMD.FEED, ...CMD.CUT);
 
   return b;

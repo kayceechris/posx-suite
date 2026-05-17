@@ -116,8 +116,8 @@ function printOrderBill(order, settings, showToast) {
     taxAmount: order.tax || 0,
     discount: order.discount || 0,
     total: order.total || 0,
-    footer: "Thank you!",
     docType: "BILL",
+    layoutSettings: settings?.bill_settings || {},
   }, { printer: usbPrinter }).catch((e) => {
     if (showToast) showToast(e.message, "error");
     else alert(e.message);

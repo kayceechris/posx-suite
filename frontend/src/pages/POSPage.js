@@ -443,7 +443,7 @@ export default function POSPage() {
       discount: 0,
       total,
       paymentMethod: method,
-      footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
+      layoutSettings: settings?.receipt_settings || {},
     };
     try {
       if (loadedOrderId) {
@@ -709,8 +709,8 @@ export default function POSPage() {
                       taxAmount: tax,
                       discount: 0,
                       total,
-                      footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
                       docType: "BILL",
+                      layoutSettings: settings?.bill_settings || {},
                     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
                   }}
                   disabled={cart.length === 0}

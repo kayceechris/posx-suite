@@ -340,7 +340,6 @@ export default function TablePOSPage() {
       const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
       usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
     } catch (_) {}
-    const bs = settings?.bill_settings || {};
     printService.printReceipt({
       businessName: settings?.business_name || "Restaurant",
       address: settings?.address || "",
@@ -352,8 +351,8 @@ export default function TablePOSPage() {
       taxAmount: total - subtotal,
       discount: 0,
       total,
-      footer: bs.receipt_footer || "Thank you!",
       docType: "BILL",
+      layoutSettings: settings?.bill_settings || {},
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
@@ -363,7 +362,6 @@ export default function TablePOSPage() {
       const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
       usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
     } catch (_) {}
-    const bs = settings?.bill_settings || {};
     printService.printReceipt({
       businessName: settings?.business_name || "Restaurant",
       address: settings?.address || "",
@@ -376,7 +374,7 @@ export default function TablePOSPage() {
       discount: 0,
       total,
       paymentMethod: method,
-      footer: bs.receipt_footer || "Thank you!",
+      layoutSettings: settings?.receipt_settings || {},
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
