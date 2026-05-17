@@ -19,12 +19,13 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
 
   const bridgeUrl    = localStorage.getItem("print_bridge_url") || "";
   const hasBluetooth = typeof navigator !== "undefined" && !!navigator.bluetooth;
-  const isMobile     = forceShow || (typeof window !== "undefined" && window.innerWidth < 1024);
+  const isVisible    = forceShow || (typeof window !== "undefined" && window.innerWidth < 1024);
 
-  const showWifi = isMobile && (mode === "wifi" || mode === "both") && !!bridgeUrl;
-  const showBT   = isMobile && (mode === "bluetooth" || mode === "both") && hasBluetooth;
+  const wantsWifi = isVisible && (mode === "wifi" || mode === "both");
+  const showWifi  = wantsWifi && !!bridgeUrl;
+  const showBT    = isVisible && (mode === "bluetooth" || mode === "both") && hasBluetooth;
 
-  if (!showWifi && !showBT) return null;
+  if (!wantsWifi && !showBT) return null;
 
   const scanWifi = async () => {
     setWifiScanning(true);
@@ -64,7 +65,12 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
 
   return (
     <div className="space-y-2 mt-1.5">
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
+        {wantsWifi && !bridgeUrl && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+            <AlertCircle size={11} /> Configure Print Bridge URL to enable WiFi scanning
+          </p>
+        )}
         {showWifi && (
           <button
             type="button"

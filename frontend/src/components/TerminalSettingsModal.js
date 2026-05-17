@@ -440,18 +440,18 @@ export default function TerminalSettingsModal({
                       </div>
                     )}
 
-                    {/* Mobile scanner */}
+                    {/* Scanner — always shown when connection mode matches */}
                     {printerForm.mode === "network" && (
                       <MobilePrinterScanner
                         mode="wifi"
-                        forceShow={isMobile}
+                        forceShow={true}
                         onSelectWifi={(ip) => { setPrinterForm((f) => ({ ...f, ip_address: ip })); setPingStatus(null); }}
                       />
                     )}
                     {printerForm.mode === "bluetooth" && (
                       <MobilePrinterScanner
                         mode="bluetooth"
-                        forceShow={isMobile}
+                        forceShow={true}
                         onSelectBluetooth={(name) => setPrinterForm((f) => ({ ...f, name: f.name || name, windows_printer_name: name }))}
                       />
                     )}
