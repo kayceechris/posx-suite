@@ -328,6 +328,12 @@ export default function POSPage() {
         setPaymentTypes(ptypes);
         if (assignedPrinters.length) {
           localStorage.setItem("pos_saved_printers", JSON.stringify(assignedPrinters));
+          ["receipt", "kitchen", "bar", "label"].forEach((t) => {
+            const p = assignedPrinters.find((x) => x.mode === "usb" && x.type === t);
+            const name = p ? (p.windows_printer_name || p.name || "").trim() : "";
+            if (name) localStorage.setItem(`pos_usb_${t}_printer`, name);
+            else localStorage.removeItem(`pos_usb_${t}_printer`);
+          });
         }
       } catch {
         showToast("Failed to load data", "error");

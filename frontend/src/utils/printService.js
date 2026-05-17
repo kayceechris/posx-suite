@@ -300,17 +300,22 @@ export const printService = {
     const printerPort = printerConfig.port || 9100;
     const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
 
-    // USB path — same as the test-print button in Terminal Settings
-    const savedPrinters = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-    const usbPrinter = savedPrinters.find((p) => p.mode === "usb" && p.type === type);
-    if (usbPrinter) {
+    // USB path — mirrors the test-print button in Terminal Settings.
+    // Reads a simple dedicated key first, then falls back to the printers array.
+    let usbPrinterName = (localStorage.getItem(`pos_usb_${type}_printer`) || "").trim();
+    if (!usbPrinterName) {
+      try {
+        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+        const p = saved.find((x) => x.mode === "usb" && x.type === type);
+        if (p) usbPrinterName = (p.windows_printer_name || p.name || "").trim();
+      } catch (_) {}
+    }
+    if (usbPrinterName) {
       if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers to enable USB printing");
-      const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
-      if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit the printer");
       const res = await fetch(`${bridgeUrl}/print-usb`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-        body: JSON.stringify({ printer_name: printerName, data: bytes }),
+        body: JSON.stringify({ printer_name: usbPrinterName, data: bytes }),
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) return { success: true, method: "usb" };

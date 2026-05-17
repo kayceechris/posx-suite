@@ -152,6 +152,15 @@ export default function TerminalSettingsModal({
     }
   };
 
+  function _cacheUsbPrinterNames(printers) {
+    ["receipt", "kitchen", "bar", "label"].forEach((t) => {
+      const p = printers.find((x) => x.mode === "usb" && x.type === t);
+      const name = p ? (p.windows_printer_name || p.name || "").trim() : "";
+      if (name) localStorage.setItem(`pos_usb_${t}_printer`, name);
+      else localStorage.removeItem(`pos_usb_${t}_printer`);
+    });
+  }
+
   const handleDeletePeripheral = async (p) => {
     if (!window.confirm(`Remove "${p.name}"?`)) return;
     try {
@@ -169,6 +178,7 @@ export default function TerminalSettingsModal({
         setSavedPrinters(printers);
         setPrinterGroups(groups);
         localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
+        _cacheUsbPrinterNames(printers);
       })
       .catch(console.error)
       .finally(() => setLoadingPrinters(false));
@@ -239,6 +249,7 @@ export default function TerminalSettingsModal({
       const list = await api.getPrinters();
       setSavedPrinters(list);
       localStorage.setItem("pos_saved_printers", JSON.stringify(list));
+      _cacheUsbPrinterNames(list);
     } catch (err) {
       setPrinterErr(err.message);
     } finally {
@@ -253,6 +264,7 @@ export default function TerminalSettingsModal({
       setSavedPrinters((prev) => {
         const updated = prev.filter((p) => p.id !== printer.id);
         localStorage.setItem("pos_saved_printers", JSON.stringify(updated));
+        _cacheUsbPrinterNames(updated);
         return updated;
       });
     } catch (err) { alert(err.message); }
@@ -332,6 +344,7 @@ export default function TerminalSettingsModal({
       setSavedPrinters((prev) => {
         const next = prev.map((p) => p.id === printerId ? { ...p, ...updated } : p);
         localStorage.setItem("pos_saved_printers", JSON.stringify(next));
+        _cacheUsbPrinterNames(next);
         return next;
       });
       setEditingPrinterId(null);
