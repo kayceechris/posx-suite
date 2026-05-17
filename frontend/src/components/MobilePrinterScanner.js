@@ -21,8 +21,11 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
   const hasBluetooth = typeof navigator !== "undefined" && !!navigator.bluetooth;
   const isVisible    = forceShow || (typeof window !== "undefined" && window.innerWidth < 1024);
 
+  // Treat the default placeholder as "not configured"
+  const hasValidBridgeUrl = !!bridgeUrl && !bridgeUrl.includes(".x:") && bridgeUrl !== "http://192.168.1.x:8765";
+
   const wantsWifi = isVisible && (mode === "wifi" || mode === "both");
-  const showWifi  = wantsWifi && !!bridgeUrl;
+  const showWifi  = wantsWifi && hasValidBridgeUrl;
   const showBT    = isVisible && (mode === "bluetooth" || mode === "both") && hasBluetooth;
 
   if (!wantsWifi && !showBT) return null;
@@ -32,14 +35,27 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
     setWifiFound([]);
     setError("");
     try {
-      const r = await fetch(`${bridgeUrl}/scan`, { signal: AbortSignal.timeout(35000) });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35000);
+      const r = await fetch(`${bridgeUrl}/scan`, {
+        signal: controller.signal,
+        mode: "cors",
+        credentials: "omit",
+      });
+      clearTimeout(timer);
       if (!r.ok) throw new Error("Bridge scan failed");
       const data = await r.json();
       const list = data.found || [];
       setWifiFound(list);
       if (list.length === 0) setError("No printers found on this network");
     } catch (e) {
-      setError(e.name === "TimeoutError" ? "Scan timed out" : (e.message || "Scan failed"));
+      if (e.name === "AbortError") {
+        setError("Scan timed out — check bridge.py is running");
+      } else if (!e.message || e.message === "Failed to fetch" || e.message.includes("fetch")) {
+        setError("Cannot reach bridge — verify bridge.py is running on your PC and the URL is correct");
+      } else {
+        setError(e.message);
+      }
     } finally {
       setWifiScanning(false);
     }
@@ -66,9 +82,10 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
   return (
     <div className="space-y-2 mt-1.5">
       <div className="flex gap-2 flex-wrap items-center">
-        {wantsWifi && !bridgeUrl && (
+        {wantsWifi && !hasValidBridgeUrl && (
           <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-            <AlertCircle size={11} /> Configure Print Bridge URL to enable WiFi scanning
+            <AlertCircle size={11} />
+            {bridgeUrl ? "Bridge URL looks like a placeholder — enter the actual PC IP below" : "Enter the Bridge URL below to enable WiFi scanning"}
           </p>
         )}
         {showWifi && (

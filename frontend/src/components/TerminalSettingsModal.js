@@ -67,6 +67,8 @@ export default function TerminalSettingsModal({
   });
   const [pingStatus, setPingStatus] = useState(null); // null | "testing" | "ok" | "fail"
   const [pingError, setPingError]   = useState("");
+  const [bridgeUrlLocal, setBridgeUrlLocal] = useState(() => localStorage.getItem("print_bridge_url") || "");
+  const saveBridgeUrl = (url) => { setBridgeUrlLocal(url); localStorage.setItem("print_bridge_url", url); };
 
   // Test print state per printer id: { status: "idle"|"loading"|"ok"|"error", msg: "" }
   const [testPrintState, setTestPrintState] = useState({});
@@ -437,6 +439,23 @@ export default function TerminalSettingsModal({
                           ))}
                         </div>
                         <p className="text-xs text-gray-400 mt-1">Select which groups this printer handles</p>
+                      </div>
+                    )}
+
+                    {/* Bridge URL (needed for WiFi scanning) */}
+                    {printerForm.mode === "network" && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">
+                          Bridge URL <span className="font-normal text-gray-400">(bridge.py on your PC)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={bridgeUrlLocal}
+                          onChange={(e) => saveBridgeUrl(e.target.value)}
+                          placeholder="http://192.168.1.10:8765"
+                          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-400"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Run bridge.py on a Windows PC on the same Wi-Fi. Required for WiFi scanning.</p>
                       </div>
                     )}
 
