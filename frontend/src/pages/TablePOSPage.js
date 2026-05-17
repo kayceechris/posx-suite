@@ -9,6 +9,7 @@ import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import { printService } from "../utils/printService";
 
 function TransferModal({ tableId, currentWaiterId, onClose, onTransferred }) {
   const [users, setUsers] = useState([]);
@@ -334,143 +335,48 @@ export default function TablePOSPage() {
     || (user?.permissions || []).includes("delete_held_order_items");
 
   const handlePrintBill = () => {
+    let usbPrinter = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+      usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
+    } catch (_) {}
     const bs = settings?.bill_settings || {};
-    const entityLabel = isBarTab ? "Bar Tab" : "Table";
-    const entityNum = entity?.number || "";
-    const bizName = settings?.business_name || "Restaurant";
-    const currency = settings?.currency_symbol || "$";
-    const now = new Date();
-    const dateStr = now.toLocaleDateString();
-    const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    const rows = cart.map((item) => `
-      <tr>
-        <td style="padding:2px 0">${item.product_name}</td>
-        <td style="padding:2px 0;text-align:center">${item.quantity}</td>
-        <td style="padding:2px 0;text-align:right">${currency}${item.total.toFixed(2)}</td>
-      </tr>`).join("");
-
-    const tax = total - subtotal;
-    const showTax = bs.show_tax !== false;
-    const header = bs.receipt_header ? `<p style="white-space:pre-line">${bs.receipt_header}</p>` : "";
-    const footer = bs.receipt_footer ? `<p style="white-space:pre-line">${bs.receipt_footer}</p>` : "<p>Thank you!</p>";
-    const note = (bs.show_note !== false) && bs.note_to_customer ? `<p style="white-space:pre-line">${bs.note_to_customer}</p>` : "";
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Bill - ${bizName}</title>
-<style>
-  body{font-family:monospace;font-size:12px;margin:0;padding:12px;width:280px}
-  h2{text-align:center;margin:0 0 4px;font-size:14px}
-  .doc-type{text-align:center;font-size:13px;font-weight:bold;letter-spacing:3px;margin:4px 0 2px}
-  p{margin:2px 0;text-align:center;font-size:11px}
-  table{width:100%;border-collapse:collapse;margin:8px 0}
-  .divider{border-top:1px dashed #000;margin:6px 0}
-  .total{font-weight:bold;font-size:13px}
-  td{vertical-align:top}
-</style></head><body>
-<h2>${bizName}</h2>
-<p class="doc-type">*** BILL ***</p>
-<p>${dateStr} ${timeStr}</p>
-<p>${entityLabel}: ${entityNum}${customerName ? ` | ${customerName}` : ""}</p>
-${header}
-<div class="divider"></div>
-<table>
-  <thead><tr>
-    <th style="text-align:left">Item</th>
-    <th style="text-align:center">Qty</th>
-    <th style="text-align:right">Amount</th>
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td>Subtotal</td><td style="text-align:right">${currency}${subtotal.toFixed(2)}</td></tr>
-  ${showTax && tax > 0 ? `<tr><td>Tax</td><td style="text-align:right">${currency}${tax.toFixed(2)}</td></tr>` : ""}
-  <tr class="total"><td>TOTAL</td><td style="text-align:right">${currency}${total.toFixed(2)}</td></tr>
-</table>
-${note}
-<div class="divider"></div>
-${footer}
-</body></html>`;
-
-    const w = window.open("", "_blank", "width=320,height=600");
-    if (!w) { showToast("Allow popups to print", "error"); return; }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    w.print();
-    w.close();
+    printService.printReceipt({
+      businessName: settings?.business_name || "Restaurant",
+      address: settings?.address || "",
+      phone: settings?.phone || "",
+      tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
+      cashier: user?.name || "",
+      items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
+      subtotal,
+      taxAmount: total - subtotal,
+      discount: 0,
+      total,
+      footer: bs.receipt_footer || "Thank you!",
+    }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
   const handlePrintReceipt = (method) => {
-    const entityLabel = isBarTab ? "Bar Tab" : "Table";
-    const entityNum = entity?.number || "";
-    const bizName = settings?.business_name || "Restaurant";
-    const currency = settings?.currency_symbol || "$";
+    let usbPrinter = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+      usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
+    } catch (_) {}
     const bs = settings?.bill_settings || {};
-    const now = new Date();
-    const dateStr = now.toLocaleDateString();
-    const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    const rows = cart.map((item) => `
-      <tr>
-        <td style="padding:2px 0">${item.product_name}</td>
-        <td style="padding:2px 0;text-align:center">${item.quantity}</td>
-        <td style="padding:2px 0;text-align:right">${currency}${item.total.toFixed(2)}</td>
-      </tr>`).join("");
-
-    const tax = total - subtotal;
-    const showTax = bs.show_tax !== false;
-    const footer = bs.receipt_footer ? `<p style="white-space:pre-line">${bs.receipt_footer}</p>` : "<p>Thank you!</p>";
-    const note = (bs.show_note !== false) && bs.note_to_customer ? `<p style="white-space:pre-line">${bs.note_to_customer}</p>` : "";
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Receipt - ${bizName}</title>
-<style>
-  body{font-family:monospace;font-size:12px;margin:0;padding:12px;width:280px}
-  h2{text-align:center;margin:0 0 4px;font-size:14px}
-  .doc-type{text-align:center;font-size:13px;font-weight:bold;letter-spacing:3px;margin:4px 0 2px}
-  p{margin:2px 0;text-align:center;font-size:11px}
-  table{width:100%;border-collapse:collapse;margin:8px 0}
-  .divider{border-top:1px dashed #000;margin:6px 0}
-  .total{font-weight:bold;font-size:13px}
-  .paid{text-align:center;font-size:13px;font-weight:bold;letter-spacing:2px;margin:6px 0}
-  td{vertical-align:top}
-</style></head><body>
-<h2>${bizName}</h2>
-<p class="doc-type">*** RECEIPT ***</p>
-<p>${dateStr} ${timeStr}</p>
-<p>${entityLabel}: ${entityNum}${customerName ? ` | ${customerName}` : ""}</p>
-<div class="divider"></div>
-<table>
-  <thead><tr>
-    <th style="text-align:left">Item</th>
-    <th style="text-align:center">Qty</th>
-    <th style="text-align:right">Amount</th>
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td>Subtotal</td><td style="text-align:right">${currency}${subtotal.toFixed(2)}</td></tr>
-  ${showTax && tax > 0 ? `<tr><td>Tax</td><td style="text-align:right">${currency}${tax.toFixed(2)}</td></tr>` : ""}
-  <tr class="total"><td>TOTAL</td><td style="text-align:right">${currency}${total.toFixed(2)}</td></tr>
-</table>
-<div class="divider"></div>
-<p>Payment: <strong>${method}</strong></p>
-<p class="paid">✓ PAID</p>
-<div class="divider"></div>
-${note}
-${footer}
-</body></html>`;
-
-    const w = window.open("", "_blank", "width=320,height=600");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    w.print();
-    w.close();
+    printService.printReceipt({
+      businessName: settings?.business_name || "Restaurant",
+      address: settings?.address || "",
+      phone: settings?.phone || "",
+      tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
+      cashier: user?.name || "",
+      items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
+      subtotal,
+      taxAmount: total - subtotal,
+      discount: 0,
+      total,
+      paymentMethod: method,
+      footer: bs.receipt_footer || "Thank you!",
+    }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
   const handleSendToKitchen = async () => {
