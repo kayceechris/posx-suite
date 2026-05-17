@@ -316,6 +316,8 @@ export const api = {
   getAssignedPrinters: () => request("/api/printers/assigned"),
   pingPrinter: (ip_address, port) =>
     request("/api/printers/ping", { method: "POST", body: JSON.stringify({ ip_address, port }) }),
+  updatePrinter: (id, data) =>
+    request(`/api/printers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   testPrint: (id) =>
     request(`/api/printers/${id}/test`, { method: "POST" }),
 

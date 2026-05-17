@@ -75,6 +75,17 @@ async def create_printer(printer_data: PrinterCreate, current_user: User = Depen
     return printer
 
 
+@router.put("/printers/{printer_id}")
+async def update_printer(printer_id: str, printer_data: dict, current_user: User = Depends(get_current_user)):
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    result = await db.printers.update_one({"id": printer_id}, {"$set": printer_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Printer not found")
+    updated = await db.printers.find_one({"id": printer_id}, {"_id": 0})
+    return updated
+
+
 @router.delete("/printers/{printer_id}")
 async def delete_printer(printer_id: str, current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:

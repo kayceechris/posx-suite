@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from "react";
-import { ChevronDown, Plus, Printer, Trash2, Check, X, Wifi, Usb, Globe, Bluetooth, Monitor, ExternalLink, Cpu } from "lucide-react";
+import { ChevronDown, Plus, Printer, Trash2, Check, X, Wifi, Usb, Globe, Bluetooth, Monitor, ExternalLink, Cpu, Pencil } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 import MobilePrinterScanner from "./MobilePrinterScanner";
@@ -72,6 +72,12 @@ export default function TerminalSettingsModal({
 
   // Test print state per printer id: { status: "idle"|"loading"|"ok"|"error", msg: "" }
   const [testPrintState, setTestPrintState] = useState({});
+
+  // Inline edit state for system printer name
+  const [editingPrinterId, setEditingPrinterId] = useState(null);
+  const [editWinName, setEditWinName]           = useState("");
+  const [editWinPrinters, setEditWinPrinters]   = useState([]);
+  const [editSaving, setEditSaving]             = useState(false);
 
   // Saved flash: "config" | "printers" | "display" | ""
   const [savedFlash, setSavedFlash] = useState("");
@@ -271,6 +277,34 @@ export default function TerminalSettingsModal({
     } catch (err) {
       setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "error", msg: err.message } }));
       setTimeout(() => setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "idle", msg: "" } })), 5000);
+    }
+  };
+
+  const handleStartEdit = async (printer) => {
+    setEditingPrinterId(printer.id);
+    setEditWinName(printer.windows_printer_name || printer.name || "");
+    setEditWinPrinters([]);
+    const bridgeUrl = (localStorage.getItem("print_bridge_url") || "").trim();
+    if (bridgeUrl) {
+      try {
+        const res = await fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) });
+        const data = res.ok ? await res.json() : { printers: [] };
+        setEditWinPrinters(data.printers || []);
+      } catch { /* bridge not reachable */ }
+    }
+  };
+
+  const handleSavePrinterName = async (printerId) => {
+    setEditSaving(true);
+    try {
+      const updated = await api.updatePrinter(printerId, { windows_printer_name: editWinName });
+      setSavedPrinters((prev) => prev.map((p) => p.id === printerId ? { ...p, ...updated } : p));
+      setEditingPrinterId(null);
+      setTestPrintState((prev) => ({ ...prev, [printerId]: { status: "idle", msg: "" } }));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -562,53 +596,101 @@ export default function TerminalSettingsModal({
                 ) : savedPrinters.length === 0 ? (
                   <div className="px-5 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">No printers added yet</div>
                 ) : (
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
                     {savedPrinters.map((p) => (
-                      <div key={p.id} className="flex items-center gap-3 px-5 py-3.5">
-                        <div className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Printer size={16} className="text-gray-500 dark:text-gray-400 dark:text-gray-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{p.name}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            {CONN_ICON[p.mode]}{p.mode}
-                            <span className="mx-1">·</span>
-                            {p.type}
-                          </p>
-                          {(p.printer_group_ids || []).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(p.printer_group_ids || []).map((gid) => {
-                                const grp = printerGroups.find((g) => g.id === gid);
-                                return grp ? (
-                                  <span key={gid} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold">{grp.name}</span>
-                                ) : null;
-                              })}
-                            </div>
+                      <div key={p.id}>
+                        <div className="flex items-center gap-3 px-5 py-3.5">
+                          <div className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Printer size={16} className="text-gray-500 dark:text-gray-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{p.name}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                              {CONN_ICON[p.mode]}{p.mode}
+                              <span className="mx-1">·</span>
+                              {p.type}
+                            </p>
+                            {(p.printer_group_ids || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {(p.printer_group_ids || []).map((gid) => {
+                                  const grp = printerGroups.find((g) => g.id === gid);
+                                  return grp ? (
+                                    <span key={gid} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold">{grp.name}</span>
+                                  ) : null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          {(() => {
+                            const ts = testPrintState[p.id] || { status: "idle", msg: "" };
+                            return (
+                              <button
+                                onClick={() => handleTestPrint(p)}
+                                disabled={ts.status === "loading"}
+                                title={ts.msg || "Test print"}
+                                className={cn(
+                                  "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors flex-shrink-0",
+                                  ts.status === "ok"    ? "bg-green-100 text-green-700" :
+                                  ts.status === "error" ? "bg-red-100 text-red-600" :
+                                                          "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                )}>
+                                <Printer size={12} />
+                                {ts.status === "loading" ? "…" : ts.status === "ok" ? "OK" : ts.status === "error" ? "Err" : "Test"}
+                              </button>
+                            );
+                          })()}
+                          {isAdmin && (
+                            <button onClick={() => editingPrinterId === p.id ? setEditingPrinterId(null) : handleStartEdit(p)}
+                              title="Edit system printer name"
+                              className={cn(
+                                "transition-colors flex-shrink-0",
+                                editingPrinterId === p.id ? "text-blue-500" : "text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
+                              )}>
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button onClick={() => handleDeletePrinter(p)}
+                              className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
+                              <Trash2 size={16} />
+                            </button>
                           )}
                         </div>
-                        {(() => {
-                          const ts = testPrintState[p.id] || { status: "idle", msg: "" };
-                          return (
-                            <button
-                              onClick={() => handleTestPrint(p)}
-                              disabled={ts.status === "loading"}
-                              title={ts.msg || "Test print"}
-                              className={cn(
-                                "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors flex-shrink-0",
-                                ts.status === "ok"    ? "bg-green-100 text-green-700" :
-                                ts.status === "error" ? "bg-red-100 text-red-600" :
-                                                        "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                              )}>
-                              <Printer size={12} />
-                              {ts.status === "loading" ? "…" : ts.status === "ok" ? "OK" : ts.status === "error" ? "Err" : "Test"}
-                            </button>
-                          );
-                        })()}
-                        {isAdmin && (
-                          <button onClick={() => handleDeletePrinter(p)}
-                            className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
-                            <Trash2 size={16} />
-                          </button>
+
+                        {/* Inline edit: system printer name */}
+                        {editingPrinterId === p.id && (
+                          <div className="px-5 pb-4 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-100 dark:border-blue-800 space-y-2">
+                            <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest pt-3">System Printer Name</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Must match exactly as shown in Windows → Printers &amp; Scanners.</p>
+                            {editWinPrinters.length > 0 ? (
+                              <select
+                                value={editWinName}
+                                onChange={(e) => setEditWinName(e.target.value)}
+                                className="w-full px-3 py-2 border-2 border-blue-300 dark:border-blue-600 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-white">
+                                <option value="">Select printer…</option>
+                                {editWinPrinters.map((wp) => (
+                                  <option key={wp.name} value={wp.name}>{wp.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                value={editWinName}
+                                onChange={(e) => setEditWinName(e.target.value)}
+                                placeholder="e.g. EPSON TM-T88V"
+                                className="w-full px-3 py-2 border-2 border-blue-300 dark:border-blue-600 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-white"
+                              />
+                            )}
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => setEditingPrinterId(null)}
+                                className="flex-1 py-1.5 border-2 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                Cancel
+                              </button>
+                              <button type="button" onClick={() => handleSavePrinterName(p.id)} disabled={editSaving || !editWinName.trim()}
+                                className="flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                                {editSaving ? "Saving…" : "Save"}
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     ))}
