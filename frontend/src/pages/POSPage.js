@@ -449,7 +449,7 @@ export default function POSPage() {
         await api.createOrder(buildPayload("completed", method, name));
       }
       showToast("Order completed!");
-      printService.printReceipt(receiptData, {}).catch(console.error);
+      printService.printReceipt(receiptData, {}).catch((e) => showToast(e.message, "error"));
       setCart([]);
       setCustomerName("");
       setLoadedOrderId(null);
@@ -693,7 +693,7 @@ export default function POSPage() {
                       discount: 0,
                       total,
                       footer: settings?.receipt_settings?.receipt_footer || "Thank you!",
-                    }, {}).catch(console.error);
+                    }, {}).catch((e) => showToast(e.message, "error"));
                   }}
                   disabled={cart.length === 0}
                   title="Print Bill"

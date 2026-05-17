@@ -311,23 +311,35 @@ export const printService = {
       if (printersRes.ok) {
         const printers = await printersRes.json();
         const usbPrinter = printers.find((p) => p.mode === "usb" && p.type === type);
-        if (usbPrinter && bridgeUrl) {
+        if (usbPrinter) {
+          if (!bridgeUrl || bridgeUrl === "http://localhost:8765") {
+            // Still try localhost but log clearly
+            console.info("[PrintService] Using bridge at", bridgeUrl || "http://localhost:8765");
+          }
+          const effectiveBridgeUrl = bridgeUrl || "http://localhost:8765";
           const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
           if (printerName) {
-            const res = await fetch(`${bridgeUrl}/print-usb`, {
+            const res = await fetch(`${effectiveBridgeUrl}/print-usb`, {
               method: "POST",
               headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
               body: JSON.stringify({ printer_name: printerName, data: bytes }),
-              signal: AbortSignal.timeout(10000),
+              signal: AbortSignal.timeout(15000),
             });
-            if (res.ok) return { success: true, method: "usb" };
-            const err = await res.json().catch(() => ({}));
-            console.warn("[PrintService] USB bridge error:", err.error);
+            if (res.ok) {
+              console.info("[PrintService] USB print OK via bridge");
+              return { success: true, method: "usb" };
+            }
+            const errData = await res.json().catch(() => ({}));
+            const msg = errData.error || `Bridge error ${res.status}`;
+            console.error("[PrintService] USB bridge error:", msg);
+            // Surface the error — don't silently fall back
+            throw new Error(`USB print failed: ${msg}`);
           }
         }
       }
     } catch (err) {
-      console.warn("[PrintService] USB print failed:", err.message);
+      if (err.message.startsWith("USB print failed:")) throw err;
+      console.warn("[PrintService] USB lookup failed:", err.message);
     }
 
     // Try network printer via bridge /print

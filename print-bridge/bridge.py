@@ -24,36 +24,85 @@ SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
 # ── Windows raw print via spooler ──────────────────────────────────────────────
 
 def _raw_print_windows(printer_name: str, raw_bytes: bytes) -> None:
-    """Send raw ESC/POS bytes directly to a named Windows printer via the spooler."""
-    import ctypes
-    import ctypes.wintypes
+    """Send raw ESC/POS bytes to a named Windows printer.
+    Tries two methods in order:
+      1. Windows spooler API via ctypes (clean, works with most drivers)
+      2. Direct port write via 'copy /b' (fallback for stubborn drivers)
+    """
+    import ctypes, tempfile, os
 
-    class DOC_INFO_1(ctypes.Structure):
-        _fields_ = [
-            ("pDocName",    ctypes.c_wchar_p),
-            ("pOutputFile", ctypes.c_wchar_p),
-            ("pDatatype",   ctypes.c_wchar_p),
-        ]
+    last_error = ""
 
-    winspool = ctypes.WinDLL("winspool.drv")
-    handle   = ctypes.c_void_p()
+    # ── Method 1: spooler API ────────────────────────────────────────────────
+    try:
+        class DOC_INFO_1(ctypes.Structure):
+            _fields_ = [
+                ("pDocName",    ctypes.c_wchar_p),
+                ("pOutputFile", ctypes.c_wchar_p),
+                ("pDatatype",   ctypes.c_wchar_p),
+            ]
 
-    if not winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None):
-        raise OSError(f"Cannot open printer '{printer_name}' — check the system printer name")
+        winspool = ctypes.WinDLL("winspool.drv", use_last_error=True)
+        handle   = ctypes.c_void_p()
 
-    doc     = DOC_INFO_1("Receipt", None, "RAW")
-    job_id  = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc))
-    if not job_id:
+        ok = winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None)
+        if not ok or not handle.value:
+            raise OSError(f"OpenPrinter failed (code {ctypes.get_last_error()})")
+
+        doc    = DOC_INFO_1("Receipt", None, "RAW")
+        job_id = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc))
+        if not job_id:
+            winspool.ClosePrinter(handle)
+            raise OSError(f"StartDocPrinter failed (code {ctypes.get_last_error()})")
+
+        winspool.StartPagePrinter(handle)
+        buf     = ctypes.create_string_buffer(raw_bytes, len(raw_bytes))
+        written = ctypes.c_ulong(0)
+        ok      = winspool.WritePrinter(handle, buf, len(raw_bytes), ctypes.byref(written))
+        winspool.EndPagePrinter(handle)
+        winspool.EndDocPrinter(handle)
         winspool.ClosePrinter(handle)
-        raise OSError("StartDocPrinter failed")
 
-    winspool.StartPagePrinter(handle)
-    buf     = ctypes.create_string_buffer(raw_bytes, len(raw_bytes))
-    written = ctypes.c_ulong(0)
-    winspool.WritePrinter(handle, buf, len(raw_bytes), ctypes.byref(written))
-    winspool.EndPagePrinter(handle)
-    winspool.EndDocPrinter(handle)
-    winspool.ClosePrinter(handle)
+        if ok and written.value > 0:
+            print(f"  [OK] Spooler: {written.value} bytes -> '{printer_name}'")
+            return
+        last_error = f"WritePrinter wrote {written.value}/{len(raw_bytes)} bytes"
+    except Exception as e:
+        last_error = str(e)
+        print(f"  [!] Spooler method failed: {e}")
+
+    # ── Method 2: direct port write via copy /b ──────────────────────────────
+    try:
+        r = subprocess.run(
+            ["wmic", "printer", "where", f"Name='{printer_name}'", "get", "PortName", "/value"],
+            capture_output=True, text=True, timeout=8,
+        )
+        port = ""
+        for line in r.stdout.splitlines():
+            if line.strip().upper().startswith("PORTNAME="):
+                port = line.strip().split("=", 1)[1].strip()
+                break
+
+        if not port:
+            raise OSError(f"Could not find port for printer '{printer_name}'")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".prn", mode="wb") as f:
+            f.write(raw_bytes)
+            tmp = f.name
+        try:
+            r = subprocess.run(
+                ["cmd", "/c", "copy", "/b", tmp, f"\\\\.\\{port}"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if r.returncode != 0:
+                raise OSError(r.stderr.strip() or r.stdout.strip() or "copy /b failed")
+            print(f"  [OK] Port write: {len(raw_bytes)} bytes -> {port} ('{printer_name}')")
+            return
+        finally:
+            try: os.unlink(tmp)
+            except Exception: pass
+    except Exception as e:
+        raise OSError(f"Both print methods failed. Spooler: {last_error} | Port: {e}")
 
 
 # ── Networking helpers ─────────────────────────────────────────────────────────
