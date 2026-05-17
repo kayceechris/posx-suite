@@ -364,7 +364,7 @@ export default function TerminalSettingsModal({
                       />
                     </div>
 
-                    {/* Windows printer selection — desktop only */}
+                    {/* Windows printer selection -- desktop only */}
                     {isAdmin && !isMobile && (
                       <div>
                         <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1 block">
@@ -440,7 +440,7 @@ export default function TerminalSettingsModal({
                       </div>
                     )}
 
-                    {/* Scanner — always shown when connection mode matches */}
+                    {/* Scanner -- always shown when connection mode matches */}
                     {printerForm.mode === "network" && (
                       <MobilePrinterScanner
                         mode="wifi"
