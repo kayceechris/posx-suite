@@ -68,7 +68,7 @@ export default function TerminalSettingsModal({
   const [pingStatus, setPingStatus] = useState(null); // null | "testing" | "ok" | "fail"
   const [pingError, setPingError]   = useState("");
   const [bridgeUrlLocal, setBridgeUrlLocal] = useState(() => localStorage.getItem("print_bridge_url") || "");
-  const saveBridgeUrl = (url) => { setBridgeUrlLocal(url); localStorage.setItem("print_bridge_url", url); };
+  const saveBridgeUrl = (url) => { const clean = url.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, ""); setBridgeUrlLocal(clean); localStorage.setItem("print_bridge_url", clean); };
 
   // Test print state per printer id: { status: "idle"|"loading"|"ok"|"error", msg: "" }
   const [testPrintState, setTestPrintState] = useState({});

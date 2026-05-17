@@ -294,9 +294,9 @@ export const printService = {
   },
 
   async _print(bytes, data, printerConfig, type) {
-    const bridgeUrl = printerConfig.bridgeUrl
+    const bridgeUrl = (printerConfig.bridgeUrl
       || localStorage.getItem("print_bridge_url")
-      || "http://localhost:8765";
+      || "http://localhost:8765").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
     const printerIp   = printerConfig.ip   || localStorage.getItem("print_printer_ip")  || "";
     const printerPort = printerConfig.port || localStorage.getItem("print_printer_port") || 9100;
 

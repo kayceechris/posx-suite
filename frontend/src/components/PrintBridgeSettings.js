@@ -20,7 +20,9 @@ export default function PrintBridgeSettings({ onClose }) {
   };
 
   const save = () => {
-    localStorage.setItem("print_bridge_url",   bridgeUrl);
+    const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
+    if (cleanUrl !== bridgeUrl) setBridgeUrl(cleanUrl);
+    localStorage.setItem("print_bridge_url",   cleanUrl);
     localStorage.setItem("print_printer_ip",   printerIp);
     localStorage.setItem("print_printer_port", printerPort);
     localStorage.setItem("print_bridge_token", bridgeToken);

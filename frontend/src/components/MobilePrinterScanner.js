@@ -17,7 +17,7 @@ export default function MobilePrinterScanner({ mode = "both", onSelectWifi, onSe
   const [btScanning,   setBtScanning]   = useState(false);
   const [error,        setError]        = useState("");
 
-  const bridgeUrl    = localStorage.getItem("print_bridge_url") || "";
+  const bridgeUrl    = (localStorage.getItem("print_bridge_url") || "").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
   const hasBluetooth = typeof navigator !== "undefined" && !!navigator.bluetooth;
   const isVisible    = forceShow || (typeof window !== "undefined" && window.innerWidth < 1024);
 
