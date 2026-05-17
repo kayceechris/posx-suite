@@ -250,13 +250,13 @@ export default function AdminPage() {
 
 function StatCard({ title, value, icon: Icon, bgColor, iconBg, valueColor }) {
   return (
-    <div className={cn("rounded-2xl border-2 border-gray-300/80 dark:border-gray-600/80 p-5 flex items-center justify-between shadow-sm", bgColor)}>
-      <div>
-        <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{title}</p>
-        <p className={cn("text-3xl font-black", valueColor)}>{value}</p>
+    <div className={cn("rounded-2xl border-2 border-gray-300/80 dark:border-gray-600/80 p-4 sm:p-5 flex items-center justify-between shadow-sm", bgColor)}>
+      <div className="min-w-0 flex-1 mr-3">
+        <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 leading-tight">{title}</p>
+        <p className={cn("text-xl sm:text-3xl font-black break-all leading-tight", valueColor)}>{value}</p>
       </div>
-      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center", iconBg)}>
-        <Icon size={26} className="text-white" />
+      <div className={cn("w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0", iconBg)}>
+        <Icon size={22} className="text-white" />
       </div>
     </div>
   );
@@ -297,27 +297,27 @@ function DashboardContent({ analytics, loading, userName }) {
           <h2 className="font-bold text-gray-900 dark:text-white text-base">Recent Orders</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[440px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-6 py-3">Order #</th>
-                <th className="text-left px-6 py-3">Customer</th>
-                <th className="text-left px-6 py-3">Items</th>
-                <th className="text-left px-6 py-3">Total</th>
-                <th className="text-left px-6 py-3">Payment</th>
+                <th className="text-left px-4 py-3">Order #</th>
+                <th className="text-left px-4 py-3">Customer</th>
+                <th className="text-left px-4 py-3">Items</th>
+                <th className="text-left px-4 py-3">Total</th>
+                <th className="text-left px-4 py-3">Payment</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {recentOrders.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-sm">No orders yet</td></tr>
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No orders yet</td></tr>
               ) : recentOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white text-sm">{order.order_number}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-sm">{order.customer_name || "Walk-in Customer"}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-sm">{order.items?.length ?? 0} items</td>
-                  <td className="px-6 py-4 font-semibold text-green-600 dark:text-green-400 text-sm">{formatCurrency(order.total)}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium",
+                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm whitespace-nowrap">{order.order_number}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{order.customer_name || "Walk-in"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{order.items?.length ?? 0}</td>
+                  <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(order.total)}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap",
                       !order.payment_method || order.payment_method === "pending"
                         ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
                         : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400")}>
