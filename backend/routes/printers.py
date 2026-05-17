@@ -192,7 +192,7 @@ async def test_print(printer_id: str, current_user: User = Depends(get_current_u
 
         def _print_usb():
             r = subprocess.run(
-                ["wmic", "printer", "where", f'Name="{win_name}"', "call", "PrintTestPage"],
+                ["wmic", "printer", "where", f"Name='{win_name}'", "call", "PrintTestPage"],
                 capture_output=True, text=True, timeout=15,
             )
             ok = r.returncode == 0 or "ReturnValue = 0" in r.stdout

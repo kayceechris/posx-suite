@@ -148,7 +148,7 @@ class PrintBridgeHandler(BaseHTTPRequestHandler):
                 return
             try:
                 r = subprocess.run(
-                    ["wmic", "printer", "where", f'Name="{printer_name}"', "call", "PrintTestPage"],
+                    ["wmic", "printer", "where", f"Name='{printer_name}'", "call", "PrintTestPage"],
                     capture_output=True, text=True, timeout=15,
                 )
                 ok = r.returncode == 0 or "ReturnValue = 0" in r.stdout
