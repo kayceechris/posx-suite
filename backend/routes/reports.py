@@ -1,9 +1,23 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import date, timedelta
 
 from database import db
 from models import User
 from auth import get_current_user
+
+
+def _date_range_query(start_date: Optional[str], end_date: Optional[str]) -> dict:
+    """Build a MongoDB $gte/$lt date range that is inclusive of the full end day.
+    created_at is stored as an ISO string like '2026-05-17T10:30:00+00:00',
+    so a plain $lte '2026-05-17' would exclude all records from that day."""
+    if not (start_date and end_date):
+        return {}
+    try:
+        next_day = (date.fromisoformat(end_date[:10]) + timedelta(days=1)).isoformat()
+    except ValueError:
+        return {}
+    return {"$gte": start_date[:10], "$lt": next_day}
 
 router = APIRouter(prefix="/api")
 
@@ -19,8 +33,9 @@ async def get_sales_report(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     query = {"status": "completed"}
-    if start_date and end_date:
-        query["created_at"] = {"$gte": start_date, "$lte": end_date}
+    dr = _date_range_query(start_date, end_date)
+    if dr:
+        query["created_at"] = dr
 
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", 1).to_list(10000)
 
@@ -67,8 +82,9 @@ async def get_cost_report(start_date: Optional[str] = None, end_date: Optional[s
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     query = {"status": "completed"}
-    if start_date and end_date:
-        query["created_at"] = {"$gte": start_date, "$lte": end_date}
+    dr = _date_range_query(start_date, end_date)
+    if dr:
+        query["created_at"] = dr
 
     orders = await db.orders.find(query, {"_id": 0}).to_list(10000)
     products_map = {}
@@ -103,8 +119,9 @@ async def get_staff_report(start_date: Optional[str] = None, end_date: Optional[
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     query = {"status": "completed"}
-    if start_date and end_date:
-        query["created_at"] = {"$gte": start_date, "$lte": end_date}
+    dr = _date_range_query(start_date, end_date)
+    if dr:
+        query["created_at"] = dr
 
     orders = await db.orders.find(query, {"_id": 0}).to_list(10000)
     users_map = {}
@@ -129,8 +146,9 @@ async def get_payment_report(start_date: Optional[str] = None, end_date: Optiona
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     query = {"status": "completed"}
-    if start_date and end_date:
-        query["created_at"] = {"$gte": start_date, "$lte": end_date}
+    dr = _date_range_query(start_date, end_date)
+    if dr:
+        query["created_at"] = dr
 
     pipeline = [{"$match": query}, {"$group": {"_id": "$payment_method", "count": {"$sum": 1}, "total": {"$sum": "$total"}}}]
     result = await db.orders.aggregate(pipeline).to_list(100)

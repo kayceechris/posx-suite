@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
+from datetime import date, timedelta
 
 from database import db
 from models import User, Order, OrderCreate, SplitBill, SplitBillCreate
@@ -98,7 +99,11 @@ async def get_orders(
     if outlet_id:
         query["outlet_id"] = outlet_id
     if start_date and end_date:
-        query["created_at"] = {"$gte": start_date, "$lte": end_date}
+        try:
+            next_day = (date.fromisoformat(end_date[:10]) + timedelta(days=1)).isoformat()
+        except ValueError:
+            next_day = end_date
+        query["created_at"] = {"$gte": start_date[:10], "$lt": next_day}
     if created_by:
         query["created_by"] = created_by
     if order_number:
