@@ -97,6 +97,7 @@ function buildReceiptBytes(data) {
   } = data;
 
   // Resolve layout toggles (default true for most)
+  console.log('[PrintService] layoutSettings received:', JSON.stringify(layoutSettings));
   const S = layoutSettings;
   const showStoreName = S.show_store_name !== false;
   const showAddress   = S.show_address   !== false;
@@ -144,31 +145,38 @@ function buildReceiptBytes(data) {
   if (showDate)                   line(`Date   : ${new Date().toLocaleString()}`);
   line(divider());
 
-  // Items
-  line(`${"ITEM".padEnd(18)} ${"QTY".padEnd(4)} ${"PRICE".padStart(9)}`);
+  // Items — 16 + 1 + 3 + 1 + 9 = 30 chars (fits 32-char 58 mm paper)
+  add(...CMD.ALIGN_LEFT);
+  line(`${"ITEM".padEnd(16)} ${"QTY".padEnd(3)} ${"PRICE".padStart(9)}`);
   line(divider());
   for (const item of items) {
-    const name  = pad(item.name, 18);
-    const qty   = pad(`x${item.quantity}`, 4);
+    const name  = pad(item.name, 16);
+    const qty   = pad(`x${item.quantity}`, 3);
     const price = rpad(fmtCurrency((item.price || 0) * (item.quantity || 1)), 9);
     line(`${name} ${qty} ${price}`);
     if (item.note) line(`  * ${item.note}`);
   }
 
-  // Totals
+  // Totals — left-align + manual padding so values always sit flush at col 32
   line(divider());
-  add(...CMD.ALIGN_RIGHT);
-  line(`Subtotal : ${fmtCurrency(subtotal)}`);
-  if (showDiscount && discount > 0)  line(`Discount : -${fmtCurrency(discount)}`);
-  if (showTax      && taxAmount > 0) line(`Tax      : ${fmtCurrency(taxAmount)}`);
+  add(...CMD.ALIGN_LEFT);
+  const LW = 32;
+  const tl = (lbl, val) => {
+    const v = typeof val === 'string' ? val : fmtCurrency(val);
+    const sp = Math.max(1, LW - lbl.length - v.length);
+    return lbl + ' '.repeat(sp) + v;
+  };
+  line(tl("Subtotal", subtotal));
+  if (showDiscount && discount > 0)  line(tl("Discount", `-${fmtCurrency(discount)}`));
+  if (showTax      && taxAmount > 0) line(tl("Tax", taxAmount));
   add(...CMD.BOLD_ON, ...CMD.SIZE_DOUBLE_H);
-  line(`TOTAL    : ${fmtCurrency(total)}`);
+  line(tl("TOTAL", total));
   add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
   if (amountPaid > 0) {
-    line(`Paid     : ${fmtCurrency(amountPaid)}`);
-    line(`Change   : ${fmtCurrency(change)}`);
+    line(tl("Paid", amountPaid));
+    line(tl("Change", change));
   }
-  if (paymentMethod) line(`Method   : ${paymentMethod.toUpperCase()}`);
+  if (paymentMethod) line(tl("Method", paymentMethod.toUpperCase()));
 
   // Note to customer
   if (showNote && noteText) {
