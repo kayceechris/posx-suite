@@ -121,7 +121,7 @@ async def get_staff_report(start_date: Optional[str] = None, end_date: Optional[
         staff_sales[uid]["orders"] += 1
         staff_sales[uid]["revenue"] += order.get("total", 0)
 
-    return {"staff": sorted(staff_sales.values(), key=lambda x: x["total_revenue"], reverse=True)}
+    return {"staff": sorted(staff_sales.values(), key=lambda x: x["revenue"], reverse=True)}
 
 
 @router.get("/reports/payment-methods")
