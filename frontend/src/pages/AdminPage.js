@@ -84,7 +84,7 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [expandedSection, setExpandedSection] = useState(null);
   const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard" });
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
