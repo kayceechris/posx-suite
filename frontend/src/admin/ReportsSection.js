@@ -25,20 +25,22 @@ function DateFilter({ onApply }) {
   const [start, setStart] = useState(monthStart());
   const [end, setEnd] = useState(today());
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3 mb-6 flex flex-wrap items-center gap-2">
-      <Calendar size={18} className="text-gray-400 flex-shrink-0" />
-      <input
-        type="date" value={start} onChange={(e) => setStart(e.target.value)}
-        className="flex-1 min-w-[130px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
-      />
-      <span className="text-gray-400 text-sm font-medium">to</span>
-      <input
-        type="date" value={end} onChange={(e) => setEnd(e.target.value)}
-        className="flex-1 min-w-[130px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
-      />
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3 mb-6 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2">
+      <Calendar size={18} className="text-gray-400 flex-shrink-0 hidden sm:block" />
+      <div className="flex items-center gap-2">
+        <input
+          type="date" value={start} onChange={(e) => setStart(e.target.value)}
+          className="flex-1 min-w-0 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
+        />
+        <span className="text-gray-400 text-sm font-medium flex-shrink-0">to</span>
+        <input
+          type="date" value={end} onChange={(e) => setEnd(e.target.value)}
+          className="flex-1 min-w-0 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50 dark:bg-gray-900 dark:text-white"
+        />
+      </div>
       <button
         onClick={() => onApply(start, end)}
-        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex-shrink-0"
+        className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
       >
         Apply
       </button>
@@ -79,7 +81,7 @@ function SalesTab() {
       <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
       {loading ? <Spinner /> : data && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
             <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
             <StatCard label="Avg Order Value" value={formatCurrency(data.avg_order_value)} color="text-orange-500 dark:text-orange-400" bg="bg-orange-50 dark:bg-orange-900/20" />
@@ -116,11 +118,11 @@ function SalesTab() {
               {/* Mobile cards */}
               <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
                 {data.top_products.map((p, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <div key={i} className="flex items-center gap-2 px-3 py-3">
                     <span className="w-6 h-6 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">{i + 1}</span>
-                    <p className="flex-1 font-semibold text-gray-900 dark:text-white text-sm truncate">{p.name}</p>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">{formatCurrency(p.revenue)}</p>
+                    <p className="flex-1 min-w-0 font-semibold text-gray-900 dark:text-white text-sm truncate">{p.name}</p>
+                    <div className="text-right flex-shrink-0 max-w-[110px]">
+                      <p className="text-sm font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(p.revenue)}</p>
                       <p className="text-xs text-gray-400">{p.quantity} sold</p>
                     </div>
                   </div>
@@ -176,7 +178,7 @@ function CostTab() {
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
             <StatCard label="Total Cost" value={formatCurrency(data.total_cost)} color="text-orange-500 dark:text-orange-400" bg="bg-orange-50 dark:bg-orange-900/20" />
             <StatCard label="Gross Profit" value={formatCurrency(data.total_profit)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
@@ -658,7 +660,7 @@ export default function ReportsSection({ view = "sales" }) {
           <BarChart2 size={20} className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Reports</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Reports</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">{VIEW_LABELS[view] || view}</p>
         </div>
       </div>
