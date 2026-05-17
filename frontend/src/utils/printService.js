@@ -115,10 +115,14 @@ function buildReceiptBytes(data) {
   const noteText      = S.note_to_customer || "";
 
   // Paper width: 80mm → 42 chars, 58mm → 32 chars
-  const PW = S.paper_size === "80mm" ? 42 : 32;
-  const COL_NAME  = PW === 42 ? 22 : 16;
-  const COL_QTY   = PW === 42 ? 4  : 3;
-  const COL_PRICE = PW === 42 ? 12 : 9;
+  const PW   = S.paper_size === "80mm" ? 42 : 32;
+  const is80 = PW === 42;
+  // 80mm 4 cols: Item(16) Qty(3) UnitPrice(9) LineTotal(11) + 3 spaces = 42
+  // 58mm 3 cols: Item(16) Qty(3) LineTotal(11)               + 2 spaces = 32
+  const COL_ITEM   = 16;
+  const COL_QTY    = 3;
+  const COL_UPRICE = 9;
+  const COL_TOTAL  = 11;
 
   const b = [];
   const add = (...bytes) => b.push(...bytes);
@@ -158,15 +162,24 @@ function buildReceiptBytes(data) {
   if (showDate)                   line(`Date   : ${new Date().toLocaleString()}`);
   line(divider("-", PW));
 
-  // Items
+  // Items — 80mm: 4 cols (Item, Qty, Unit Price, Line Total); 58mm: 3 cols (Item, Qty, Total)
   add(...CMD.ALIGN_LEFT);
-  line(`${"ITEM".padEnd(COL_NAME)} ${"QTY".padEnd(COL_QTY)} ${"PRICE".padStart(COL_PRICE)}`);
+  if (is80) {
+    line(`${"ITEM".padEnd(COL_ITEM)} ${"QTY".padEnd(COL_QTY)} ${"PRICE".padStart(COL_UPRICE)} ${"TOTAL".padStart(COL_TOTAL)}`);
+  } else {
+    line(`${"ITEM".padEnd(COL_ITEM)} ${"QTY".padEnd(COL_QTY)} ${"TOTAL".padStart(COL_TOTAL)}`);
+  }
   line(divider("-", PW));
   for (const item of items) {
-    const name  = pad(item.name, COL_NAME);
-    const qty   = pad(`x${item.quantity}`, COL_QTY);
-    const price = rpad(fmtCurrency((item.price || 0) * (item.quantity || 1)), COL_PRICE);
-    line(`${name} ${qty} ${price}`);
+    const name      = pad(item.name, COL_ITEM);
+    const qty       = pad(`x${item.quantity}`, COL_QTY);
+    const unitPrice = rpad(fmtCurrency(item.price || 0), COL_UPRICE);
+    const lineTotal = rpad(fmtCurrency((item.price || 0) * (item.quantity || 1)), COL_TOTAL);
+    if (is80) {
+      line(`${name} ${qty} ${unitPrice} ${lineTotal}`);
+    } else {
+      line(`${name} ${qty} ${lineTotal}`);
+    }
     if (item.note) line(`  * ${item.note}`);
   }
 
@@ -270,6 +283,9 @@ function browserPrint(html) {
   .bold   { font-weight: bold; }
   .big    { font-size: 16px; }
   .divider{ border-top: 1px dashed #000; margin: 4px 0; }
+  table { border-collapse: collapse; }
+  th, td { padding: 2px 4px; font-size: 11px; vertical-align: top; }
+  th { border-bottom: 1px solid #000; }
   @media print { @page { margin: 0; size: 80mm auto; } }
 </style>
 </head><body>${html}</body></html>`);
@@ -285,40 +301,79 @@ function receiptToHtml(data) {
     phone = "",
     orderNo = "",
     tableName = "",
+    cashier = "",
     items = [],
     subtotal = 0,
     taxAmount = 0,
     discount = 0,
     total = 0,
+    amountPaid = 0,
+    change = 0,
     paymentMethod = "",
     footer = "Thank you! Please come again.",
+    docType = "RECEIPT",
+    layoutSettings = {},
   } = data;
 
-  const rows = items.map(i =>
-    `<tr><td>${i.name}</td><td>x${i.quantity}</td><td class="right">${fmtCurrency((i.price||0)*(i.quantity||1))}</td></tr>`
-  ).join("");
+  const S = layoutSettings;
+  const showStoreName = S.show_store_name !== false;
+  const showAddress   = S.show_address   !== false;
+  const showPhone     = S.show_phone     !== false;
+  const showDate      = S.show_date      !== false;
+  const showSeller    = S.show_seller    !== false;
+  const showReference = S.show_reference !== false;
+  const showCustomer  = S.show_customer  !== false;
+  const showTax       = S.show_tax       !== false;
+  const showDiscount  = S.show_discount  !== false;
+  const showNote      = S.show_note      !== false;
+  const showPaid      = S.show_paid      !== false;
+  const showDue       = S.show_due       !== false;
+  const printedFooter = S.receipt_footer || footer;
+  const printedHeader = S.receipt_header || "";
+  const noteText      = S.note_to_customer || "";
+
+  const twoCol = (lbl, val, style = "") =>
+    `<div style="display:flex;justify-content:space-between;${style}"><span>${lbl}</span><span>${val}</span></div>`;
+
+  const rows = items.map(i => {
+    const lineTotal = (i.price || 0) * (i.quantity || 1);
+    return `<tr>
+      <td>${i.name}${i.note ? `<br><small style="color:#666">* ${i.note}</small>` : ""}</td>
+      <td class="center">x${i.quantity}</td>
+      <td class="right">${fmtCurrency(i.price || 0)}</td>
+      <td class="right">${fmtCurrency(lineTotal)}</td>
+    </tr>`;
+  }).join("");
 
   return `
-    <div class="center bold big">${businessName}</div>
-    ${address ? `<div class="center">${address}</div>` : ""}
-    ${phone   ? `<div class="center">Tel: ${phone}</div>` : ""}
+    ${showStoreName ? `<div class="center bold big">${businessName}</div>` : ""}
+    ${showAddress && address ? `<div class="center">${address}</div>` : ""}
+    ${showPhone   && phone   ? `<div class="center">Tel: ${phone}</div>` : ""}
+    ${printedHeader          ? `<div class="center">${printedHeader}</div>` : ""}
     <div class="divider"></div>
-    ${tableName ? `<div>Table  : ${tableName}</div>` : ""}
-    ${orderNo   ? `<div>Order  : ${orderNo}</div>` : ""}
-    <div>Date   : ${new Date().toLocaleString()}</div>
+    <div class="center bold">${docType}</div>
+    <div class="divider"></div>
+    ${showCustomer  && tableName ? `<div>Table  : ${tableName}</div>` : ""}
+    ${showReference && orderNo   ? `<div>Order  : ${orderNo}</div>` : ""}
+    ${showSeller    && cashier   ? `<div>Cashier: ${cashier}</div>` : ""}
+    ${showDate                   ? `<div>Date   : ${new Date().toLocaleString()}</div>` : ""}
     <div class="divider"></div>
     <table width="100%">
-      <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+      <thead><tr><th style="text-align:left">Item</th><th class="center">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="divider"></div>
-    <div class="right">Subtotal : ${fmtCurrency(subtotal)}</div>
-    ${discount > 0 ? `<div class="right">Discount : -${fmtCurrency(discount)}</div>` : ""}
-    ${taxAmount > 0 ? `<div class="right">Tax      : ${fmtCurrency(taxAmount)}</div>` : ""}
-    <div class="right bold big">TOTAL    : ${fmtCurrency(total)}</div>
-    ${paymentMethod ? `<div class="right">Method   : ${paymentMethod.toUpperCase()}</div>` : ""}
+    ${twoCol("Subtotal", fmtCurrency(subtotal))}
+    ${showDiscount && discount > 0 ? twoCol("Discount", `-${fmtCurrency(discount)}`, "color:red") : ""}
+    ${showTax && taxAmount > 0 ? twoCol("Tax", fmtCurrency(taxAmount)) : ""}
     <div class="divider"></div>
-    <div class="center">${footer}</div>
+    ${twoCol("TOTAL", fmtCurrency(total), "font-weight:bold;font-size:16px")}
+    ${amountPaid > 0 && showPaid ? twoCol("Paid", fmtCurrency(amountPaid)) : ""}
+    ${amountPaid > 0 && showDue  ? twoCol("Change", fmtCurrency(change)) : ""}
+    ${paymentMethod ? twoCol("Method", paymentMethod.toUpperCase()) : ""}
+    ${showNote && noteText ? `<div class="divider"></div><div class="center">${noteText}</div>` : ""}
+    <div class="divider"></div>
+    <div class="center">${printedFooter}</div>
   `;
 }
 
