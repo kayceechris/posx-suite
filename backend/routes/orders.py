@@ -36,11 +36,14 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(get
 
     if order.table_id:
         kitchen_statuses = ("held", "sent_to_kitchen")
+        is_active = order.status in kitchen_statuses
         await db.tables.update_one(
             {"id": order.table_id},
             {"$set": {
-                "status": "occupied" if order.status in kitchen_statuses else "available",
-                "current_order_id": order.id if order.status in kitchen_statuses else None
+                "status": "occupied" if is_active else "available",
+                "current_order_id": order.id if is_active else None,
+                "waiter_id": current_user.id if is_active else None,
+                "waiter_name": current_user.name if is_active else None,
             }}
         )
 
@@ -158,7 +161,12 @@ async def update_order(order_id: str, order_data: dict, current_user: User = Dep
     if update_fields.get("status") == "held" and existing.get("table_id"):
         await db.tables.update_one(
             {"id": existing["table_id"]},
-            {"$set": {"status": "occupied", "current_order_id": order_id}}
+            {"$set": {
+                "status": "occupied",
+                "current_order_id": order_id,
+                "waiter_id": current_user.id,
+                "waiter_name": current_user.name,
+            }}
         )
 
     if update_fields.get("status") == "completed" and existing.get("status") == "held":

@@ -136,7 +136,7 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onCli
         <p className={cn("text-xs font-bold uppercase tracking-wider", s.label)}>{statusLabel}</p>
         {entity.seats && <p className="text-xs text-gray-400 dark:text-gray-500">{entity.seats} seats</p>}
         {(status === "occupied" || status === "mine") && ownerName && (
-          <span className="text-[10px] text-red-400 font-semibold truncate max-w-full px-1">{ownerName}</span>
+          <span className={`text-[10px] font-semibold truncate max-w-full px-1 ${status === "mine" ? "text-blue-400" : "text-red-400"}`}>{ownerName}</span>
         )}
       </button>
 
