@@ -317,6 +317,7 @@ class Printer(BaseModel):
     outlet_id: str
     terminal_id: Optional[str] = None
     windows_printer_name: Optional[str] = None
+    printer_group_ids: List[str] = []
     active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -330,6 +331,7 @@ class PrinterCreate(BaseModel):
     outlet_id: str
     terminal_id: Optional[str] = None
     windows_printer_name: Optional[str] = None
+    printer_group_ids: List[str] = []
 
 
 # ==================== SPLIT BILL MODELS ====================

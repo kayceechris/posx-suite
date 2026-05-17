@@ -54,15 +54,16 @@ export default function TerminalSettingsModal({
   // â”€â”€ Printers state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [savedPrinters, setSavedPrinters]   = useState([]);
   const [winPrinters, setWinPrinters]       = useState([]);
+  const [printerGroups, setPrinterGroups]   = useState([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [showAdd, setShowAdd]               = useState(false);
   const [addLoading, setAddLoading]         = useState(false);
   const [saving, setSaving]                 = useState(false);
-  const [printerErr, setPrinterErr]         = useState("");
+  const [printerErr, setPrinterErr]         = useState(“”);
   const [printerForm, setPrinterForm]       = useState({
-    name: "", windows_printer_name: "", type: "receipt",
-    mode: isMobile ? "network" : "usb", outlet_id: outlets[0]?.id || "",
-    ip_address: "", port: "",
+    name: “”, windows_printer_name: “”, type: “receipt”,
+    mode: isMobile ? “network” : “usb”, outlet_id: outlets[0]?.id || “”,
+    ip_address: “”, port: “”, printer_group_ids: [],
   });
   const [pingStatus, setPingStatus] = useState(null); // null | "testing" | "ok" | "fail"
   const [pingError, setPingError]   = useState("");
@@ -155,7 +156,10 @@ export default function TerminalSettingsModal({
     if (tab !== "printers") return;
     setLoadingPrinters(true);
     const fetcher = isAdmin ? api.getPrinters() : api.getAssignedPrinters?.() ?? Promise.resolve([]);
-    fetcher.then(setSavedPrinters).catch(console.error).finally(() => setLoadingPrinters(false));
+    Promise.all([fetcher, api.getPrinterGroups().catch(() => [])])
+      .then(([printers, groups]) => { setSavedPrinters(printers); setPrinterGroups(groups); })
+      .catch(console.error)
+      .finally(() => setLoadingPrinters(false));
   }, [tab, isAdmin]);
 
   const handlePingTest = async () => {
@@ -178,7 +182,7 @@ export default function TerminalSettingsModal({
   const openAddPrinter = async () => {
     setShowAdd(true);
     setPrinterErr(""); setPingStatus(null); setPingError("");
-    setPrinterForm((f) => ({ ...f, outlet_id: outlets[0]?.id || "" }));
+    setPrinterForm((f) => ({ ...f, outlet_id: outlets[0]?.id || "", printer_group_ids: [] }));
     if (!isAdmin) return;
     setAddLoading(true);
     try {
@@ -212,6 +216,7 @@ export default function TerminalSettingsModal({
         type: printerForm.type,
         mode: printerForm.mode,
         outlet_id: printerForm.outlet_id || outlets[0]?.id || "",
+        printer_group_ids: printerForm.printer_group_ids || [],
         ...(printerForm.mode === "network" && {
           ip_address: printerForm.ip_address,
           port: printerForm.port ? parseInt(printerForm.port) : null,
@@ -408,7 +413,34 @@ export default function TerminalSettingsModal({
                       </div>
                     </div>
 
-                    {/* Mobile scanner — appears on tablet/phone only */}
+                    {/* Printer Groups */}
+                    {printerGroups.length > 0 && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">Printer Groups</label>
+                        <div className="border-2 border-gray-200 dark:border-gray-700 rounded-xl max-h-32 overflow-y-auto bg-white dark:bg-gray-800">
+                          {printerGroups.map((g) => (
+                            <label key={g.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0">
+                              <input
+                                type="checkbox"
+                                checked={(printerForm.printer_group_ids || []).includes(g.id)}
+                                onChange={() => {
+                                  const ids = printerForm.printer_group_ids || [];
+                                  setPrinterForm((f) => ({
+                                    ...f,
+                                    printer_group_ids: ids.includes(g.id) ? ids.filter((x) => x !== g.id) : [...ids, g.id],
+                                  }));
+                                }}
+                                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600"
+                              />
+                              <span className="text-xs text-gray-700 dark:text-gray-200">{g.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Select which groups this printer handles</p>
+                      </div>
+                    )}
+
+                    {/* Mobile scanner */}
                     {printerForm.mode === "network" && (
                       <MobilePrinterScanner
                         mode="wifi"
@@ -505,6 +537,16 @@ export default function TerminalSettingsModal({
                             <span className="mx-1">·</span>
                             {p.type}
                           </p>
+                          {(p.printer_group_ids || []).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(p.printer_group_ids || []).map((gid) => {
+                                const grp = printerGroups.find((g) => g.id === gid);
+                                return grp ? (
+                                  <span key={gid} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-[10px] font-semibold">{grp.name}</span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
                         </div>
                         {(() => {
                           const ts = testPrintState[p.id] || { status: "idle", msg: "" };

@@ -1202,29 +1202,20 @@ function PrinterGroupsSettings() {
   const [groups, setGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [systemPrinters, setSystemPrinters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editGroup, setEditGroup] = useState(null);
-  const [form, setForm] = useState({ name: "", printer_id: "", category_ids: [], product_ids: [] });
+  const [form, setForm] = useState({ name: "", category_ids: [], product_ids: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const load = () => {
     setLoading(true);
-    const bridgeUrl = localStorage.getItem("print_bridge_url") || "";
-    const printersFetch = bridgeUrl
-      ? fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) })
-          .then((r) => (r.ok ? r.json() : { printers: [] }))
-          .catch(() => ({ printers: [] }))
-      : Promise.resolve({ printers: [] });
-
-    Promise.all([api.getPrinterGroups(), api.getCategories(), api.getProducts(), printersFetch])
-      .then(([g, c, p, sys]) => {
+    Promise.all([api.getPrinterGroups(), api.getCategories(), api.getProducts()])
+      .then(([g, c, p]) => {
         setGroups(g);
         setCategories(c);
         setProducts(p);
-        setSystemPrinters(sys?.printers || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -1235,17 +1226,22 @@ function PrinterGroupsSettings() {
   const categoryName = (id) => categories.find((c) => c.id === id)?.name || id;
 
   const openAdd = () => {
-    setForm({ name: "", printer_id: "", category_ids: [], product_ids: [] });
+    setForm({ name: "", category_ids: [], product_ids: [] });
     setError(""); setShowAdd(true); setEditGroup(null);
   };
 
   const openEdit = (g) => {
-    setForm({ name: g.name, printer_id: g.printer_id || "", category_ids: g.category_ids || [], product_ids: g.product_ids || [] });
+    setForm({ name: g.name, category_ids: g.category_ids || [], product_ids: g.product_ids || [] });
     setError(""); setEditGroup(g); setShowAdd(false);
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setSaving(true); setError("");
+    e.preventDefault();
+    if (form.category_ids.length === 0 && form.product_ids.length === 0) {
+      setError("Assign at least one category or product to this group.");
+      return;
+    }
+    setSaving(true); setError("");
     try {
       if (editGroup) await api.updatePrinterGroup(editGroup.id, form);
       else await api.createPrinterGroup(form);
@@ -1272,46 +1268,7 @@ function PrinterGroupsSettings() {
       <div>
         <label className={LABEL}>Group Name</label>
         <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-          className={INPUT} placeholder="e.g. Kitchen Printer Group" />
-      </div>
-      <div>
-        <label className={LABEL}>Assigned Printer</label>
-        {systemPrinters.length > 0 ? (
-          <select
-            value={form.printer_id}
-            onChange={(e) => {
-              const val = e.target.value;
-              setForm((prev) => ({
-                ...prev,
-                printer_id: val,
-                name: prev.name || val,
-              }));
-            }}
-            className={INPUT}
-          >
-            <option value="">Not assigned</option>
-            {systemPrinters.map((p) => (
-              <option key={p.name} value={p.name}>{p.name}{p.port ? ` (${p.port})` : ""}</option>
-            ))}
-          </select>
-        ) : (
-          <>
-            <input
-              value={form.printer_id}
-              onChange={(e) => setForm({ ...form, printer_id: e.target.value })}
-              className={INPUT}
-              placeholder="Enter printer name (e.g. EPSON TM-T82II)"
-            />
-            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-              <AlertCircle size={12} /> Start Print Bridge to auto-detect printers, or type the name manually
-            </p>
-          </>
-        )}
-        <MobilePrinterScanner
-          mode="both"
-          onSelectWifi={(ip) => setForm((prev) => ({ ...prev, printer_id: ip, name: prev.name || ip }))}
-          onSelectBluetooth={(name) => setForm((prev) => ({ ...prev, printer_id: name, name: prev.name || name }))}
-        />
+          className={INPUT} placeholder="e.g. Kitchen, Bar, Hot Food" />
       </div>
       <div>
         <label className={LABEL}>Categories</label>
@@ -1375,9 +1332,8 @@ function PrinterGroupsSettings() {
       </div>
 
       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-6 text-sm text-green-800 dark:text-green-300">
-        <p>Assign products or categories to printer groups. When an order is placed, items will print at their assigned printer.
-          Click <strong>Test All Routing</strong> to fire a sample ticket through every group at once.</p>
-        <p className="mt-2 text-green-700 dark:text-green-400"><strong>Only have one printer?</strong> That's fine  - assign the <em>same</em> printer to both Kitchen and Bar groups. Or simpler: use one group called "All Stations" with every category assigned, pointed at your single printer.</p>
+        <p>Create groups and assign products or categories to them. Then go to <strong>Terminal Settings → Printers</strong> in the POS to assign a printer to each group.</p>
+        <p className="mt-2 text-green-700 dark:text-green-400"><strong>Example:</strong> Create a "Kitchen" group with hot food categories, a "Bar" group with drinks — then assign your printers to those groups from the POS.</p>
       </div>
 
       {loading ? (
@@ -1389,7 +1345,7 @@ function PrinterGroupsSettings() {
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="font-bold text-gray-900 dark:text-white">{g.name}</p>
-                  <p className="text-xs text-gray-400">Printer: {g.printer_id || "Not assigned"}</p>
+                  <p className="text-xs text-gray-400">{(g.category_ids || []).length + (g.product_ids || []).length} item{((g.category_ids || []).length + (g.product_ids || []).length) !== 1 ? "s" : ""} assigned</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => openEdit(g)} className="text-gray-400 hover:text-blue-500 transition-colors"><Pencil size={15} /></button>
