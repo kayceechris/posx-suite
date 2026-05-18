@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { OfflineProvider } from "./context/OfflineContext";
+import OfflineBanner from "./components/OfflineBanner";
 import SetupPage from "./pages/SetupPage";
 import LoginPage from "./pages/LoginPage";
 import HeldOrdersPage from "./pages/HeldOrdersPage";
@@ -77,13 +79,15 @@ export default function App() {
   return (
     <ThemeProvider>
     <BrowserRouter>
-      {/* Public routes — no auth required */}
       <Routes>
         <Route path="/display" element={<CustomerDisplayPage />} />
         <Route path="*" element={
           <BusinessProvider>
             <AuthProvider>
-              <AppRoutes />
+              <OfflineProvider>
+                <AppRoutes />
+                <OfflineBanner />
+              </OfflineProvider>
             </AuthProvider>
           </BusinessProvider>
         } />

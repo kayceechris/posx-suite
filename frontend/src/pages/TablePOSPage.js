@@ -10,6 +10,7 @@ import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import { printService } from "../utils/printService";
+import { useOffline } from "../context/OfflineContext";
 
 function TransferModal({ tableId, currentWaiterId, onClose, onTransferred }) {
   const [users, setUsers] = useState([]);
@@ -172,6 +173,7 @@ export default function TablePOSPage() {
   const { user } = useAuth();
   const { settings } = useBusiness();
   const navigate = useNavigate();
+  const { isOnline, queueOrder } = useOffline();
 
   const isBarTab = !!barTabId;
   const entityId = tableId || barTabId;
@@ -386,6 +388,15 @@ export default function TablePOSPage() {
 
   const handleSendToKitchen = async () => {
     if (cart.length === 0) { showToast("Add at least one item", "error"); return; }
+    if (!isOnline) {
+      setSubmitting(true);
+      try {
+        await queueOrder("send_kitchen", buildOrderPayload("sent_to_kitchen", "pending"), `Kitchen — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        showToast("Saved offline — will sync when connected");
+        setCart([]); setCustomerName(""); navigate("/tables");
+      } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
+      return;
+    }
     setSubmitting(true);
     try {
       await api.createOrder(buildOrderPayload("sent_to_kitchen", "pending"));
@@ -416,6 +427,15 @@ export default function TablePOSPage() {
 
   const handleHold = async () => {
     if (cart.length === 0) { showToast("Add at least one item", "error"); return; }
+    if (!isOnline) {
+      setSubmitting(true);
+      try {
+        await queueOrder("hold", buildOrderPayload("held", "pending"), `Hold — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        showToast("Saved offline — will sync when connected");
+        setCart([]); setCustomerName(""); navigate("/tables");
+      } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
+      return;
+    }
     setSubmitting(true);
     try {
       await api.createOrder(buildOrderPayload("held", "pending"));
@@ -433,6 +453,14 @@ export default function TablePOSPage() {
   const handleComplete = async (method) => {
     setSubmitting(true);
     setShowPay(false);
+    if (!isOnline) {
+      try {
+        await queueOrder("checkout", buildOrderPayload("completed", method), `Sale — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        showToast("Saved offline — will sync when connected");
+        setCart([]); setCustomerName(""); navigate("/tables");
+      } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
+      return;
+    }
     try {
       await api.createOrder(buildOrderPayload("completed", method));
       handlePrintReceipt(method);

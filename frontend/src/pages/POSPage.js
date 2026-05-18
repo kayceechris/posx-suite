@@ -10,6 +10,7 @@ import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import { useOffline } from "../context/OfflineContext";
 
 // ─── Payment Modal ─────────────────────────────────────────────────────────────
 function PaymentModal({ total, onClose, onConfirm, paymentTypes, customerName, onCustomerNameChange }) {
@@ -255,6 +256,7 @@ export default function POSPage() {
   const { user } = useAuth();
   const { settings } = useBusiness();
   const location = useLocation();
+  const { isOnline, queueOrder } = useOffline();
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -413,6 +415,16 @@ export default function POSPage() {
 
   const handleHold = async () => {
     if (cart.length === 0) { showToast("Add at least one item", "error"); return; }
+    if (!isOnline) {
+      if (loadedOrderId) { showToast("Cannot update a held order while offline", "error"); return; }
+      setSubmitting(true);
+      try {
+        await queueOrder("hold", buildPayload("held", "pending"), `Hold — ${formatCurrency(total)}`);
+        showToast("Saved offline — will sync when connected");
+        setCart([]); setCustomerName(""); setLoadedOrderId(null); setShowCart(false);
+      } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
+      return;
+    }
     setSubmitting(true);
     try {
       if (loadedOrderId) {
@@ -436,6 +448,15 @@ export default function POSPage() {
     setSubmitting(true);
     setShowPay(false);
     if (name !== undefined) setCustomerName(name);
+    if (!isOnline) {
+      if (loadedOrderId) { showToast("Cannot complete a held order while offline", "error"); setSubmitting(false); return; }
+      try {
+        await queueOrder("checkout", buildPayload("completed", method, name), `Sale — ${formatCurrency(total)}`);
+        showToast("Saved offline — will sync when connected");
+        setCart([]); setCustomerName(""); setLoadedOrderId(null); setShowCart(false);
+      } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
+      return;
+    }
     const receiptData = {
       businessName: settings?.business_name || "Restaurant",
       address: settings?.address || "",
