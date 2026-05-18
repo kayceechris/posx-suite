@@ -114,8 +114,8 @@ function buildReceiptBytes(data) {
   const printedHeader = S.receipt_header || "";
   const noteText      = S.note_to_customer || "";
 
-  // Paper width: 80mm → 42 chars, 58mm → 32 chars
-  const PW   = S.paper_size === "80mm" ? 42 : 32;
+  // Paper width: 80mm → 42 chars, 58mm → 32 chars. Default to 80mm.
+  const PW   = S.paper_size === "58mm" ? 32 : 42;
   const is80 = PW === 42;
   // 80mm 4 cols: Item(16) Qty(3) UnitPrice(9) LineTotal(11) + 3 spaces = 42
   // 58mm 3 cols: Item(16) Qty(3) LineTotal(11)               + 2 spaces = 32
