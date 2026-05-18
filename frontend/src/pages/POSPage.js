@@ -328,6 +328,10 @@ export default function POSPage() {
         setOutlets(outs);
         setPaymentTypes(ptypes);
         setAssignedPrinters(assignedPrinters);
+        // Keep printer cache fresh so printService works without opening Terminal Settings
+        if (assignedPrinters.length > 0) {
+          localStorage.setItem("pos_saved_printers", JSON.stringify(assignedPrinters));
+        }
       } catch {
         showToast("Failed to load data", "error");
       } finally {

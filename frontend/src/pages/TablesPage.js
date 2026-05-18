@@ -217,6 +217,10 @@ export default function TablesPage() {
     Promise.all([api.getTerminals(), api.getOutlets()])
       .then(([t, o]) => { setTerminals(t); setOutlets(o); })
       .catch(console.error);
+    // Keep printer cache fresh so printService works without opening Terminal Settings
+    api.getAssignedPrinters().then((printers) => {
+      if (printers.length > 0) localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
+    }).catch(() => {});
     const interval = setInterval(() => load(true), 30000);
     return () => clearInterval(interval);
   }, [load]);
