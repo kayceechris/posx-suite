@@ -416,10 +416,13 @@ export default function POSPage() {
   const handleHold = async () => {
     if (cart.length === 0) { showToast("Add at least one item", "error"); return; }
     if (!isOnline) {
-      if (loadedOrderId) { showToast("Cannot update a held order while offline", "error"); return; }
       setSubmitting(true);
       try {
-        await queueOrder("hold", buildPayload("held", "pending"), `Hold — ${formatCurrency(total)}`);
+        if (loadedOrderId) {
+          await queueOrder("update_order", { order_id: loadedOrderId, data: { items: cart, subtotal, total } }, `Update held — ${formatCurrency(total)}`);
+        } else {
+          await queueOrder("hold", buildPayload("held", "pending"), `Hold — ${formatCurrency(total)}`);
+        }
         showToast("Saved offline — will sync when connected");
         setCart([]); setCustomerName(""); setLoadedOrderId(null); setShowCart(false);
       } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
@@ -449,9 +452,12 @@ export default function POSPage() {
     setShowPay(false);
     if (name !== undefined) setCustomerName(name);
     if (!isOnline) {
-      if (loadedOrderId) { showToast("Cannot complete a held order while offline", "error"); setSubmitting(false); return; }
       try {
-        await queueOrder("checkout", buildPayload("completed", method, name), `Sale — ${formatCurrency(total)}`);
+        if (loadedOrderId) {
+          await queueOrder("complete_order", { order_id: loadedOrderId, method }, `Complete held — ${formatCurrency(total)}`);
+        } else {
+          await queueOrder("checkout", buildPayload("completed", method, name), `Sale — ${formatCurrency(total)}`);
+        }
         showToast("Saved offline — will sync when connected");
         setCart([]); setCustomerName(""); setLoadedOrderId(null); setShowCart(false);
       } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }

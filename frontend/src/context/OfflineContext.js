@@ -47,7 +47,14 @@ export function OfflineProvider({ children }) {
 
     for (const item of items) {
       try {
-        await api.createOrder(item.payload);
+        if (item.type === "update_order") {
+          await api.updateOrder(item.payload.order_id, item.payload.data);
+        } else if (item.type === "complete_order") {
+          await api.completeOrder(item.payload.order_id, item.payload.method);
+        } else {
+          // checkout, hold, send_kitchen
+          await api.createOrder(item.payload);
+        }
         await offlineQueue.remove(item.id);
         success++;
       } catch {
