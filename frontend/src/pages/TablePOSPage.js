@@ -262,6 +262,9 @@ export default function TablePOSPage() {
       }
     };
     load();
+    api.getAssignedPrinters().then((printers) => {
+      if (printers.length > 0) localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
+    }).catch(() => {});
   }, [entityId, isBarTab]);
 
   const addToCart = (product) => {

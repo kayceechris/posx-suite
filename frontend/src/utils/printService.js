@@ -450,18 +450,23 @@ export const printService = {
     }
 
     // Network printer via bridge /print
+    let networkAttemptFailed = false;
     if (printerIp) {
       try {
         await sendToBridge({ bridgeUrl, printerIp, printerPort, bytes });
         return { success: true, method: "bridge" };
       } catch (err) {
         console.warn("[PrintService] Bridge failed:", err.message);
+        networkAttemptFailed = true;
       }
     }
 
-    // If bridge URL is configured but no USB printer found → error, not silent browser popup
+    // If bridge URL is configured but printing failed → give accurate error
     if (bridgeUrl) {
-      throw new Error("No USB receipt printer found — open Terminal Settings → Printers tab to load printer list");
+      if (networkAttemptFailed) {
+        throw new Error("Cannot reach the print bridge — make sure the bridge app is running on your PC and the bridge URL is correct");
+      }
+      throw new Error("No printer configured for this terminal — open Terminal Settings → Printers tab to add a printer");
     }
 
     // Browser fallback (only when bridge is not configured at all)
