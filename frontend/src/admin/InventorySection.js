@@ -1063,12 +1063,15 @@ function WasteView() {
 }
 
 // ─── Stock Valuation ──────────────────────────────────────────────────────────
+const VALUATION_PAGE_SIZE = 25;
+
 function ValuationView() {
   const [data, setData] = useState(null);
   const [outlets, setOutlets] = useState([]);
   const [outletId, setOutletId] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const load = (oid) => {
     setLoading(true);
@@ -1082,11 +1085,14 @@ function ValuationView() {
     api.getOutlets().then((o) => { setOutlets(o); load(""); }).catch(console.error);
   }, []);
 
-  useEffect(() => { load(outletId); }, [outletId]);
+  useEffect(() => { load(outletId); setPage(1); }, [outletId]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const items = data?.items || [];
   const filtered = items.filter((i) => !search || i.product_name.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / VALUATION_PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * VALUATION_PAGE_SIZE, page * VALUATION_PAGE_SIZE);
 
   return (
     <div>
@@ -1143,7 +1149,7 @@ function ValuationView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {filtered.map((item, i) => (
+              {paginated.map((item, i) => (
                 <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.product_name}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{outletName(item.outlet_id)}</td>
@@ -1158,27 +1164,68 @@ function ValuationView() {
             </tbody>
           </table>
         )}
+        {!loading && totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {(page - 1) * VALUATION_PAGE_SIZE + 1}–{Math.min(page * VALUATION_PAGE_SIZE, filtered.length)} of {filtered.length} items
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <span key={`e${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                  ) : (
+                    <button key={p} onClick={() => setPage(p)}
+                      className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                        p === page ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>
+                      {p}
+                    </button>
+                  )
+                )}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ─── Consolidated Multi-Outlet View ───────────────────────────────────────────
+const CONSOLIDATED_PAGE_SIZE = 25;
+
 function ConsolidatedView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const load = () => {
     setLoading(true);
     api.getConsolidatedStock().then(setData).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [search]);
 
   const outlets = data?.outlets || [];
-  const productRows = (data?.products || []).filter(
+  const allRows = (data?.products || []).filter(
     (p) => !search || p.product_name.toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(allRows.length / CONSOLIDATED_PAGE_SIZE));
+  const productRows = allRows.slice((page - 1) * CONSOLIDATED_PAGE_SIZE, page * CONSOLIDATED_PAGE_SIZE);
   const isLow = (info) => info && info.quantity <= info.min_quantity;
 
   return (
@@ -1235,6 +1282,41 @@ function ConsolidatedView() {
               {productRows.length === 0 && <tr><td colSpan={outlets.length + 2} className="px-6 py-10 text-center text-gray-400 text-sm">No stock data</td></tr>}
             </tbody>
           </table>
+        )}
+        {!loading && totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {(page - 1) * CONSOLIDATED_PAGE_SIZE + 1}–{Math.min(page * CONSOLIDATED_PAGE_SIZE, allRows.length)} of {allRows.length} products
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <span key={`e${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                  ) : (
+                    <button key={p} onClick={() => setPage(p)}
+                      className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                        p === page ? "bg-violet-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>
+                      {p}
+                    </button>
+                  )
+                )}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
