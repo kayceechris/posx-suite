@@ -2,7 +2,7 @@
 import {
   Plus, Pencil, Trash2, X, Tag, Upload, Printer, Download,
   FileText, CheckSquare, Square, ChevronDown, Search, RefreshCw,
-  FileUp, FileDown, BarChart2, Images,
+  FileUp, FileDown, BarChart2, GalleryThumbnails,
 } from "lucide-react";
 import ImageLibraryModal from "../components/ImageLibraryModal";
 import jsPDF from "jspdf";
@@ -598,7 +598,7 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
               </button>
               <button type="button" onClick={() => setShowLibrary(true)} disabled={uploading}
                 className="px-3 py-2 border-2 border-indigo-200 dark:border-indigo-700 rounded-xl text-sm hover:border-indigo-400 transition-colors flex items-center gap-2 text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
-                <Images size={14} /> From Library
+                <GalleryThumbnails size={14} /> From Library
               </button>
               {uploading && <span className="text-xs text-gray-400">Compressing &amp; uploading…</span>}
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -1711,7 +1711,7 @@ function ImageLibraryView() {
     <div>
       <SectionHeader
         title="Image Library"
-        icon={<Images size={20} className="text-indigo-600" />}
+        icon={<GalleryThumbnails size={20} className="text-indigo-600" />}
         iconBg="bg-indigo-100"
         action={
           <button onClick={() => fileRef.current?.click()} disabled={uploading}
@@ -1743,7 +1743,7 @@ function ImageLibraryView() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-gray-400">
-            <Images size={32} className="opacity-40" />
+            <GalleryThumbnails size={32} className="opacity-40" />
             <p className="text-sm font-medium">Drop images here or click to browse</p>
             <p className="text-xs">JPG, PNG, WebP, GIF — up to 10 MB each — multiple files supported</p>
           </div>
@@ -1768,7 +1768,7 @@ function ImageLibraryView() {
         <Spinner />
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center py-20 text-gray-400">
-          <Images size={40} className="opacity-25 mb-3" />
+          <GalleryThumbnails size={40} className="opacity-25 mb-3" />
           <p className="text-sm">{search ? "No images match your search" : "No images yet — upload some above"}</p>
         </div>
       ) : (

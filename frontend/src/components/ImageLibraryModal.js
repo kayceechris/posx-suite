@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Images, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, GalleryThumbnails, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 
 const BASE_URL = process.env.REACT_APP_BACKEND_URL || "https://posx-suite.vercel.app";
@@ -85,7 +85,7 @@ export default function ImageLibraryModal({ onSelect, onClose }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-              <Images size={18} className="text-indigo-600 dark:text-indigo-400" />
+              <GalleryThumbnails size={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white">Image Library</h3>
@@ -118,7 +118,7 @@ export default function ImageLibraryModal({ onSelect, onClose }) {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <Images size={40} className="mb-3 opacity-30" />
+              <GalleryThumbnails size={40} className="mb-3 opacity-30" />
               <p className="text-sm">{search ? "No images match your search" : "No images uploaded yet"}</p>
             </div>
           ) : (
