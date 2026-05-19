@@ -196,6 +196,20 @@ export const api = {
   updateStock: (data) =>
     request("/api/stock", { method: "POST", body: JSON.stringify(data) }),
   getLowStock: () => request("/api/stock/low"),
+  getStockValuation: (outlet_id) =>
+    request(`/api/stock/valuation${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
+  getConsolidatedStock: () => request("/api/stock/consolidated"),
+  getExpiringStock: (days = 30) => request(`/api/stock/expiring?days=${days}`),
+
+  // Waste / Spoilage
+  getWasteEntries: (outlet_id) =>
+    request(`/api/waste${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
+  createWasteEntry: (data) =>
+    request("/api/waste", { method: "POST", body: JSON.stringify(data) }),
+  deleteWasteEntry: (id) =>
+    request(`/api/waste/${id}`, { method: "DELETE" }),
+  getWasteSummary: (outlet_id) =>
+    request(`/api/waste/summary${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
 
   // Customers
   getCustomers: () => request("/api/customers"),

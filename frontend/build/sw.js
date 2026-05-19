@@ -1,5 +1,5 @@
-const CACHE = "posx-v1";
-const API_CACHE = "posx-api-v1";
+const CACHE = "posx-v2";
+const API_CACHE = "posx-api-v2";
 
 // API GET endpoints to cache for offline access
 const OFFLINE_API_PREFIXES = [
@@ -9,6 +9,10 @@ const OFFLINE_API_PREFIXES = [
   "/api/outlets",
   "/api/terminals",
   "/api/payment-types",
+  "/api/tables",
+  "/api/bar-tabs",
+  "/api/users",
+  "/api/printers",
 ];
 
 // ── Install: cache the app shell ────────────────────────────────────────────

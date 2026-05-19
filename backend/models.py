@@ -120,6 +120,8 @@ class Stock(BaseModel):
     outlet_id: str
     quantity: int
     min_quantity: int = 10
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None  # ISO date string YYYY-MM-DD
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -128,6 +130,8 @@ class StockUpdate(BaseModel):
     outlet_id: str
     quantity: int
     min_quantity: Optional[int] = 10
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
 
 
 class StockMovement(BaseModel):
@@ -597,3 +601,25 @@ class RegisterAdmin(BaseModel):
     pincode: str
     business_name: str
     business_type: str = "restaurant"
+
+
+# ==================== WASTE / SPOILAGE MODELS ====================
+
+class WasteEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    outlet_id: str
+    quantity: int
+    reason: str  # spoilage | damage | theft | expired | other
+    notes: Optional[str] = None
+    recorded_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class WasteEntryCreate(BaseModel):
+    product_id: str
+    outlet_id: str
+    quantity: int
+    reason: str
+    notes: Optional[str] = None

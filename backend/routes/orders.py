@@ -9,6 +9,27 @@ from auth import get_current_user
 router = APIRouter(prefix="/api")
 
 
+async def _deduct_stock_for_order(items: list, outlet_id: str):
+    """Deduct product stock. If a recipe exists for a product, also deduct its ingredients."""
+    for item in items:
+        pid = item["product_id"] if isinstance(item, dict) else item.product_id
+        qty = item["quantity"] if isinstance(item, dict) else item.quantity
+        await db.stock.update_one(
+            {"product_id": pid, "outlet_id": outlet_id},
+            {"$inc": {"quantity": -qty}}
+        )
+        # Recipe ingredient deduction
+        recipe = await db.recipes.find_one({"product_id": pid}, {"_id": 0})
+        if recipe:
+            for ing in recipe.get("ingredients", []):
+                if ing.get("product_id"):
+                    deduct_qty = float(ing.get("quantity", 0)) * qty
+                    await db.stock.update_one(
+                        {"product_id": ing["product_id"], "outlet_id": outlet_id},
+                        {"$inc": {"quantity": -deduct_qty}}
+                    )
+
+
 @router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: User = Depends(get_current_user)):
     count = await db.orders.count_documents({})
@@ -23,11 +44,10 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(get
     )
 
     if order.status == "completed":
-        for item in order.items:
-            await db.stock.update_one(
-                {"product_id": item.product_id, "outlet_id": order.outlet_id},
-                {"$inc": {"quantity": -item.quantity}}
-            )
+        await _deduct_stock_for_order(
+            [{"product_id": i.product_id, "quantity": i.quantity} for i in order.items],
+            order.outlet_id
+        )
         if order.customer_id:
             await db.customers.update_one(
                 {"id": order.customer_id},
@@ -59,11 +79,7 @@ async def complete_order(order_id: str, payment_method: str, current_user: User 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    for item in order["items"]:
-        await db.stock.update_one(
-            {"product_id": item["product_id"], "outlet_id": order["outlet_id"]},
-            {"$inc": {"quantity": -item["quantity"]}}
-        )
+    await _deduct_stock_for_order(order["items"], order["outlet_id"])
 
     if order.get("customer_id"):
         await db.customers.update_one(
@@ -170,14 +186,9 @@ async def update_order(order_id: str, order_data: dict, current_user: User = Dep
         )
 
     if update_fields.get("status") == "completed" and existing.get("status") == "held":
-        # Deduct stock for completed held orders
         items = update_fields.get("items", existing.get("items", []))
         outlet_id = existing.get("outlet_id", "")
-        for item in items:
-            await db.stock.update_one(
-                {"product_id": item["product_id"], "outlet_id": outlet_id},
-                {"$inc": {"quantity": -item["quantity"]}}
-            )
+        await _deduct_stock_for_order(items, outlet_id)
         # Update customer stats
         customer_id = update_fields.get("customer_id") or existing.get("customer_id")
         if customer_id:
@@ -261,11 +272,7 @@ async def pay_split(order_id: str, split_id: str, current_user: User = Depends(g
         )
 
         order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-        for item in order["items"]:
-            await db.stock.update_one(
-                {"product_id": item["product_id"], "outlet_id": order["outlet_id"]},
-                {"$inc": {"quantity": -item["quantity"]}}
-            )
+        await _deduct_stock_for_order(order["items"], order["outlet_id"])
 
         if order.get("table_id"):
             await db.tables.update_one(

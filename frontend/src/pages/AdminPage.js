@@ -38,8 +38,14 @@ const EXPANDABLE = {
     { id: "staff", label: "Staff Performance" }, { id: "payments", label: "Payment Methods" },
   ],
   inventory: [
-    { id: "stock", label: "Stock Levels" }, { id: "stock-count", label: "Stock Count" },
-    { id: "update-stock", label: "Update Stock" }, { id: "transfer-stock", label: "Transfer Stock" },
+    { id: "stock", label: "Stock Levels" },
+    { id: "stock-count", label: "Stock Count" },
+    { id: "update-stock", label: "Update Stock" },
+    { id: "transfer-stock", label: "Transfer Stock" },
+    { id: "reorder", label: "Reorder Alerts" },
+    { id: "waste", label: "Waste Recording" },
+    { id: "valuation", label: "Stock Valuation" },
+    { id: "consolidated", label: "Consolidated View" },
   ],
   purchases: [
     { id: "pending", label: "Pending Orders" },
@@ -88,9 +94,11 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   useEffect(() => {
     api.getDashboardAnalytics().then(setAnalytics).catch(console.error).finally(() => setAnalyticsLoading(false));
+    api.getLowStock().then((items) => setLowStockCount(items?.length ?? 0)).catch(() => {});
   }, []);
 
   const handleNavClick = (id) => {
@@ -157,6 +165,11 @@ export default function AdminPage() {
                   >
                     <Icon size={18} />
                     <span className="flex-1 text-left font-medium">{item.label}</span>
+                    {item.id === "inventory" && lowStockCount > 0 && (
+                      <span className="ml-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                        {lowStockCount > 99 ? "99+" : lowStockCount}
+                      </span>
+                    )}
                     {item.expandable ? (
                       isExpanded
                         ? <ChevronDown size={14} className="text-white/60" />
