@@ -2,8 +2,9 @@
 import {
   Plus, Pencil, Trash2, X, Tag, Upload, Printer, Download,
   FileText, CheckSquare, Square, ChevronDown, Search, RefreshCw,
-  FileUp, FileDown, BarChart2,
+  FileUp, FileDown, BarChart2, Images,
 } from "lucide-react";
+import ImageLibraryModal from "../components/ImageLibraryModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { api } from "../lib/api";
@@ -372,6 +373,7 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [imagePreview, setImagePreview] = useState(
     mode === "edit" && product?.image ? api.getImageUrl(product.image) : null
   );
@@ -404,7 +406,7 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
     setUploading(true);
     try {
       const resizedBlob = await resizeImageFile(file);
-      const resized = new File([resizedBlob], "upload.jpg", { type: resizedBlob.type || "image/jpeg" });
+      const resized = new File([resizedBlob], file.name || "upload.jpg", { type: resizedBlob.type || "image/jpeg" });
       const result = await api.uploadImage(resized);
       f("image", result.url);
       setImagePreview(result.fullUrl);
@@ -413,6 +415,11 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleLibrarySelect = ({ url, fullUrl }) => {
+    f("image", url);
+    setImagePreview(fullUrl);
   };
 
   // Terminal prices helpers
@@ -584,12 +591,16 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
         <div>
           <label className={label}>Product Image</label>
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-                className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm hover:border-gray-300 transition-colors flex items-center gap-2 text-gray-600 dark:text-gray-300 disabled:opacity-50">
-                <Upload size={14} /> {uploading ? "Uploading…" : "Upload Image"}
+                className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm hover:border-blue-400 transition-colors flex items-center gap-2 text-gray-600 dark:text-gray-300 disabled:opacity-50">
+                <Upload size={14} /> {uploading ? "Uploading…" : "Upload New"}
               </button>
-              {uploading && <span className="text-sm text-gray-400">Compressing &amp; uploading…</span>}
+              <button type="button" onClick={() => setShowLibrary(true)} disabled={uploading}
+                className="px-3 py-2 border-2 border-indigo-200 dark:border-indigo-700 rounded-xl text-sm hover:border-indigo-400 transition-colors flex items-center gap-2 text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                <Images size={14} /> From Library
+              </button>
+              {uploading && <span className="text-xs text-gray-400">Compressing &amp; uploading…</span>}
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             </div>
             {imagePreview && (
@@ -604,6 +615,9 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
             )}
           </div>
         </div>
+        {showLibrary && (
+          <ImageLibraryModal onSelect={handleLibrarySelect} onClose={() => setShowLibrary(false)} />
+        )}
 
         {/* Description */}
         <div>

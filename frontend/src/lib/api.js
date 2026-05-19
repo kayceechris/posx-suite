@@ -375,6 +375,11 @@ export const api = {
   // Seed (dev only)
   seed: () => request("/api/seed", { method: "POST" }),
 
+  // Image library
+  getImages: (page = 1, search = "") =>
+    request(`/api/images?page=${page}&limit=24&q=${encodeURIComponent(search)}`),
+  deleteImage: (id) => request(`/api/images/${id}`, { method: "DELETE" }),
+
   // Image upload
   uploadImage: async (file) => {
     const token = getToken();
