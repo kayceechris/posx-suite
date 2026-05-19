@@ -5,6 +5,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
@@ -172,6 +173,7 @@ export default function TablePOSPage() {
   const { tableId, barTabId } = useParams();
   const { user } = useAuth();
   const { settings } = useBusiness();
+  const config = useBusinessConfig();
   const navigate = useNavigate();
   const { isOnline, queueOrder } = useOffline();
 
@@ -484,6 +486,7 @@ export default function TablePOSPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <div className={`h-1 bg-gradient-to-r ${config.headerBg} flex-shrink-0`} />
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex-shrink-0">
@@ -551,12 +554,13 @@ export default function TablePOSPage() {
               {categories.map((cat) => (
                 <button key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={cn(
-                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
+                  className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0"
+                  style={
                     activeCategory === cat.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  )}>
+                      ? { backgroundColor: cat.color || "#3B82F6", color: "#fff" }
+                      : { backgroundColor: (cat.color || "#3B82F6") + "22", color: cat.color || "#3B82F6" }
+                  }
+                >
                   {cat.name}
                 </button>
               ))}
@@ -587,7 +591,7 @@ export default function TablePOSPage() {
                       )}
                       <div className="p-2.5">
                         <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight truncate">{product.name}</p>
-                        <p className="text-blue-600 dark:text-blue-400 font-black text-sm mt-0.5">{formatCurrency(product.price)}</p>
+                        <p className="font-black text-sm mt-0.5" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>{formatCurrency(product.price)}</p>
                       </div>
                     </button>
                   ))}

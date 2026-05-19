@@ -57,7 +57,7 @@ export default function LoginPage() {
   const dots = Array.from({ length: 6 }).map((_, i) => ({ filled: i < pin.length }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center p-4 relative">
       {/* Theme toggle */}
       <button
         onClick={toggleTheme}
@@ -70,7 +70,7 @@ export default function LoginPage() {
 
         {/* Logo + Title */}
         <div className="flex flex-col items-center justify-center py-4">
-          <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+          <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-900/40">
             <Store size={30} className="text-white" />
           </div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">

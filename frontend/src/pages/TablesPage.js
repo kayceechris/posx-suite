@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
@@ -175,6 +176,7 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onCli
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TablesPage() {
   const { user } = useAuth();
+  const config = useBusinessConfig();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("table");
@@ -266,6 +268,7 @@ export default function TablesPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 min-w-0">
+        <div className={`h-1 bg-gradient-to-r ${config.headerBg} flex-shrink-0`} />
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3.5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <button

@@ -189,8 +189,10 @@ export default function OrdersPage() {
                 <div
                   key={order.id}
                   data-testid={`order-card-${order.id}`}
-                  className="bg-white rounded-2xl border-2 border-border px-4 py-4"
+                  className="bg-white dark:bg-gray-800 rounded-2xl border border-border overflow-hidden shadow-sm"
                 >
+                  <div className="h-1" style={{ background: `linear-gradient(to right, ${config.accent}, ${config.accent}99)` }} />
+                  <div className="px-4 py-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-heading font-bold text-sm text-foreground">
@@ -201,7 +203,7 @@ export default function OrdersPage() {
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <p className="font-heading font-black text-base text-foreground">
+                      <p className="font-heading font-black text-base" style={{ color: config.accent }}>
                         {formatCurrency(order.total)}
                       </p>
                       <span
@@ -229,6 +231,7 @@ export default function OrdersPage() {
                         minute: "2-digit",
                       })}
                     </span>
+                  </div>
                   </div>
                 </div>
               ))}
@@ -302,7 +305,7 @@ export default function OrdersPage() {
                         <td className="px-5 py-3.5 font-body text-sm text-foreground-muted capitalize">
                           {order.payment_method || "—"}
                         </td>
-                        <td className="px-5 py-3.5 text-right font-heading font-bold text-foreground">
+                        <td className="px-5 py-3.5 text-right font-heading font-bold" style={{ color: config.accent }}>
                           {formatCurrency(order.total)}
                         </td>
                         <td className="px-5 py-3.5 font-body text-xs text-foreground-muted whitespace-nowrap">

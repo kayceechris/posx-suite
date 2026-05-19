@@ -5,6 +5,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
@@ -273,6 +274,7 @@ function EmptyState({ canSeeAll }) {
 export default function HeldOrdersPage() {
   const { user } = useAuth();
   const { settings } = useBusiness();
+  const config = useBusinessConfig();
   const navigate = useNavigate();
 
   const canSeeAll =
@@ -399,6 +401,7 @@ export default function HeldOrdersPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <div className={`h-1 bg-gradient-to-r ${config.headerBg} flex-shrink-0`} />
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <button

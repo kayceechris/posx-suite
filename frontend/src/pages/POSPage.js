@@ -6,6 +6,7 @@ import { printService } from "../utils/printService";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
@@ -255,6 +256,7 @@ function MobileCartSheet({
 export default function POSPage() {
   const { user } = useAuth();
   const { settings } = useBusiness();
+  const config = useBusinessConfig();
   const location = useLocation();
   const { isOnline, queueOrder } = useOffline();
 
@@ -520,6 +522,7 @@ export default function POSPage() {
       <div className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-900">
         {/* Product browser */}
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+          <div className={`h-1 bg-gradient-to-r ${config.headerBg} flex-shrink-0`} />
           {/* Top bar */}
           <div className="px-4 pt-4 pb-3 flex gap-3 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
             <button
@@ -567,12 +570,12 @@ export default function POSPage() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
+                className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0"
+                style={
                   activeCategory === cat.id
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                )}
+                    ? { backgroundColor: cat.color || "#3B82F6", color: "#fff" }
+                    : { backgroundColor: (cat.color || "#3B82F6") + "22", color: cat.color || "#3B82F6" }
+                }
               >
                 {cat.name}
               </button>
@@ -614,7 +617,7 @@ export default function POSPage() {
                       <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2">
                         {product.name}
                       </p>
-                      <p className="text-blue-600 dark:text-blue-400 font-black text-sm mt-0.5">
+                      <p className="font-black text-sm mt-0.5" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>
                         {formatCurrency(product.price)}
                       </p>
                     </div>
