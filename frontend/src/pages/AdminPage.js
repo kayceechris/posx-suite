@@ -99,6 +99,15 @@ export default function AdminPage() {
   useEffect(() => {
     api.getDashboardAnalytics().then(setAnalytics).catch(console.error).finally(() => setAnalyticsLoading(false));
     api.getLowStock().then((items) => setLowStockCount(items?.length ?? 0)).catch(() => {});
+
+    const handleNavPurchases = (e) => {
+      const sub = e.detail || "pending";
+      setActiveSection("purchases");
+      setExpandedSection("purchases");
+      setSubViews((s) => ({ ...s, purchases: sub }));
+    };
+    window.addEventListener("nav-purchases", handleNavPurchases);
+    return () => window.removeEventListener("nav-purchases", handleNavPurchases);
   }, []);
 
   const handleNavClick = (id) => {
