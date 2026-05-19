@@ -53,6 +53,8 @@ function Spinner({ color = "blue" }) {
 }
 
 // ─── Stock Levels ──────────────────────────────────────────────────────────────
+const STOCK_PAGE_SIZE = 25;
+
 function StockLevelsView() {
   const [stock, setStock] = useState([]);
   const [products, setProducts] = useState([]);
@@ -63,6 +65,7 @@ function StockLevelsView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
+  const [page, setPage] = useState(1);
 
   const load = () => {
     setLoading(true);
@@ -87,6 +90,8 @@ function StockLevelsView() {
   const displayed = tab === "low" ? stock.filter(isLow)
     : tab === "expiring" ? stock.filter((s) => isExpiring(s) || isExpired(s))
     : stock;
+  const totalStockPages = Math.max(1, Math.ceil(displayed.length / STOCK_PAGE_SIZE));
+  const pagedStock = displayed.slice((page - 1) * STOCK_PAGE_SIZE, page * STOCK_PAGE_SIZE);
 
   const openUpdate = (item) => {
     setForm({
@@ -149,7 +154,7 @@ function StockLevelsView() {
           ["low", `Low Stock (${lowCount})`],
           ["expiring", `Expiring (${expiringCount})`],
         ].map(([v, l]) => (
-          <button key={v} onClick={() => setTab(v)}
+          <button key={v} onClick={() => { setTab(v); setPage(1); }}
             className={cn("px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
               tab === v ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700")}>
             {l}
@@ -174,7 +179,7 @@ function StockLevelsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {displayed.map((item, i) => {
+                {pagedStock.map((item, i) => {
                   const low = isLow(item);
                   const expired = isExpired(item);
                   const expiring = !expired && isExpiring(item);
@@ -207,6 +212,26 @@ function StockLevelsView() {
                 {displayed.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No stock records</td></tr>}
               </tbody>
             </table>
+            {totalStockPages > 1 && (
+              <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {(page - 1) * STOCK_PAGE_SIZE + 1}–{Math.min(page * STOCK_PAGE_SIZE, displayed.length)} of {displayed.length} entries
+                </p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Prev</button>
+                  {Array.from({ length: totalStockPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalStockPages || Math.abs(p - page) <= 1)
+                    .reduce((acc, p, idx, arr) => { if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…"); acc.push(p); return acc; }, [])
+                    .map((p, i) => p === "…"
+                      ? <span key={`e${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                      : <button key={p} onClick={() => setPage(p)} className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors", p === page ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>{p}</button>
+                    )}
+                  <button onClick={() => setPage((p) => Math.min(totalStockPages, p + 1))} disabled={page === totalStockPages}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Next</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -262,6 +287,8 @@ function StockLevelsView() {
 }
 
 // ─── Stock Count (with barcode scan) ──────────────────────────────────────────
+const COUNT_PAGE_SIZE = 25;
+
 function StockCountView() {
   const { products, outlets, loading } = useBaseData();
   const [stock, setStock] = useState([]);
@@ -273,6 +300,7 @@ function StockCountView() {
   const [scanMode, setScanMode] = useState(false);
   const [scanBuffer, setScanBuffer] = useState("");
   const [lastScanned, setLastScanned] = useState(null);
+  const [page, setPage] = useState(1);
   const scanRef = useRef(null);
   const scanTimeout = useRef(null);
 
@@ -284,6 +312,7 @@ function StockCountView() {
     if (!outletId) return;
     api.getStock(outletId).then(setStock).catch(console.error);
     setCounts({});
+    setPage(1);
   }, [outletId]);
 
   useEffect(() => {
@@ -324,6 +353,8 @@ function StockCountView() {
 
   const filtered = products.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const filledCount = Object.values(counts).filter((v) => v !== "" && v != null).length;
+  const totalCountPages = Math.max(1, Math.ceil(filtered.length / COUNT_PAGE_SIZE));
+  const pagedCount = filtered.slice((page - 1) * COUNT_PAGE_SIZE, page * COUNT_PAGE_SIZE);
 
   const handleSave = async () => {
     setSaving(true);
@@ -402,7 +433,7 @@ function StockCountView() {
       <div className="flex gap-3 mb-5">
         <div className="relative flex-1 max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
+          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search products…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800 dark:text-white" />
         </div>
         <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
@@ -431,7 +462,7 @@ function StockCountView() {
             {filtered.length === 0 && (
               <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 text-sm">No products found</td></tr>
             )}
-            {filtered.map((p) => {
+            {pagedCount.map((p) => {
               const v = variance(p.id);
               const counted = counts[p.id] ?? "";
               return (
@@ -460,6 +491,26 @@ function StockCountView() {
             })}
           </tbody>
         </table>
+        {totalCountPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {(page - 1) * COUNT_PAGE_SIZE + 1}–{Math.min(page * COUNT_PAGE_SIZE, filtered.length)} of {filtered.length} products
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Prev</button>
+              {Array.from({ length: totalCountPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalCountPages || Math.abs(p - page) <= 1)
+                .reduce((acc, p, idx, arr) => { if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…"); acc.push(p); return acc; }, [])
+                .map((p, i) => p === "…"
+                  ? <span key={`e${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                  : <button key={p} onClick={() => setPage(p)} className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors", p === page ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>{p}</button>
+                )}
+              <button onClick={() => setPage((p) => Math.min(totalCountPages, p + 1))} disabled={page === totalCountPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Next</button>
+            </div>
+          </div>
+        )}
         {filledCount > 0 && (
           <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400"><span className="font-bold text-gray-900 dark:text-white">{filledCount}</span> of {products.length} products counted</p>
