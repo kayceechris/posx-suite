@@ -36,31 +36,13 @@
     overscroll-behavior: none;
   }
 
-  /* Custom scrollbar for Windows/desktop */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Hide scrollbars app-wide while keeping scroll behaviour */
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
-  ::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-  }
-
-  .dark ::-webkit-scrollbar-track {
-    background: #1e293b;
-  }
-  .dark ::-webkit-scrollbar-thumb {
-    background: #334155;
-  }
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+  *::-webkit-scrollbar {
+    display: none;
   }
 }
 
