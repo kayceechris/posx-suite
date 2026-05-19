@@ -544,6 +544,8 @@ function UpdateStockView() {
   const [stock, setStock] = useState([]);
   const [outletId, setOutletId] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ quantity: "", min_quantity: "", batch_number: "", expiry_date: "" });
   const [saving, setSaving] = useState(false);
@@ -588,6 +590,12 @@ function UpdateStockView() {
   };
 
   const filtered = products.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset page when search or outlet changes
+  useEffect(() => { setPage(1); setEditingId(null); }, [search, outletId]);
 
   if (loading) return <Spinner />;
 
@@ -617,6 +625,13 @@ function UpdateStockView() {
         </select>
       </div>
 
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {filtered.length} product{filtered.length !== 1 ? "s" : ""}
+          {totalPages > 1 && ` · page ${safePage} of ${totalPages}`}
+        </p>
+      </div>
+
       <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
         <table className="w-full min-w-[680px]">
           <thead>
@@ -632,10 +647,10 @@ function UpdateStockView() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-            {filtered.length === 0 && (
+            {paginated.length === 0 && (
               <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No products found</td></tr>
             )}
-            {filtered.map((p) => {
+            {paginated.map((p) => {
               const s = stockFor(p.id);
               const editing = editingId === p.id;
               const inp = "w-20 px-2 py-1.5 border-2 border-blue-400 rounded-xl text-sm text-center font-mono focus:outline-none bg-white dark:bg-gray-700 dark:text-white";
@@ -686,6 +701,49 @@ function UpdateStockView() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button onClick={() => setPage(1)} disabled={safePage === 1}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">
+            «
+          </button>
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">
+            ‹ Prev
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((n) => n === 1 || n === totalPages || Math.abs(n - safePage) <= 1)
+            .reduce((acc, n, i, arr) => {
+              if (i > 0 && n - arr[i - 1] > 1) acc.push("…");
+              acc.push(n);
+              return acc;
+            }, [])
+            .map((n, i) =>
+              n === "…" ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-xs text-gray-400">…</span>
+              ) : (
+                <button key={n} onClick={() => setPage(n)}
+                  className={cn(
+                    "w-8 h-8 rounded-lg text-xs font-semibold transition-colors",
+                    n === safePage
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  )}>
+                  {n}
+                </button>
+              )
+            )}
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">
+            Next ›
+          </button>
+          <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors">
+            »
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -912,13 +970,25 @@ function ReorderView() {
                     <span className="font-semibold text-blue-600">{deficit(item)}</span>
                   </td>
                   <td className="px-3 py-3 text-center">
-                    <a
-                      href="#"
-                      onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("nav-purchases", { detail: "pending" })); }}
+                    <button
+                      onClick={() => {
+                        const product = products.find((p) => p.id === item.product_id);
+                        window.dispatchEvent(new CustomEvent("nav-purchases", {
+                          detail: {
+                            sub: "pending",
+                            prefill: {
+                              product_id: item.product_id,
+                              product_name: productName(item.product_id),
+                              quantity: deficit(item),
+                              cost_price: product?.cost_price || 0,
+                            },
+                          },
+                        }));
+                      }}
                       className="flex items-center gap-1 justify-center text-xs font-semibold text-green-600 hover:text-green-800 whitespace-nowrap"
                     >
                       <ShoppingBag size={13} /> Create PO
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}
