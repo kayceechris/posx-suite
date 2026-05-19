@@ -1635,16 +1635,196 @@ function ImportExportView() {
   );
 }
 
+// ─── Image Library View ───────────────────────────────────────────────────────
+function ImageLibraryView() {
+  const [items, setItems]         = useState([]);
+  const [page, setPage]           = useState(1);
+  const [pages, setPages]         = useState(1);
+  const [total, setTotal]         = useState(0);
+  const [search, setSearch]       = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting]   = useState(null);
+  const [uploadErr, setUploadErr] = useState("");
+  const fileRef                   = useRef();
+  const searchTimeout             = useRef(null);
+
+  const BASE_URL = process.env.REACT_APP_BACKEND_URL || "https://posx-suite.vercel.app";
+  const imgUrl = (id) => `${BASE_URL}/api/images/${id}`;
+  const formatSize = (b) => {
+    if (!b) return "";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const load = useCallback(async (p, q) => {
+    setLoading(true);
+    try {
+      const res = await api.getImages(p, q);
+      setItems(res.items);
+      setPages(res.pages);
+      setTotal(res.total);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(1, ""); }, [load]);
+
+  const handleSearch = (val) => {
+    setSearch(val);
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => { setPage(1); load(1, val); }, 350);
+  };
+
+  const handlePageChange = (p) => { setPage(p); load(p, search); };
+
+  const handleFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploadErr("");
+    setUploading(true);
+    let failed = 0;
+    for (const file of Array.from(files)) {
+      try {
+        const blob = await resizeImageFile(file);
+        const named = new File([blob], file.name || "upload.jpg", { type: blob.type || "image/jpeg" });
+        await api.uploadImage(named);
+      } catch { failed++; }
+    }
+    setUploading(false);
+    if (failed > 0) setUploadErr(`${failed} file(s) failed to upload.`);
+    load(1, search);
+    setPage(1);
+  };
+
+  const handleDelete = async (item) => {
+    if (!window.confirm(`Delete "${item.name}"? Products using this image will lose it.`)) return;
+    setDeleting(item.id);
+    try { await api.deleteImage(item.id); load(page, search); }
+    catch { alert("Failed to delete."); }
+    finally { setDeleting(null); }
+  };
+
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div>
+      <SectionHeader
+        title="Image Library"
+        icon={<Images size={20} className="text-indigo-600" />}
+        iconBg="bg-indigo-100"
+        action={
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            <Upload size={15} /> {uploading ? "Uploading…" : "Upload Images"}
+          </button>
+        }
+      />
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => fileRef.current?.click()}
+        className={[
+          "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors mb-6",
+          dragOver
+            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+            : "border-gray-300 dark:border-gray-700 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10",
+        ].join(" ")}
+      >
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2 text-indigo-500">
+            <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-medium">Uploading…</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-gray-400">
+            <Images size={32} className="opacity-40" />
+            <p className="text-sm font-medium">Drop images here or click to browse</p>
+            <p className="text-xs">JPG, PNG, WebP, GIF — up to 10 MB each — multiple files supported</p>
+          </div>
+        )}
+      </div>
+
+      {uploadErr && <p className="text-sm text-red-500 mb-4">{uploadErr}</p>}
+
+      {/* Search + count */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Search by filename…"
+            className="w-full pl-8 pr-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500" />
+        </div>
+        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{total} image{total !== 1 ? "s" : ""}</span>
+      </div>
+
+      {/* Grid */}
+      {loading ? (
+        <Spinner />
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center py-20 text-gray-400">
+          <Images size={40} className="opacity-25 mb-3" />
+          <p className="text-sm">{search ? "No images match your search" : "No images yet — upload some above"}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+          {items.map((item) => (
+            <div key={item.id}
+              className="group relative rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-all">
+              <div className="aspect-square bg-gray-100 dark:bg-gray-700">
+                <img src={imgUrl(item.id)} alt={item.name} loading="lazy"
+                  className="w-full h-full object-cover" />
+              </div>
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              <button onClick={() => handleDelete(item)} disabled={deleting === item.id}
+                className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 rounded-full items-center justify-center hidden group-hover:flex transition-colors">
+                {deleting === item.id
+                  ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <Trash2 size={11} className="text-white" />}
+              </button>
+              <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <p className="truncate">{item.name}</p>
+                {item.size && <p className="text-white/70">{formatSize(item.size)}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <button onClick={() => handlePageChange(page - 1)} disabled={page <= 1 || loading}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40">
+            <ChevronDown size={15} className="rotate-90" />
+          </button>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{page} / {pages}</span>
+          <button onClick={() => handlePageChange(page + 1)} disabled={page >= pages || loading}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40">
+            <ChevronDown size={15} className="-rotate-90" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Root Export ─────────────────────────────────────────────────────────────
 export default function ProductsSection({ view = "all-products", onViewChange }) {
   switch (view) {
-    case "all-products":  return <AllProductsView autoOpen={false} />;
+    case "all-products":   return <AllProductsView autoOpen={false} />;
     case "create-product": return <AllProductsView autoOpen={true} />;
-    case "categories":   return <CategoriesView />;
-    case "brands":       return <BrandsView />;
-    case "units":        return <UnitsView />;
-    case "print-labels": return <PrintLabelsView />;
-    case "import":       return <ImportExportView />;
-    default:             return <AllProductsView autoOpen={false} />;
+    case "categories":     return <CategoriesView />;
+    case "brands":         return <BrandsView />;
+    case "units":          return <UnitsView />;
+    case "print-labels":   return <PrintLabelsView />;
+    case "import":         return <ImportExportView />;
+    case "image-library":  return <ImageLibraryView />;
+    default:               return <AllProductsView autoOpen={false} />;
   }
 }
