@@ -68,6 +68,44 @@ const EXPANDABLE = {
   ],
 };
 
+// Top-level section → minimum permission needed (admin/manager bypass all)
+const SECTION_PERMISSION = {
+  users: "view_users",
+  outlets: "view_outlets",
+  products: "view_products",
+  inventory: "view_inventory",
+  purchases: "view_purchases",
+  customers: "view_customers",
+  orders: "view_orders",
+  reports: "view_sales_report",
+  accounts: "view_accounts",
+  floor: "view_tables",
+  settings: "view_settings",
+};
+
+// Sub-item → required permission (undefined = always visible to anyone who can see the section)
+const SUB_ITEM_PERMISSION = {
+  "inventory.stock": "view_inventory",
+  "inventory.stock-count": "update_stock",
+  "inventory.update-stock": "update_stock",
+  "inventory.transfer-stock": "transfer_stock",
+  "inventory.reorder": "view_reorder_alerts",
+  "inventory.waste": "record_waste",
+  "inventory.valuation": "view_stock_valuation",
+  "inventory.consolidated": "view_consolidated_stock",
+  "products.create-product": "create_product",
+  "products.import": "import_products",
+  "purchases.approved": "approve_purchase",
+  "reports.sales": "view_sales_report",
+  "reports.cost": "view_financial_report",
+  "reports.staff": "view_staff_report",
+  "reports.payments": "view_payment_report",
+  "users.types": "manage_user_types",
+  "accounts.profit-loss": "view_profit_loss",
+  "accounts.create-expense": "manage_expenses",
+  "accounts.create-deposit": "manage_expenses",
+};
+
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "users", label: "User Management", icon: Users, expandable: true },
@@ -96,6 +134,13 @@ export default function AdminPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
 
+  const isPrivileged = user?.role === "admin" || user?.role === "manager";
+  const userPerms = user?.permissions || [];
+  const can = (perm) => !perm || isPrivileged || userPerms.includes(perm);
+  const visibleSubs = (sectionId) =>
+    (EXPANDABLE[sectionId] || []).filter((sub) => can(SUB_ITEM_PERMISSION[`${sectionId}.${sub.id}`]));
+  const visibleNavItems = NAV_ITEMS.filter((item) => can(SECTION_PERMISSION[item.id]));
+
   useEffect(() => {
     api.getDashboardAnalytics().then(setAnalytics).catch(console.error).finally(() => setAnalyticsLoading(false));
     api.getLowStock().then((items) => setLowStockCount(items?.length ?? 0)).catch(() => {});
@@ -115,7 +160,8 @@ export default function AdminPage() {
     if (EXPANDABLE[id]) {
       setExpandedSection((prev) => {
         if (prev === id) return null;
-        setSubViews((s) => ({ ...s, [id]: EXPANDABLE[id][0].id }));
+        const firstVisible = visibleSubs(id)[0];
+        if (firstVisible) setSubViews((s) => ({ ...s, [id]: firstVisible.id }));
         return id;
       });
     } else {
@@ -157,11 +203,11 @@ export default function AdminPage() {
           </div>
 
           <nav className="flex-1 overflow-y-auto scrollbar-hide py-3 px-3">
-            {NAV_ITEMS.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active = activeSection === item.id;
               const isExpanded = item.expandable && expandedSection === item.id;
-              const subItems = EXPANDABLE[item.id] || [];
+              const subItems = visibleSubs(item.id);
 
               return (
                 <React.Fragment key={item.id}>

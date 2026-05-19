@@ -3,10 +3,23 @@ import {
   AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck,
   Edit3, RefreshCw, Search, X, Trash2, Plus, Barcode,
   TrendingDown, LayoutGrid, DollarSign, PackageX, Calendar,
-  ShoppingBag, ChevronDown,
+  ShoppingBag, Lock,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import { useAuth } from "../context/AuthContext";
+
+function AccessDenied({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mb-4">
+        <Lock size={24} className="text-gray-400" />
+      </div>
+      <p className="text-lg font-bold text-gray-700 dark:text-gray-200">Access Restricted</p>
+      <p className="text-gray-400 text-sm mt-1">You don't have permission to view <span className="font-semibold">{label}</span>.</p>
+    </div>
+  );
+}
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -1376,12 +1389,17 @@ function ConsolidatedView() {
 
 // ─── Entry point ───────────────────────────────────────────────────────────────
 export default function InventorySection({ view = "stock" }) {
-  if (view === "stock-count")   return <StockCountView />;
-  if (view === "update-stock")  return <UpdateStockView />;
-  if (view === "transfer-stock") return <TransferStockView />;
-  if (view === "reorder")       return <ReorderView />;
-  if (view === "waste")         return <WasteView />;
-  if (view === "valuation")     return <ValuationView />;
-  if (view === "consolidated")  return <ConsolidatedView />;
-  return <StockLevelsView />;
+  const { user } = useAuth();
+  const isPrivileged = user?.role === "admin" || user?.role === "manager";
+  const perms = user?.permissions || [];
+  const can = (p) => isPrivileged || perms.includes(p);
+
+  if (view === "stock-count")    return can("update_stock")             ? <StockCountView />    : <AccessDenied label="Stock Count" />;
+  if (view === "update-stock")   return can("update_stock")             ? <UpdateStockView />   : <AccessDenied label="Update Stock" />;
+  if (view === "transfer-stock") return can("transfer_stock")           ? <TransferStockView /> : <AccessDenied label="Transfer Stock" />;
+  if (view === "reorder")        return can("view_reorder_alerts")      ? <ReorderView />       : <AccessDenied label="Reorder Alerts" />;
+  if (view === "waste")          return can("record_waste")             ? <WasteView />         : <AccessDenied label="Waste Recording" />;
+  if (view === "valuation")      return can("view_stock_valuation")     ? <ValuationView />     : <AccessDenied label="Stock Valuation" />;
+  if (view === "consolidated")   return can("view_consolidated_stock")  ? <ConsolidatedView />  : <AccessDenied label="Consolidated View" />;
+  return can("view_inventory") ? <StockLevelsView /> : <AccessDenied label="Stock Levels" />;
 }

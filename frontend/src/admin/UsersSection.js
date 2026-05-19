@@ -23,6 +23,10 @@ const PERMISSION_MODULES = [
       { id: "update_stock", label: "Update Stock" },
       { id: "transfer_stock", label: "Transfer Stock" },
       { id: "low_stock_alerts", label: "Low Stock Alerts" },
+      { id: "view_reorder_alerts", label: "View Reorder Alerts" },
+      { id: "record_waste", label: "Record Waste / Spoilage" },
+      { id: "view_stock_valuation", label: "View Stock Valuation" },
+      { id: "view_consolidated_stock", label: "View Consolidated Stock" },
     ],
   },
   {
