@@ -26,6 +26,7 @@ from routes.import_export import router as import_export_router
 from routes.terminals import router as terminals_router
 from routes.taxes import router as taxes_router
 from routes.bar_tabs import router as bar_tabs_router
+from routes.recipes import router as recipes_router
 
 all_routers = [
     auth_router,
@@ -54,4 +55,5 @@ all_routers = [
     terminals_router,
     taxes_router,
     bar_tabs_router,
+    recipes_router,
 ]

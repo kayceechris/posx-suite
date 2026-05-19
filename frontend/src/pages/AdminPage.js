@@ -31,6 +31,7 @@ const EXPANDABLE = {
     { id: "categories", label: "Categories" }, { id: "brands", label: "Brands" },
     { id: "units", label: "Units" }, { id: "print-labels", label: "Print Labels" },
     { id: "import", label: "Import Products" }, { id: "image-library", label: "Image Library" },
+    { id: "recipes", label: "Recipes" },
   ],
   reports: [
     { id: "sales", label: "Sales" }, { id: "cost", label: "Cost Analysis" },

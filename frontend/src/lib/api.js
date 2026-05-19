@@ -375,6 +375,12 @@ export const api = {
   // Seed (dev only)
   seed: () => request("/api/seed", { method: "POST" }),
 
+  // Recipes
+  getRecipes: () => request("/api/recipes"),
+  getRecipe: (productId) => request(`/api/recipes/${productId}`),
+  upsertRecipe: (productId, data) => request(`/api/recipes/${productId}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteRecipe: (productId) => request(`/api/recipes/${productId}`, { method: "DELETE" }),
+
   // Image library
   getImages: (page = 1, search = "") =>
     request(`/api/images?page=${page}&limit=24&q=${encodeURIComponent(search)}`),

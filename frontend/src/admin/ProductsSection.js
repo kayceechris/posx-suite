@@ -2,7 +2,7 @@
 import {
   Plus, Pencil, Trash2, X, Tag, Upload, Printer, Download,
   FileText, CheckSquare, Square, ChevronDown, Search, RefreshCw,
-  FileUp, FileDown, BarChart2, GalleryThumbnails,
+  FileUp, FileDown, BarChart2, GalleryThumbnails, ChefHat, UtensilsCrossed,
 } from "lucide-react";
 import ImageLibraryModal from "../components/ImageLibraryModal";
 import jsPDF from "jspdf";
@@ -1814,6 +1814,327 @@ function ImageLibraryView() {
   );
 }
 
+// ─── Recipes View ─────────────────────────────────────────────────────────────
+const COMMON_UNITS = ["g", "kg", "ml", "L", "pcs", "cups", "tbsp", "tsp", "oz", "lb", "slice", "whole", "portion"];
+
+function RecipeModal({ product, recipe, products, onSave, onClose }) {
+  const empty = { id: crypto.randomUUID(), name: "", quantity: "", unit: "g", product_id: "" };
+  const [ingredients, setIngredients] = useState(
+    recipe?.ingredients?.length ? recipe.ingredients.map((i) => ({ ...i, quantity: String(i.quantity) })) : [{ ...empty }]
+  );
+  const [notes, setNotes]         = useState(recipe?.notes || "");
+  const [prepTime, setPrepTime]   = useState(String(recipe?.prep_time || ""));
+  const [servings, setServings]   = useState(String(recipe?.servings || "1"));
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
+
+  const updateIng = (idx, key, val) =>
+    setIngredients((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
+
+  const addIng = () => setIngredients((prev) => [...prev, { ...empty, id: crypto.randomUUID() }]);
+  const removeIng = (idx) => setIngredients((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleSave = async () => {
+    const filled = ingredients.filter((i) => i.name.trim());
+    if (filled.length === 0) { setError("Add at least one ingredient."); return; }
+    setSaving(true); setError("");
+    try {
+      await onSave({
+        ingredients: filled.map((i) => ({
+          id: i.id,
+          name: i.name.trim(),
+          quantity: parseFloat(i.quantity) || 0,
+          unit: i.unit,
+          product_id: i.product_id || null,
+        })),
+        notes,
+        prep_time: parseInt(prepTime) || 0,
+        servings: parseInt(servings) || 1,
+      });
+      onClose();
+    } catch (e) { setError(e.message || "Failed to save."); }
+    finally { setSaving(false); }
+  };
+
+  const inp = "w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500";
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+              <ChefHat size={18} className="text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-white">{recipe ? "Edit Recipe" : "Create Recipe"}</h3>
+              <p className="text-xs text-gray-400 truncate max-w-xs">{product.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          {/* Meta row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Prep Time (min)</label>
+              <input type="number" min="0" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} className={inp} placeholder="e.g. 15" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Servings</label>
+              <input type="number" min="1" value={servings} onChange={(e) => setServings(e.target.value)} className={inp} placeholder="1" />
+            </div>
+          </div>
+
+          {/* Ingredients */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ingredients</label>
+              <button type="button" onClick={addIng}
+                className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors">
+                <Plus size={12} /> Add
+              </button>
+            </div>
+            <div className="space-y-2">
+              {/* Column headers */}
+              <div className="grid grid-cols-[1fr_80px_90px_100px_24px] gap-2 px-1">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase">Ingredient</span>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase">Qty</span>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase">Unit</span>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase">Product link</span>
+                <span />
+              </div>
+              {ingredients.map((ing, idx) => (
+                <div key={ing.id} className="grid grid-cols-[1fr_80px_90px_100px_24px] gap-2 items-center">
+                  <input
+                    value={ing.name} onChange={(e) => updateIng(idx, "name", e.target.value)}
+                    placeholder="e.g. Flour"
+                    className="px-2.5 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500"
+                  />
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={ing.quantity} onChange={(e) => updateIng(idx, "quantity", e.target.value)}
+                    placeholder="0"
+                    className="px-2.5 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500 text-center"
+                  />
+                  <select value={ing.unit} onChange={(e) => updateIng(idx, "unit", e.target.value)}
+                    className="px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500">
+                    {COMMON_UNITS.map((u) => <option key={u}>{u}</option>)}
+                    <option value={ing.unit && !COMMON_UNITS.includes(ing.unit) ? ing.unit : "custom"}>custom</option>
+                  </select>
+                  <select value={ing.product_id || ""} onChange={(e) => updateIng(idx, "product_id", e.target.value)}
+                    className="px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xs focus:outline-none focus:border-green-500">
+                    <option value="">— none —</option>
+                    {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <button type="button" onClick={() => removeIng(idx)} disabled={ingredients.length === 1}
+                    className="text-gray-300 hover:text-red-500 disabled:opacity-30 transition-colors">
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Preparation Notes</label>
+            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Cooking steps, tips, allergen info…"
+              className={`${inp} resize-none`} />
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 flex justify-end gap-2">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
+            {saving ? "Saving…" : "Save Recipe"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecipesView() {
+  const [products, setProducts]   = useState([]);
+  const [recipes, setRecipes]     = useState({});   // keyed by product_id
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState("");
+  const [filterCat, setFilterCat] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [modal, setModal]         = useState(null);  // { product, recipe | null }
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [prods, cats, recs] = await Promise.all([
+        api.getProducts(), api.getCategories(), api.getRecipes(),
+      ]);
+      setProducts(prods);
+      setCategories(cats);
+      const map = {};
+      recs.forEach((r) => { map[r.product_id] = r; });
+      setRecipes(map);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async (productId, data) => {
+    await api.upsertRecipe(productId, data);
+    await load();
+  };
+
+  const handleDelete = async (productId) => {
+    if (!window.confirm("Delete this recipe?")) return;
+    await api.deleteRecipe(productId);
+    await load();
+  };
+
+  const filtered = products.filter((p) => {
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterCat && p.category_id !== filterCat) return false;
+    return true;
+  });
+
+  const withRecipe    = filtered.filter((p) => recipes[p.id]);
+  const withoutRecipe = filtered.filter((p) => !recipes[p.id]);
+
+  return (
+    <div>
+      <SectionHeader
+        title="Recipes"
+        icon={<ChefHat size={20} className="text-green-600" />}
+        iconBg="bg-green-100"
+        action={
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {Object.keys(recipes).length} recipe{Object.keys(recipes).length !== 1 ? "s" : ""} of {products.length} products
+          </span>
+        }
+      />
+
+      {/* Filters */}
+      <div className="flex gap-3 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
+            className="w-full pl-8 pr-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500" />
+        </div>
+        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}
+          className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500">
+          <option value="">All Categories</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div className="space-y-8">
+          {/* Products with recipes */}
+          {withRecipe.length > 0 && (
+            <div>
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">With Recipe ({withRecipe.length})</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {withRecipe.map((p) => {
+                  const recipe = recipes[p.id];
+                  return (
+                    <div key={p.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-green-200 dark:border-green-800 p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{p.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? "s" : ""}
+                            {recipe.prep_time ? ` · ${recipe.prep_time} min` : ""}
+                            {recipe.servings > 1 ? ` · ${recipe.servings} servings` : ""}
+                          </p>
+                        </div>
+                        <span className="flex-shrink-0 w-6 h-6 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
+                          <ChefHat size={13} className="text-green-600 dark:text-green-400" />
+                        </span>
+                      </div>
+                      {/* Ingredient preview */}
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {recipe.ingredients.slice(0, 4).map((ing) => (
+                          <span key={ing.id} className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
+                            {ing.quantity > 0 ? `${ing.quantity}${ing.unit} ` : ""}{ing.name}
+                          </span>
+                        ))}
+                        {recipe.ingredients.length > 4 && (
+                          <span className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-400 rounded-full">
+                            +{recipe.ingredients.length - 4} more
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setModal({ product: p, recipe })}
+                          className="flex-1 py-1.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1">
+                          <Pencil size={11} /> Edit
+                        </button>
+                        <button onClick={() => handleDelete(p.id)}
+                          className="py-1.5 px-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-xs text-red-400 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Products without recipes */}
+          {withoutRecipe.length > 0 && (
+            <div>
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">No Recipe Yet ({withoutRecipe.length})</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {withoutRecipe.map((p) => (
+                  <div key={p.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-4 shadow-sm flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{categories.find((c) => c.id === p.category_id)?.name || "—"}</p>
+                    </div>
+                    <button onClick={() => setModal({ product: p, recipe: null })}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-700 text-green-700 dark:text-green-400 rounded-xl text-xs font-semibold hover:bg-green-100 transition-colors">
+                      <Plus size={12} /> Recipe
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center py-20 text-gray-400">
+              <UtensilsCrossed size={40} className="opacity-25 mb-3" />
+              <p className="text-sm">No products match your search</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {modal && (
+        <RecipeModal
+          product={modal.product}
+          recipe={modal.recipe}
+          products={products}
+          onSave={(data) => handleSave(modal.product.id, data)}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Root Export ─────────────────────────────────────────────────────────────
 export default function ProductsSection({ view = "all-products", onViewChange }) {
   switch (view) {
@@ -1825,6 +2146,7 @@ export default function ProductsSection({ view = "all-products", onViewChange })
     case "print-labels":   return <PrintLabelsView />;
     case "import":         return <ImportExportView />;
     case "image-library":  return <ImageLibraryView />;
+    case "recipes":        return <RecipesView />;
     default:               return <AllProductsView autoOpen={false} />;
   }
 }
