@@ -133,6 +133,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [preFillPO, setPreFillPO] = useState(null);
 
   const isPrivileged = user?.role === "admin" || user?.role === "manager";
   const userPerms = user?.permissions || [];
@@ -146,10 +147,13 @@ export default function AdminPage() {
     api.getLowStock().then((items) => setLowStockCount(items?.length ?? 0)).catch(() => {});
 
     const handleNavPurchases = (e) => {
-      const sub = e.detail || "pending";
+      const detail = e.detail;
+      const sub = typeof detail === "string" ? detail : (detail?.sub || "pending");
+      const prefill = typeof detail === "object" ? detail?.prefill : null;
       setActiveSection("purchases");
       setExpandedSection("purchases");
       setSubViews((s) => ({ ...s, purchases: sub }));
+      if (prefill) setPreFillPO(prefill);
     };
     window.addEventListener("nav-purchases", handleNavPurchases);
     return () => window.removeEventListener("nav-purchases", handleNavPurchases);
@@ -311,7 +315,13 @@ export default function AdminPage() {
             {activeSection === "floor" && subViews.floor === "tables" && <TablesSection />}
             {activeSection === "floor" && subViews.floor === "bar-tabs" && <BarTabsAdminSection />}
             {activeSection === "settings" && <SettingsSection view={subViews.settings} onViewChange={(v) => handleSubClick("settings", v)} />}
-            {activeSection === "purchases" && <PurchasesSection view={subViews.purchases} />}
+            {activeSection === "purchases" && (
+              <PurchasesSection
+                view={subViews.purchases}
+                preFillPO={preFillPO}
+                onPreFillUsed={() => setPreFillPO(null)}
+              />
+            )}
           </div>
         </main>
       </div>

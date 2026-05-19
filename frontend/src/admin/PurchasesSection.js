@@ -52,9 +52,9 @@ const UNITS = ["pcs", "carton", "kg", "g", "litre", "dozen", "box", "pack", "bag
 
 const EMPTY_ITEM = { product_id: "", description: "", quantity: 1, unit: "pcs", unit_cost: "", total: 0 };
 
-function NewPOModal({ suppliers, products, units, onClose, onCreated }) {
+function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreated }) {
   const [form, setForm] = useState({ supplier_id: "", type: "external", notes: "" });
-  const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
+  const [items, setItems] = useState(initialItems?.length ? initialItems : [{ ...EMPTY_ITEM }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -334,7 +334,7 @@ function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
   );
 }
 
-function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) {
+function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, preFillPO, onPreFillUsed }) {
   const { user } = useAuth();
   const canApprove = user?.role === "admin" || user?.permissions?.includes("approve_purchase");
 
@@ -344,6 +344,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [newPOInitialItems, setNewPOInitialItems] = useState(null);
   const [detail, setDetail] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -363,6 +364,22 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!preFillPO || products.length === 0) return;
+    const qty = preFillPO.quantity || 1;
+    const cost = parseFloat(preFillPO.cost_price) || 0;
+    setNewPOInitialItems([{
+      product_id: preFillPO.product_id || "",
+      description: preFillPO.product_name || "",
+      quantity: qty,
+      unit: "pcs",
+      unit_cost: cost || "",
+      total: qty * cost,
+    }]);
+    setShowNew(true);
+    onPreFillUsed?.();
+  }, [preFillPO, products]);
 
   const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || "—";
 
@@ -496,9 +513,11 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor }) 
           suppliers={suppliers}
           products={products}
           units={units}
-          onClose={() => setShowNew(false)}
+          initialItems={newPOInitialItems}
+          onClose={() => { setShowNew(false); setNewPOInitialItems(null); }}
           onCreated={() => {
             setShowNew(false);
+            setNewPOInitialItems(null);
             setToast({ msg: "Purchase order submitted for approval!", type: "success" });
             load();
           }}
@@ -704,7 +723,7 @@ function SuppliersView() {
   );
 }
 
-export default function PurchasesSection({ view = "pending" }) {
+export default function PurchasesSection({ view = "pending", preFillPO, onPreFillUsed }) {
   if (view === "approved") {
     return (
       <OrdersView
@@ -726,6 +745,8 @@ export default function PurchasesSection({ view = "pending" }) {
       emptyMsg="No pending orders"
       icon={Clock}
       accentColor="bg-amber-500"
+      preFillPO={preFillPO}
+      onPreFillUsed={onPreFillUsed}
     />
   );
 }
