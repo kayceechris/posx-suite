@@ -403,7 +403,8 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
     e.target.value = "";
     setUploading(true);
     try {
-      const resized = await resizeImageFile(file);
+      const resizedBlob = await resizeImageFile(file);
+      const resized = new File([resizedBlob], "upload.jpg", { type: resizedBlob.type || "image/jpeg" });
       const result = await api.uploadImage(resized);
       f("image", result.url);
       setImagePreview(result.fullUrl);
@@ -553,18 +554,18 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
             : form.terminal_prices.map((tp, i) => (
               <div key={i} className="flex items-center gap-2 mt-2">
                 <select value={tp.outlet_id} onChange={(e) => updateTerminalPrice(i, "outlet_id", e.target.value)}
-                  className="flex-1 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-xs focus:outline-none focus:border-blue-500">
+                  className="flex-1 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-xs focus:outline-none focus:border-blue-500">
                   <option value="">Any Outlet</option>
                   {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
                 <select value={tp.terminal_id} onChange={(e) => updateTerminalPrice(i, "terminal_id", e.target.value)}
-                  className="flex-1 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-xs focus:outline-none focus:border-blue-500">
+                  className="flex-1 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-xs focus:outline-none focus:border-blue-500">
                   <option value="">Pick terminal…</option>
                   {terminals.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
                 <input type="number" step="0.01" min="0" value={tp.price}
                   onChange={(e) => updateTerminalPrice(i, "price", e.target.value)}
-                  placeholder="Price" className="w-24 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-xs focus:outline-none focus:border-blue-500" />
+                  placeholder="Price" className="w-24 px-2 py-2 border-2 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-xs focus:outline-none focus:border-blue-500" />
                 <button type="button" onClick={() => removeTerminalPrice(i)}
                   className="text-gray-300 hover:text-red-500 transition-colors"><X size={15} /></button>
               </div>
@@ -754,7 +755,7 @@ function BulkPriceModal({ products, outlets, terminals, onClose, onApplied }) {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products…"
-                className="w-full pl-8 pr-3 py-2 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                className="w-full pl-8 pr-3 py-2 border-2 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500" />
             </div>
             <button onClick={toggleAll}
               className="px-3 py-2 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-white dark:bg-gray-800 transition-colors whitespace-nowrap">
@@ -1323,7 +1324,7 @@ function PrintLabelsView() {
                       <span className="flex-1 text-sm text-gray-700 dark:text-gray-200 truncate">{p.name}</span>
                       <input type="number" min="1" value={selected[p.id]}
                         onChange={(e) => setCopiesForProduct(p.id, e.target.value)}
-                        className="w-14 px-2 py-1 border-2 border-gray-300 dark:border-gray-700 rounded-lg text-xs text-center focus:outline-none focus:border-blue-500" />
+                        className="w-14 px-2 py-1 border-2 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-xs text-center focus:outline-none focus:border-blue-500" />
                       <button onClick={() => removeSelected(p.id)}
                         className="text-gray-300 hover:text-red-500 transition-colors"><X size={14} /></button>
                     </div>

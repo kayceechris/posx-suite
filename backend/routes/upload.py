@@ -15,7 +15,14 @@ MAX_SIZE_MB = 10
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    ext = file.filename.split(".")[-1].lower() if file.filename and "." in file.filename else ""
+    if not ext or ext not in ALLOWED_TYPES:
+        # Fall back to MIME type (canvas blobs arrive as "image/jpeg" with no filename)
+        mime_map = {
+            "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+            "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg",
+        }
+        ext = mime_map.get(file.content_type or "", "bin")
     if ext not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 

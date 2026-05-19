@@ -925,7 +925,7 @@ export default function TerminalSettingsModal({
                           value={periphForm.name}
                           onChange={(e) => setPeriphForm({ ...periphForm, name: e.target.value })}
                           placeholder="e.g. Front Cash Drawer"
-                          className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+                          className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">

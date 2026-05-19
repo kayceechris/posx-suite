@@ -483,14 +483,14 @@ function UpdateStockView() {
                     {editing ? (
                       <input type="number" min="0" value={editForm.quantity}
                         onChange={(e) => setEditForm((f) => ({ ...f, quantity: e.target.value }))}
-                        className="w-20 px-2 py-1.5 border-2 border-blue-400 rounded-xl text-sm text-center font-mono focus:outline-none" />
+                        className="w-20 px-2 py-1.5 border-2 border-blue-400 rounded-xl text-sm text-center font-mono focus:outline-none bg-white dark:bg-gray-700 dark:text-white" />
                     ) : <span className="text-gray-300 text-sm">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {editing ? (
                       <input type="number" min="0" value={editForm.min_quantity}
                         onChange={(e) => setEditForm((f) => ({ ...f, min_quantity: e.target.value }))}
-                        className="w-20 px-2 py-1.5 border-2 border-blue-400 rounded-xl text-sm text-center font-mono focus:outline-none" />
+                        className="w-20 px-2 py-1.5 border-2 border-blue-400 rounded-xl text-sm text-center font-mono focus:outline-none bg-white dark:bg-gray-700 dark:text-white" />
                     ) : <span className="text-gray-300 text-sm">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center">

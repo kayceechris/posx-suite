@@ -379,7 +379,7 @@ export const api = {
   uploadImage: async (file) => {
     const token = getToken();
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", file, file.name || "upload.jpg");
     let res;
     try {
       res = await fetch(`${BASE_URL}/api/upload`, {
