@@ -3,7 +3,7 @@ import {
   ArrowLeftRight, BookOpen, FolderOpen, AlertCircle,
   Minus, Plus, Receipt, RefreshCw, Tag, Trash2, TrendingDown,
   TrendingUp, Wallet, X, FileText, DollarSign, Clock, CheckCircle2,
-  BarChart2, CreditCard, Activity,
+  BarChart2, CreditCard, Activity, Users, Target, Globe, Scale, Landmark,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
@@ -1238,25 +1238,912 @@ function VatManagementView() {
   );
 }
 
+// ─── GENERAL LEDGER ──────────────────────────────────────────────────────────
+const LEDGER_TYPE_COLORS = {
+  sales:    "bg-green-50  text-green-700  dark:bg-green-900/20  dark:text-green-400",
+  expense:  "bg-red-50    text-red-700    dark:bg-red-900/20    dark:text-red-400",
+  deposit:  "bg-blue-50   text-blue-700   dark:bg-blue-900/20   dark:text-blue-400",
+  purchase: "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400",
+  transfer: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400",
+};
+
+function GeneralLedgerView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [start, setStart] = useState(monthStart());
+  const [end, setEnd] = useState(today());
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE = 25;
+
+  const load = () => {
+    setLoading(true);
+    api.getLedger(start, end, typeFilter !== "all" ? typeFilter : undefined)
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [start, end, typeFilter]);
+  useEffect(() => { setPage(1); }, [typeFilter, start, end]);
+
+  const entries = data?.entries || [];
+  const totalPages = Math.ceil(entries.length / PAGE);
+  const pageRows = entries.slice((page - 1) * PAGE, page * PAGE);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">General Ledger</h2>
+      </div>
+      <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard label="Total Credits" value={formatCurrency(data?.total_credits || 0)} iconBg="bg-green-500" icon={<TrendingUp size={22} className="text-white" />} valueColor="text-green-600" />
+        <StatCard label="Total Debits"  value={formatCurrency(data?.total_debits  || 0)} iconBg="bg-red-500"   icon={<TrendingDown size={22} className="text-white" />} valueColor="text-red-500" />
+        <StatCard label="Net Balance"   value={formatCurrency(data?.net_balance   || 0)}
+          iconBg={(data?.net_balance || 0) >= 0 ? "bg-indigo-500" : "bg-orange-500"}
+          icon={<Wallet size={22} className="text-white" />}
+          valueColor={(data?.net_balance || 0) >= 0 ? "text-indigo-600" : "text-orange-600"} />
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {["all", "sales", "expense", "deposit", "purchase", "transfer"].map((t) => (
+          <button key={t} onClick={() => setTypeFilter(t)}
+            className={cn("px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-colors",
+              typeFilter === t ? "bg-indigo-600 text-white" : "bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400")}>
+            {t === "all" ? "All Entries" : t}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-4 py-3">Date</th>
+                  <th className="text-left px-4 py-3">Type</th>
+                  <th className="text-left px-4 py-3">Description</th>
+                  <th className="text-left px-4 py-3">Reference</th>
+                  <th className="text-right px-4 py-3">Debit</th>
+                  <th className="text-right px-4 py-3">Credit</th>
+                  <th className="text-right px-4 py-3">Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {pageRows.map((e, i) => (
+                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors dark:bg-gray-900">
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.date)}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-bold capitalize", LEDGER_TYPE_COLORS[e.type] || "bg-gray-100 text-gray-600")}>{e.type}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-200 max-w-[200px] truncate">{e.description}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{e.reference || "—"}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-red-500 tabular-nums">{e.debit > 0 ? formatCurrency(e.debit) : "—"}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-green-600 tabular-nums">{e.credit > 0 ? formatCurrency(e.credit) : "—"}</td>
+                    <td className={cn("px-4 py-3 text-right font-bold tabular-nums", e.balance >= 0 ? "text-gray-900 dark:text-white" : "text-red-500")}>{formatCurrency(e.balance)}</td>
+                  </tr>
+                ))}
+                {entries.length === 0 && (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No entries for this period</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-700">
+              <span className="text-xs text-gray-400">{entries.length} entries</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  className="px-3 py-1.5 border-2 border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Prev</button>
+                <span className="text-xs text-gray-500">{page} / {totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="px-3 py-1.5 border-2 border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── BALANCE SHEET ────────────────────────────────────────────────────────────
+function BalanceSheetView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [asOf, setAsOf] = useState(today());
+
+  const load = () => {
+    setLoading(true);
+    api.getBalanceSheet(asOf).then(setData).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [asOf]);
+
+  const BSSection = ({ title, bg, textColor, items, total, totalLabel }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+      <div className={cn("px-6 py-3 border-b border-gray-100 dark:border-gray-700", bg)}>
+        <p className={cn("text-xs font-bold uppercase tracking-widest", textColor)}>{title}</p>
+      </div>
+      {items.map(([label, val]) => (
+        <div key={label} className="flex items-center justify-between px-6 py-3 border-b border-gray-50 dark:border-gray-700/50">
+          <span className="text-sm text-gray-600 dark:text-gray-300">{label}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">{formatCurrency(val)}</span>
+        </div>
+      ))}
+      <div className="flex items-center justify-between px-6 py-4">
+        <span className="text-sm font-bold text-gray-900 dark:text-white">{totalLabel}</span>
+        <span className={cn("text-base font-black tabular-nums", textColor)}>{formatCurrency(total)}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">Balance Sheet</h2>
+        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
+          <Scale size={15} className="text-gray-400" />
+          <span className="text-xs text-gray-400 font-medium">As of</span>
+          <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
+            className="text-sm text-gray-700 dark:text-gray-200 focus:outline-none bg-transparent" />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : data && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <BSSection
+              title="Assets" bg="bg-blue-50 dark:bg-blue-900/20" textColor="text-blue-700 dark:text-blue-400"
+              items={[
+                ["Cash & Equivalents", data.assets.cash_and_equivalents],
+                ["Inventory Value",    data.assets.inventory],
+                ["Accounts Receivable", data.assets.accounts_receivable],
+              ]}
+              total={data.assets.total} totalLabel="Total Assets"
+            />
+            <div className="space-y-6">
+              <BSSection
+                title="Liabilities" bg="bg-red-50 dark:bg-red-900/20" textColor="text-red-600 dark:text-red-400"
+                items={[["Accounts Payable (POs)", data.liabilities.accounts_payable]]}
+                total={data.liabilities.total} totalLabel="Total Liabilities"
+              />
+              <BSSection
+                title="Equity" bg="bg-green-50 dark:bg-green-900/20" textColor="text-green-700 dark:text-green-400"
+                items={[["Retained Earnings", data.equity.retained_earnings]]}
+                total={data.equity.total} totalLabel="Total Equity"
+              />
+            </div>
+          </div>
+
+          <div className={cn("rounded-2xl p-6 border-2 flex items-center justify-between",
+            Math.abs(data.assets.total - data.total_liabilities_and_equity) < 1
+              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700"
+              : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700")}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Assets = Liabilities + Equity</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {Math.abs(data.assets.total - data.total_liabilities_and_equity) < 1 ? "✓ Balance sheet is balanced" : "⚠ Small rounding difference detected"}
+              </p>
+            </div>
+            <p className="text-2xl font-black tabular-nums text-gray-900 dark:text-white">{formatCurrency(data.assets.total)}</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── BANK RECONCILIATION ──────────────────────────────────────────────────────
+function BankReconciliationView() {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(today().slice(0, 7));
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ date: today(), description: "", amount: "", type: "credit", reference: "" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    api.getBankStatements(period).then(setEntries).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [period]);
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setErr("");
+    try {
+      await api.createBankStatement({ ...form, amount: parseFloat(form.amount) });
+      setShowAdd(false);
+      setForm({ date: today(), description: "", amount: "", type: "credit", reference: "" });
+      load();
+    } catch (ex) { setErr(ex.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (entry) => {
+    if (!window.confirm("Delete this bank entry?")) return;
+    try { await api.deleteBankStatement(entry.id); load(); } catch (ex) { alert(ex.message); }
+  };
+
+  const totalCredits = entries.filter((e) => e.type === "credit").reduce((s, e) => s + e.amount, 0);
+  const totalDebits  = entries.filter((e) => e.type === "debit").reduce((s, e) => s + e.amount, 0);
+  const netBalance   = totalCredits - totalDebits;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">Bank Reconciliation</h2>
+        <div className="flex items-center gap-3">
+          <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          <button onClick={() => { setShowAdd(true); setErr(""); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+            <Plus size={16} /> Add Entry
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard label="Total Credits" value={formatCurrency(totalCredits)} iconBg="bg-green-500" icon={<TrendingUp size={22} className="text-white" />} valueColor="text-green-600" />
+        <StatCard label="Total Debits"  value={formatCurrency(totalDebits)}  iconBg="bg-red-500"   icon={<TrendingDown size={22} className="text-white" />} valueColor="text-red-500" />
+        <StatCard label="Net Balance"   value={formatCurrency(netBalance)}   iconBg={netBalance >= 0 ? "bg-blue-500" : "bg-orange-500"} icon={<Landmark size={22} className="text-white" />} valueColor={netBalance >= 0 ? "text-blue-600" : "text-orange-600"} />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                <th className="text-left px-5 py-3">Date</th>
+                <th className="text-left px-5 py-3">Description</th>
+                <th className="text-left px-5 py-3">Reference</th>
+                <th className="text-left px-5 py-3">Type</th>
+                <th className="text-right px-5 py-3">Amount</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+              {entries.map((e) => (
+                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+                  <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.date)}</td>
+                  <td className="px-5 py-3 text-gray-700 dark:text-gray-200">{e.description}</td>
+                  <td className="px-5 py-3 text-gray-400 text-xs">{e.reference || "—"}</td>
+                  <td className="px-5 py-3">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-bold uppercase",
+                      e.type === "credit" ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400")}>
+                      {e.type}
+                    </span>
+                  </td>
+                  <td className={cn("px-5 py-3 text-right font-bold tabular-nums", e.type === "credit" ? "text-green-600" : "text-red-500")}>{formatCurrency(e.amount)}</td>
+                  <td className="px-5 py-3">
+                    <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  </td>
+                </tr>
+              ))}
+              {entries.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400">No bank entries for {period}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAdd && (
+        <Modal title="Add Bank Statement Entry" onClose={() => setShowAdd(false)} wide>
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Date</label>
+                <input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={INPUT} />
+              </div>
+              <div>
+                <label className={LABEL}>Type</label>
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className={INPUT}>
+                  <option value="credit">Credit — Money In</option>
+                  <option value="debit">Debit — Money Out</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={LABEL}>Description</label>
+              <input required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={INPUT} placeholder="e.g. Customer payment received" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Amount</label>
+                <input required type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={INPUT} placeholder="0.00" />
+              </div>
+              <div>
+                <label className={LABEL}>Reference (Optional)</label>
+                <input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} className={INPUT} placeholder="TXN ref" />
+              </div>
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowAdd(false)}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">Cancel</button>
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {saving ? "Saving…" : "Add Entry"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── BUDGETING & FORECAST ─────────────────────────────────────────────────────
+const BUDGET_EXPENSE_CATS = ["Rent", "Utilities", "Salaries", "Supplies", "Marketing", "Maintenance", "Food & Beverage", "Equipment", "Other"];
+const BUDGET_REVENUE_CATS = ["Sales Revenue", "Other Income", "Loan", "Investment", "Catering", "Events"];
+
+function BudgetingView() {
+  const [budgets, setBudgets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(today().slice(0, 7));
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ category: "", budget_type: "expense", budget_amount: "" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [catFilter, setCatFilter] = useState("all");
+
+  const load = () => {
+    setLoading(true);
+    api.getBudgets(period).then(setBudgets).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [period]);
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setErr("");
+    try {
+      await api.saveBudget({ ...form, period, budget_amount: parseFloat(form.budget_amount) });
+      setShowAdd(false); setForm({ category: "", budget_type: "expense", budget_amount: "" }); load();
+    } catch (ex) { setErr(ex.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (b) => {
+    if (!window.confirm("Remove this budget?")) return;
+    try { await api.deleteBudget(b.id); load(); } catch (ex) { alert(ex.message); }
+  };
+
+  const filtered = catFilter === "all" ? budgets : budgets.filter((b) => b.budget_type === catFilter);
+  const totalBudget = filtered.reduce((s, b) => s + (b.budget_amount || 0), 0);
+  const totalActual = filtered.reduce((s, b) => s + (b.actual || 0), 0);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">Budgeting & Forecast</h2>
+        <div className="flex items-center gap-3">
+          <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          <button onClick={() => { setShowAdd(true); setErr(""); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+            <Plus size={16} /> Set Budget
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard label="Total Budget" value={formatCurrency(totalBudget)} iconBg="bg-indigo-500" icon={<Target size={22} className="text-white" />} valueColor="text-indigo-600" />
+        <StatCard label="Total Actual" value={formatCurrency(totalActual)} iconBg="bg-amber-500"  icon={<BarChart2 size={22} className="text-white" />} valueColor="text-amber-600" />
+        <StatCard label="Variance" value={formatCurrency(totalActual - totalBudget)}
+          iconBg={totalActual <= totalBudget ? "bg-green-500" : "bg-red-500"}
+          icon={totalActual <= totalBudget ? <TrendingDown size={22} className="text-white" /> : <TrendingUp size={22} className="text-white" />}
+          valueColor={totalActual <= totalBudget ? "text-green-600" : "text-red-500"} />
+      </div>
+
+      <div className="flex gap-2 mb-5">
+        {["all", "expense", "revenue"].map((t) => (
+          <button key={t} onClick={() => setCatFilter(t)}
+            className={cn("px-3 py-1.5 rounded-xl text-xs font-bold transition-colors",
+              catFilter === t ? "bg-indigo-600 text-white" : "bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400")}>
+            {t === "all" ? "All" : t === "expense" ? "Expenses" : "Revenue"}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((b) => {
+            const pct  = b.budget_amount > 0 ? Math.min(100, ((b.actual || 0) / b.budget_amount) * 100) : 0;
+            const over = (b.actual || 0) > (b.budget_amount || 0);
+            return (
+              <div key={b.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-bold",
+                      b.budget_type === "expense" ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400")}>
+                      {b.budget_type}
+                    </span>
+                    <span className="font-bold text-gray-900 dark:text-white">{b.category}</span>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold">Actual</p>
+                      <p className={cn("text-sm font-black tabular-nums", over ? "text-red-500" : "text-gray-900 dark:text-white")}>{formatCurrency(b.actual || 0)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold">Budget</p>
+                      <p className="text-sm font-black tabular-nums text-gray-500 dark:text-gray-400">{formatCurrency(b.budget_amount)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold">Variance</p>
+                      <p className={cn("text-sm font-black tabular-nums", over ? "text-red-500" : "text-green-600")}>{formatCurrency((b.actual || 0) - b.budget_amount)}</p>
+                    </div>
+                    <button onClick={() => del(b)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  </div>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                  <div className={cn("h-2 rounded-full transition-all", over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-green-500")}
+                    style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">{pct.toFixed(1)}% of budget used</p>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="py-16 text-center bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700">
+              <Target size={36} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-400 text-sm">No budgets set for {period}. Click "Set Budget" to get started.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showAdd && (
+        <Modal title="Set Budget" onClose={() => setShowAdd(false)}>
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label className={LABEL}>Type</label>
+              <select value={form.budget_type} onChange={(e) => setForm({ ...form, budget_type: e.target.value, category: "" })} className={INPUT}>
+                <option value="expense">Expense</option>
+                <option value="revenue">Revenue</option>
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Category</label>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={INPUT}>
+                <option value="">Select category…</option>
+                {(form.budget_type === "expense" ? BUDGET_EXPENSE_CATS : BUDGET_REVENUE_CATS).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Budget Amount</label>
+              <input required type="number" step="0.01" min="0" value={form.budget_amount}
+                onChange={(e) => setForm({ ...form, budget_amount: e.target.value })} className={INPUT} placeholder="0.00" />
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowAdd(false)}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">Cancel</button>
+              <button type="submit" disabled={saving || !form.category}
+                className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {saving ? "Saving…" : "Save Budget"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── PAYROLL ──────────────────────────────────────────────────────────────────
+function PayrollView() {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(today().slice(0, 7));
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ employee_name: "", employee_id: "", period: today().slice(0, 7), basic_pay: "", allowances: "0", deductions: "0", payment_method: "bank transfer", notes: "" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    api.getPayrollEntries(period).then(setEntries).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [period]);
+
+  const netPay = (f) => (parseFloat(f.basic_pay) || 0) + (parseFloat(f.allowances) || 0) - (parseFloat(f.deductions) || 0);
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setErr("");
+    try {
+      await api.createPayrollEntry({
+        ...form,
+        basic_pay:  parseFloat(form.basic_pay)  || 0,
+        allowances: parseFloat(form.allowances) || 0,
+        deductions: parseFloat(form.deductions) || 0,
+      });
+      setShowAdd(false);
+      setForm({ employee_name: "", employee_id: "", period: today().slice(0, 7), basic_pay: "", allowances: "0", deductions: "0", payment_method: "bank transfer", notes: "" });
+      load();
+    } catch (ex) { setErr(ex.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (e) => {
+    if (!window.confirm("Delete this payroll entry?")) return;
+    try { await api.deletePayrollEntry(e.id); load(); } catch (ex) { alert(ex.message); }
+  };
+
+  const markPaid = async (e) => {
+    try { await api.markPayrollPaid(e.id); load(); } catch (ex) { alert(ex.message); }
+  };
+
+  const totalPayroll = entries.reduce((s, e) => s + (e.net_pay || 0), 0);
+  const paidCount    = entries.filter((e) => e.status === "paid").length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">Payroll</h2>
+        <div className="flex items-center gap-3">
+          <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          <button onClick={() => { setShowAdd(true); setErr(""); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 transition-colors">
+            <Plus size={16} /> Add Entry
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard label="Total Payroll"  value={formatCurrency(totalPayroll)} iconBg="bg-violet-600" icon={<DollarSign size={22} className="text-white" />} valueColor="text-violet-600" />
+        <StatCard label="Employees"      value={entries.length}               iconBg="bg-blue-500"   icon={<Users size={22} className="text-white" />}     valueColor="text-blue-600" />
+        <StatCard label="Paid"           value={`${paidCount} / ${entries.length}`} iconBg="bg-green-500" icon={<CheckCircle2 size={22} className="text-white" />} valueColor="text-green-600" />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-5 py-3">Employee</th>
+                  <th className="text-right px-4 py-3">Basic</th>
+                  <th className="text-right px-4 py-3">Allowances</th>
+                  <th className="text-right px-4 py-3">Deductions</th>
+                  <th className="text-right px-4 py-3">Net Pay</th>
+                  <th className="text-left px-4 py-3">Method</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {entries.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+                    <td className="px-5 py-3">
+                      <p className="font-semibold text-gray-900 dark:text-white">{e.employee_name}</p>
+                      {e.employee_id && <p className="text-xs text-gray-400">{e.employee_id}</p>}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-200">{formatCurrency(e.basic_pay)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-green-600">{formatCurrency(e.allowances)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-red-500">{formatCurrency(e.deductions)}</td>
+                    <td className="px-4 py-3 text-right font-bold tabular-nums text-violet-600">{formatCurrency(e.net_pay)}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs capitalize whitespace-nowrap">{e.payment_method}</td>
+                    <td className="px-4 py-3">
+                      {e.status === "paid" ? (
+                        <span className="px-2 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-full text-[11px] font-bold">Paid</span>
+                      ) : (
+                        <button onClick={() => markPaid(e)}
+                          className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-full text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer">
+                          Mark Paid
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </td>
+                  </tr>
+                ))}
+                {entries.length === 0 && (
+                  <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-400">No payroll entries for {period}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <Modal title="Add Payroll Entry" onClose={() => setShowAdd(false)} wide>
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Employee Name</label>
+                <input required value={form.employee_name} onChange={(e) => setForm({ ...form, employee_name: e.target.value })} className={INPUT} placeholder="Full name" />
+              </div>
+              <div>
+                <label className={LABEL}>Employee ID (Optional)</label>
+                <input value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} className={INPUT} placeholder="EMP-001" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={LABEL}>Basic Pay</label>
+                <input required type="number" step="0.01" min="0" value={form.basic_pay}
+                  onChange={(e) => setForm({ ...form, basic_pay: e.target.value })} className={INPUT} placeholder="0.00" />
+              </div>
+              <div>
+                <label className={LABEL}>Allowances</label>
+                <input type="number" step="0.01" min="0" value={form.allowances}
+                  onChange={(e) => setForm({ ...form, allowances: e.target.value })} className={INPUT} placeholder="0.00" />
+              </div>
+              <div>
+                <label className={LABEL}>Deductions</label>
+                <input type="number" step="0.01" min="0" value={form.deductions}
+                  onChange={(e) => setForm({ ...form, deductions: e.target.value })} className={INPUT} placeholder="0.00" />
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Net Pay</span>
+              <span className="text-base font-black text-violet-600 tabular-nums">{formatCurrency(netPay(form))}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Period</label>
+                <input type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} className={INPUT} />
+              </div>
+              <div>
+                <label className={LABEL}>Payment Method</label>
+                <select value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} className={INPUT}>
+                  {["bank transfer", "cash", "mobile money", "cheque"].map((m) => (
+                    <option key={m} value={m} className="capitalize">{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={LABEL}>Notes (Optional)</label>
+              <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={INPUT} placeholder="Additional notes" />
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowAdd(false)}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">Cancel</button>
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                {saving ? "Saving…" : "Add Entry"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── MULTI-CURRENCY ───────────────────────────────────────────────────────────
+const COMMON_CURRENCIES = [
+  { code: "USD", name: "US Dollar",              symbol: "$"   },
+  { code: "EUR", name: "Euro",                   symbol: "€"   },
+  { code: "GBP", name: "British Pound",          symbol: "£"   },
+  { code: "GHS", name: "Ghanaian Cedi",          symbol: "₵"   },
+  { code: "KES", name: "Kenyan Shilling",        symbol: "Ksh" },
+  { code: "ZAR", name: "South African Rand",     symbol: "R"   },
+  { code: "XOF", name: "West African CFA Franc", symbol: "CFA" },
+  { code: "JPY", name: "Japanese Yen",           symbol: "¥"   },
+  { code: "CNY", name: "Chinese Yuan",           symbol: "¥"   },
+  { code: "CAD", name: "Canadian Dollar",        symbol: "CA$" },
+];
+
+function MultiCurrencyView() {
+  const [currencies, setCurrencies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ code: "", name: "", symbol: "", rate: "" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [convAmount, setConvAmount] = useState("");
+  const [convFrom, setConvFrom] = useState("NGN");
+  const [convTo, setConvTo] = useState("USD");
+
+  const load = () => {
+    setLoading(true);
+    api.getExchangeRates().then(setCurrencies).catch(console.error).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const submit = async (e) => {
+    e.preventDefault(); setSaving(true); setErr("");
+    try {
+      await api.saveCurrencyRate(form.code, { name: form.name, symbol: form.symbol, rate: parseFloat(form.rate) });
+      setShowAdd(false); setForm({ code: "", name: "", symbol: "", rate: "" }); load();
+    } catch (ex) { setErr(ex.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (c) => {
+    if (!window.confirm(`Remove ${c.code}?`)) return;
+    try { await api.deleteExchangeRate(c.code); load(); } catch (ex) { alert(ex.message); }
+  };
+
+  const prefill = (c) => { setForm({ code: c.code, name: c.name, symbol: c.symbol, rate: "" }); setShowAdd(true); };
+
+  const allCodes = ["NGN", ...currencies.map((c) => c.code)];
+  const getRate  = (code) => code === "NGN" ? 1 : (currencies.find((c) => c.code === code)?.rate || 1);
+  const converted = convAmount
+    ? ((parseFloat(convAmount) / getRate(convFrom)) * getRate(convTo)).toFixed(2)
+    : "";
+  const convSymbol = convTo === "NGN" ? "₦" : (currencies.find((c) => c.code === convTo)?.symbol || convTo);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">Currencies & Exchange Rates</h2>
+        <button onClick={() => { setShowAdd(true); setForm({ code: "", name: "", symbol: "", rate: "" }); setErr(""); }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+          <Plus size={16} /> Add Currency
+        </button>
+      </div>
+
+      {/* Quick converter */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-6 mb-6">
+        <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Globe size={18} className="text-indigo-500" /> Quick Converter
+        </h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <input type="number" step="any" min="0" value={convAmount} onChange={(e) => setConvAmount(e.target.value)}
+            className="w-32 px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            placeholder="Amount" />
+          <select value={convFrom} onChange={(e) => setConvFrom(e.target.value)}
+            className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+            {allCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <ArrowLeftRight size={16} className="text-gray-400" />
+          <select value={convTo} onChange={(e) => setConvTo(e.target.value)}
+            className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+            {allCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <span className="text-xl font-black text-indigo-600 tabular-nums min-w-[140px]">
+            {converted ? `${convSymbol} ${converted}` : "—"}
+          </span>
+        </div>
+      </div>
+
+      <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-4 py-3 mb-5 text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+        Base currency: <strong>NGN (₦)</strong>. Rates are expressed as units of foreign currency per 1 NGN.
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {currencies.map((c) => (
+              <div key={c.code} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl flex items-center justify-center">
+                      <span className="text-indigo-600 dark:text-indigo-400 font-black text-sm">{c.symbol}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 dark:text-white">{c.code}</p>
+                      <p className="text-xs text-gray-400">{c.name}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => del(c)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Rate</span>
+                  <span className="font-black text-indigo-600 text-sm tabular-nums">₦1 = {c.rate} {c.code}</span>
+                </div>
+              </div>
+            ))}
+            {currencies.length === 0 && (
+              <div className="col-span-3 py-12 text-center">
+                <Globe size={36} className="mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-400 text-sm">No currencies added yet</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-3 text-sm">Common Currencies — click to add rate</h3>
+            <div className="flex flex-wrap gap-2">
+              {COMMON_CURRENCIES.filter((c) => !currencies.find((x) => x.code === c.code)).map((c) => (
+                <button key={c.code} onClick={() => prefill(c)}
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-400 rounded-xl text-xs font-semibold transition-colors">
+                  {c.symbol} {c.code}
+                </button>
+              ))}
+              {COMMON_CURRENCIES.every((c) => currencies.find((x) => x.code === c.code)) && (
+                <p className="text-xs text-gray-400">All common currencies added.</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {showAdd && (
+        <Modal title="Add / Update Currency" onClose={() => setShowAdd(false)}>
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={LABEL}>Code (e.g. USD)</label>
+                <input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                  className={INPUT} placeholder="USD" maxLength={5} />
+              </div>
+              <div>
+                <label className={LABEL}>Symbol</label>
+                <input required value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })}
+                  className={INPUT} placeholder="$" maxLength={10} />
+              </div>
+            </div>
+            <div>
+              <label className={LABEL}>Currency Name</label>
+              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={INPUT} placeholder="US Dollar" />
+            </div>
+            <div>
+              <label className={LABEL}>Exchange Rate (per 1 NGN)</label>
+              <input required type="number" step="any" min="0" value={form.rate}
+                onChange={(e) => setForm({ ...form, rate: e.target.value })} className={INPUT} placeholder="0.00065" />
+              <p className="text-xs text-gray-400 mt-1">How many {form.code || "foreign units"} = 1 NGN</p>
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowAdd(false)}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">Cancel</button>
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {saving ? "Saving…" : "Save Currency"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
 export default function AccountsSection({ view = "dashboard", onViewChange }) {
   const go = (id) => onViewChange?.(id);
 
   const renderView = () => {
     switch (view) {
-      case "dashboard":          return <Dashboard />;
-      case "profit-loss":        return <ProfitLoss />;
-      case "cash-flow":          return <CashFlowView />;
-      case "invoices":           return <InvoiceTrackingView />;
-      case "tax-summary":        return <VatManagementView />;
-      case "expenses":           return <AllExpenses onAdd={() => go("create-expense")} />;
-      case "create-expense":     return <CreateExpense onSaved={() => go("expenses")} />;
-      case "expense-categories": return <CategoryManager type="expense" label="Expense Categories" color="red" />;
-      case "deposits":           return <AllDeposits onAdd={() => go("create-deposit")} />;
-      case "create-deposit":     return <CreateDeposit onSaved={() => go("deposits")} />;
-      case "deposit-categories": return <CategoryManager type="deposit" label="Deposit Categories" color="green" />;
-      case "transfers":          return <Transfers />;
-      default:                   return <Dashboard />;
+      case "dashboard":            return <Dashboard />;
+      case "profit-loss":          return <ProfitLoss />;
+      case "cash-flow":            return <CashFlowView />;
+      case "invoices":             return <InvoiceTrackingView />;
+      case "tax-summary":          return <VatManagementView />;
+      case "ledger":               return <GeneralLedgerView />;
+      case "balance-sheet":        return <BalanceSheetView />;
+      case "bank-reconciliation":  return <BankReconciliationView />;
+      case "budgeting":            return <BudgetingView />;
+      case "payroll":              return <PayrollView />;
+      case "currencies":           return <MultiCurrencyView />;
+      case "expenses":             return <AllExpenses onAdd={() => go("create-expense")} />;
+      case "create-expense":       return <CreateExpense onSaved={() => go("expenses")} />;
+      case "expense-categories":   return <CategoryManager type="expense" label="Expense Categories" color="red" />;
+      case "deposits":             return <AllDeposits onAdd={() => go("create-deposit")} />;
+      case "create-deposit":       return <CreateDeposit onSaved={() => go("deposits")} />;
+      case "deposit-categories":   return <CategoryManager type="deposit" label="Deposit Categories" color="green" />;
+      case "transfers":            return <Transfers />;
+      default:                     return <Dashboard />;
     }
   };
 

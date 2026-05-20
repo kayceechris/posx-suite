@@ -1,4 +1,6 @@
 import asyncio
+import calendar
+import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
@@ -402,3 +404,388 @@ async def get_invoices(current_user: User = Depends(get_current_user)):
         "overdue_count": sum(1 for i in invoices if i["overdue"]),
         "aging_summary": aging,
     }
+
+
+# ==================== GENERAL LEDGER ====================
+
+@router.get("/accounts/ledger")
+async def get_ledger(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    entry_type: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+
+    cutoff_end = (end_date + "T23:59:59") if end_date else None
+    order_q = {"status": "completed"}
+    exp_q, dep_q, tr_q, po_q = {}, {}, {}, {}
+
+    if start_date and end_date:
+        order_q["created_at"] = {"$gte": start_date, "$lte": cutoff_end}
+        exp_q["date"] = {"$gte": start_date, "$lte": end_date}
+        dep_q["date"] = {"$gte": start_date, "$lte": end_date}
+        tr_q["date"]  = {"$gte": start_date, "$lte": end_date}
+        po_q["created_at"] = {"$gte": start_date, "$lte": cutoff_end}
+
+    entries = []
+
+    if not entry_type or entry_type == "sales":
+        orders = await db.orders.find(order_q, {"_id": 0, "id": 1, "created_at": 1, "total": 1, "order_number": 1, "payment_method": 1}).to_list(2000)
+        for o in orders:
+            entries.append({
+                "date": str(o.get("created_at", ""))[:10],
+                "type": "sales",
+                "description": f"Sale #{o.get('order_number', str(o.get('id',''))[:8])}",
+                "reference": o.get("payment_method", ""),
+                "debit": 0.0,
+                "credit": float(o.get("total", 0)),
+            })
+
+    if not entry_type or entry_type == "expense":
+        for e in await db.expenses.find(exp_q, {"_id": 0}).to_list(2000):
+            entries.append({
+                "date": str(e.get("date", ""))[:10],
+                "type": "expense",
+                "description": e.get("description", e.get("category", "")),
+                "reference": e.get("category", ""),
+                "debit": float(e.get("amount", 0)),
+                "credit": 0.0,
+            })
+
+    if not entry_type or entry_type == "deposit":
+        for d in await db.deposits.find(dep_q, {"_id": 0}).to_list(2000):
+            entries.append({
+                "date": str(d.get("date", ""))[:10],
+                "type": "deposit",
+                "description": d.get("description", d.get("category", "")),
+                "reference": d.get("payment_method", ""),
+                "debit": 0.0,
+                "credit": float(d.get("amount", 0)),
+            })
+
+    if not entry_type or entry_type == "transfer":
+        for t in await db.transfers.find(tr_q, {"_id": 0}).to_list(2000):
+            entries.append({
+                "date": str(t.get("date", ""))[:10],
+                "type": "transfer",
+                "description": f"Transfer {t.get('from_account','')} → {t.get('to_account','')}",
+                "reference": t.get("reference", ""),
+                "debit": float(t.get("amount", 0)),
+                "credit": float(t.get("amount", 0)),
+            })
+
+    if not entry_type or entry_type == "purchase":
+        for p in await db.purchase_orders.find(po_q, {"_id": 0, "id": 1, "created_at": 1, "total_amount": 1, "po_number": 1, "supplier_name": 1}).to_list(2000):
+            entries.append({
+                "date": str(p.get("created_at", ""))[:10],
+                "type": "purchase",
+                "description": f"PO #{p.get('po_number', str(p.get('id',''))[:8])} — {p.get('supplier_name', '')}",
+                "reference": p.get("po_number", ""),
+                "debit": float(p.get("total_amount", 0)),
+                "credit": 0.0,
+            })
+
+    entries.sort(key=lambda x: x["date"])
+    running = 0.0
+    for e in entries:
+        running += e["credit"] - e["debit"]
+        e["balance"] = round(running, 2)
+
+    return {
+        "entries": entries,
+        "total_debits": round(sum(e["debit"] for e in entries), 2),
+        "total_credits": round(sum(e["credit"] for e in entries), 2),
+        "net_balance": round(running, 2),
+    }
+
+
+# ==================== BALANCE SHEET ====================
+
+@router.get("/accounts/balance-sheet")
+async def get_balance_sheet(
+    as_of: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+    cutoff = (as_of or datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    dep_pipe  = [{"$match": {"date": {"$lte": cutoff}}}, {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]
+    exp_pipe  = [{"$match": {"date": {"$lte": cutoff}}}, {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]
+    sal_pipe  = [{"$match": {"status": "completed", "created_at": {"$lte": cutoff + "T23:59:59"}}}, {"$group": {"_id": None, "t": {"$sum": "$total"}}}]
+    stock_pipe = [
+        {"$lookup": {"from": "products", "localField": "product_id", "foreignField": "id", "as": "p"}},
+        {"$unwind": {"path": "$p", "preserveNullAndEmptyArrays": True}},
+        {"$group": {"_id": None, "v": {"$sum": {"$multiply": ["$quantity", {"$ifNull": ["$p.cost_price", 0]}]}}}}
+    ]
+    ar_pipe   = [{"$match": {"status": {"$in": ["held", "pending"]}}}, {"$group": {"_id": None, "t": {"$sum": "$total"}}}]
+    ap_pipe   = [{"$match": {"status": {"$in": ["pending", "ordered"]}}}, {"$group": {"_id": None, "t": {"$sum": "$total_amount"}}}]
+
+    dep_r, exp_r, sal_r, stk_r, ar_r, ap_r = await asyncio.gather(
+        db.deposits.aggregate(dep_pipe).to_list(1),
+        db.expenses.aggregate(exp_pipe).to_list(1),
+        db.orders.aggregate(sal_pipe).to_list(1),
+        db.stock.aggregate(stock_pipe).to_list(1),
+        db.orders.aggregate(ar_pipe).to_list(1),
+        db.purchase_orders.aggregate(ap_pipe).to_list(1),
+    )
+
+    sales_total      = sal_r[0]["t"] if sal_r else 0
+    deposits_total   = dep_r[0]["t"] if dep_r else 0
+    expenses_total   = exp_r[0]["t"] if exp_r else 0
+    inventory_value  = stk_r[0]["v"] if stk_r else 0
+    receivables      = ar_r[0]["t"]  if ar_r  else 0
+    accounts_payable = ap_r[0]["t"]  if ap_r  else 0
+
+    cash = sales_total + deposits_total - expenses_total
+    total_assets = max(cash, 0) + inventory_value + receivables
+    equity = total_assets - accounts_payable
+
+    return {
+        "as_of": cutoff,
+        "assets": {
+            "cash_and_equivalents": round(cash, 2),
+            "inventory": round(inventory_value, 2),
+            "accounts_receivable": round(receivables, 2),
+            "total": round(total_assets, 2),
+        },
+        "liabilities": {
+            "accounts_payable": round(accounts_payable, 2),
+            "total": round(accounts_payable, 2),
+        },
+        "equity": {
+            "retained_earnings": round(equity, 2),
+            "total": round(equity, 2),
+        },
+        "total_liabilities_and_equity": round(accounts_payable + equity, 2),
+    }
+
+
+# ==================== BANK RECONCILIATION ====================
+
+@router.get("/accounts/bank-statements")
+async def get_bank_statements(
+    period: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+    q = {"period": period} if period else {}
+    return await db.bank_statements.find(q, {"_id": 0}).sort("date", -1).to_list(500)
+
+
+@router.post("/accounts/bank-statements")
+async def create_bank_statement(data: dict, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    date_str = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    entry = {
+        "id": str(uuid.uuid4()),
+        "date": date_str,
+        "description": data.get("description", ""),
+        "amount": float(data.get("amount", 0)),
+        "type": data.get("type", "credit"),
+        "period": date_str[:7],
+        "reference": data.get("reference", ""),
+        "reconciled": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user.id,
+    }
+    await db.bank_statements.insert_one(entry)
+    entry.pop("_id", None)
+    return entry
+
+
+@router.delete("/accounts/bank-statements/{entry_id}")
+async def delete_bank_statement(entry_id: str, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    res = await db.bank_statements.delete_one({"id": entry_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"message": "Deleted"}
+
+
+# ==================== BUDGETING ====================
+
+@router.get("/accounts/budgets")
+async def get_budgets(
+    period: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+    q = {"period": period} if period else {}
+    budgets = await db.budgets.find(q, {"_id": 0}).sort([("period", -1), ("category", 1)]).to_list(500)
+
+    if period:
+        year, month = int(period[:4]), int(period[5:7])
+        last_day = calendar.monthrange(year, month)[1]
+        start_d  = f"{period}-01"
+        end_d    = f"{period}-{last_day:02d}"
+        cutoff   = end_d + "T23:59:59"
+
+        exp_pipe = [
+            {"$match": {"date": {"$gte": start_d, "$lte": end_d}}},
+            {"$group": {"_id": "$category", "actual": {"$sum": "$amount"}}}
+        ]
+        dep_pipe = [
+            {"$match": {"date": {"$gte": start_d, "$lte": end_d}}},
+            {"$group": {"_id": "$category", "actual": {"$sum": "$amount"}}}
+        ]
+        sal_pipe = [
+            {"$match": {"status": "completed", "created_at": {"$gte": start_d, "$lte": cutoff}}},
+            {"$group": {"_id": None, "actual": {"$sum": "$total"}}}
+        ]
+
+        exp_r, dep_r, sal_r = await asyncio.gather(
+            db.expenses.aggregate(exp_pipe).to_list(100),
+            db.deposits.aggregate(dep_pipe).to_list(100),
+            db.orders.aggregate(sal_pipe).to_list(1),
+        )
+
+        actuals = {}
+        for e in exp_r:
+            actuals[f"expense:{e['_id']}"] = e["actual"]
+        for d in dep_r:
+            actuals[f"deposit:{d['_id']}"] = d["actual"]
+        if sal_r:
+            actuals["revenue:Sales Revenue"] = sal_r[0]["actual"]
+
+        for b in budgets:
+            key = f"{b.get('budget_type','expense')}:{b.get('category','')}"
+            b["actual"] = round(actuals.get(key, 0), 2)
+            b["variance"] = round(b["actual"] - b.get("budget_amount", 0), 2)
+
+    return budgets
+
+
+@router.post("/accounts/budgets")
+async def save_budget(data: dict, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    period      = data.get("period", "")
+    category    = data.get("category", "")
+    budget_type = data.get("budget_type", "expense")
+    amount      = float(data.get("budget_amount", 0))
+
+    existing = await db.budgets.find_one(
+        {"period": period, "category": category, "budget_type": budget_type}, {"_id": 0}
+    )
+    if existing:
+        await db.budgets.update_one(
+            {"period": period, "category": category, "budget_type": budget_type},
+            {"$set": {"budget_amount": amount}}
+        )
+        return {**existing, "budget_amount": amount}
+
+    entry = {
+        "id": str(uuid.uuid4()),
+        "period": period,
+        "category": category,
+        "budget_type": budget_type,
+        "budget_amount": amount,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user.id,
+    }
+    await db.budgets.insert_one(entry)
+    entry.pop("_id", None)
+    return entry
+
+
+@router.delete("/accounts/budgets/{budget_id}")
+async def delete_budget(budget_id: str, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    res = await db.budgets.delete_one({"id": budget_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Budget not found")
+    return {"message": "Deleted"}
+
+
+# ==================== PAYROLL ====================
+
+@router.get("/accounts/payroll")
+async def get_payroll(
+    period: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+    q = {"period": period} if period else {}
+    return await db.payroll_entries.find(q, {"_id": 0}).sort([("period", -1), ("employee_name", 1)]).to_list(500)
+
+
+@router.post("/accounts/payroll")
+async def create_payroll_entry(data: dict, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    basic      = float(data.get("basic_pay", 0))
+    allowances = float(data.get("allowances", 0))
+    deductions = float(data.get("deductions", 0))
+    entry = {
+        "id": str(uuid.uuid4()),
+        "employee_name":  data.get("employee_name", ""),
+        "employee_id":    data.get("employee_id", ""),
+        "period":         data.get("period", ""),
+        "basic_pay":      basic,
+        "allowances":     allowances,
+        "deductions":     deductions,
+        "net_pay":        round(basic + allowances - deductions, 2),
+        "payment_method": data.get("payment_method", "bank transfer"),
+        "notes":          data.get("notes", ""),
+        "status":         "pending",
+        "created_at":     datetime.now(timezone.utc).isoformat(),
+        "created_by":     current_user.id,
+    }
+    await db.payroll_entries.insert_one(entry)
+    entry.pop("_id", None)
+    return entry
+
+
+@router.patch("/accounts/payroll/{entry_id}/pay")
+async def mark_payroll_paid(entry_id: str, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    res = await db.payroll_entries.update_one(
+        {"id": entry_id},
+        {"$set": {"status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"message": "Marked as paid"}
+
+
+@router.delete("/accounts/payroll/{entry_id}")
+async def delete_payroll_entry(entry_id: str, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    res = await db.payroll_entries.delete_one({"id": entry_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"message": "Deleted"}
+
+
+# ==================== CURRENCIES ====================
+
+@router.get("/accounts/currencies")
+async def get_currencies(current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    return await db.currency_rates.find({}, {"_id": 0}).sort("code", 1).to_list(100)
+
+
+@router.put("/accounts/currencies/{code}")
+async def upsert_currency_rate(code: str, data: dict, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    code = code.upper()
+    await db.currency_rates.update_one(
+        {"code": code},
+        {"$set": {
+            "code":       code,
+            "name":       data.get("name", code),
+            "symbol":     data.get("symbol", code),
+            "rate":       float(data.get("rate", 1)),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user.id,
+        }},
+        upsert=True
+    )
+    result = await db.currency_rates.find_one({"code": code}, {"_id": 0})
+    return result
+
+
+@router.delete("/accounts/currencies/{code}")
+async def delete_currency(code: str, current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+    await db.currency_rates.delete_one({"code": code.upper()})
+    return {"message": "Deleted"}

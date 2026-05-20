@@ -459,4 +459,59 @@ export const api = {
   downloadStockTemplate: () => triggerDownload("/api/stock/import/template/csv", "stock_template.csv"),
   downloadCurrentStockCSV: () => triggerDownload("/api/stock/export/csv", "stock_current.csv"),
   importStockCSV: (file) => requestUpload("/api/stock/import/csv", file),
+
+  // Accounts — general ledger
+  getLedger: (start_date, end_date, entry_type) => {
+    const p = new URLSearchParams();
+    if (start_date)  p.append("start_date", start_date);
+    if (end_date)    p.append("end_date", end_date);
+    if (entry_type)  p.append("entry_type", entry_type);
+    const qs = p.toString();
+    return request(`/api/accounts/ledger${qs ? `?${qs}` : ""}`);
+  },
+
+  // Accounts — balance sheet
+  getBalanceSheet: (as_of) => {
+    const qs = as_of ? `?as_of=${as_of}` : "";
+    return request(`/api/accounts/balance-sheet${qs}`);
+  },
+
+  // Accounts — bank reconciliation
+  getBankStatements: (period) => {
+    const qs = period ? `?period=${period}` : "";
+    return request(`/api/accounts/bank-statements${qs}`);
+  },
+  createBankStatement: (data) =>
+    request("/api/accounts/bank-statements", { method: "POST", body: JSON.stringify(data) }),
+  deleteBankStatement: (id) =>
+    request(`/api/accounts/bank-statements/${id}`, { method: "DELETE" }),
+
+  // Accounts — budgeting
+  getBudgets: (period) => {
+    const qs = period ? `?period=${period}` : "";
+    return request(`/api/accounts/budgets${qs}`);
+  },
+  saveBudget: (data) =>
+    request("/api/accounts/budgets", { method: "POST", body: JSON.stringify(data) }),
+  deleteBudget: (id) =>
+    request(`/api/accounts/budgets/${id}`, { method: "DELETE" }),
+
+  // Accounts — payroll
+  getPayrollEntries: (period) => {
+    const qs = period ? `?period=${period}` : "";
+    return request(`/api/accounts/payroll${qs}`);
+  },
+  createPayrollEntry: (data) =>
+    request("/api/accounts/payroll", { method: "POST", body: JSON.stringify(data) }),
+  deletePayrollEntry: (id) =>
+    request(`/api/accounts/payroll/${id}`, { method: "DELETE" }),
+  markPayrollPaid: (id) =>
+    request(`/api/accounts/payroll/${id}/pay`, { method: "PATCH" }),
+
+  // Accounts — multi-currency (exchange rates)
+  getExchangeRates: () => request("/api/accounts/currencies"),
+  saveCurrencyRate: (code, data) =>
+    request(`/api/accounts/currencies/${code}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteExchangeRate: (code) =>
+    request(`/api/accounts/currencies/${code}`, { method: "DELETE" }),
 };

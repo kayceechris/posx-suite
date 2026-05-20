@@ -102,10 +102,12 @@ const PERMISSION_MODULES = [
   {
     id: "accounts", label: "Accounts",
     permissions: [
-      { id: "view_accounts", label: "View Accounts" },
-      { id: "manage_expenses", label: "Manage Expenses" },
-      { id: "view_profit_loss", label: "View Profit & Loss" },
-      { id: "manage_cash_flow", label: "Manage Cash Flow" },
+      { id: "view_accounts",       label: "View Accounts" },
+      { id: "manage_expenses",     label: "Manage Expenses & Deposits" },
+      { id: "view_profit_loss",    label: "View P&L, Balance Sheet & Budgets" },
+      { id: "view_financial_report", label: "View Ledger, Invoices & Reconciliation" },
+      { id: "manage_cash_flow",    label: "Manage Cash Flow" },
+      { id: "manage_payroll",      label: "Manage Payroll" },
     ],
   },
   {
