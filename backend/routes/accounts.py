@@ -1,5 +1,7 @@
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import datetime, timezone
 
 from database import db
 from models import (
@@ -286,4 +288,117 @@ async def get_accounts_summary(
         "expense_by_category": expense_by_category,
         "gross_margin": (gross_profit / total_revenue * 100) if total_revenue > 0 else 0,
         "net_margin": (net_profit / total_revenue * 100) if total_revenue > 0 else 0,
+    }
+
+
+# ==================== CASH FLOW ====================
+
+@router.get("/accounts/cash-flow")
+async def get_cash_flow(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    require_admin(current_user)
+
+    order_q = {"status": "completed"}
+    exp_q = {}
+    dep_q = {}
+
+    if start_date and end_date:
+        order_q["created_at"] = {"$gte": start_date, "$lte": end_date}
+        exp_q["date"] = {"$gte": start_date, "$lte": end_date}
+        dep_q["date"] = {"$gte": start_date, "$lte": end_date}
+
+    sales_pipe = [
+        {"$match": order_q},
+        {"$group": {"_id": {"$substr": ["$created_at", 0, 10]}, "amount": {"$sum": "$total"}}},
+        {"$sort": {"_id": 1}},
+    ]
+    exp_pipe = [
+        {"$match": exp_q},
+        {"$group": {"_id": "$date", "amount": {"$sum": "$amount"}}},
+        {"$sort": {"_id": 1}},
+    ]
+    dep_pipe = [
+        {"$match": dep_q},
+        {"$group": {"_id": "$date", "amount": {"$sum": "$amount"}}},
+        {"$sort": {"_id": 1}},
+    ]
+
+    sales_res, exp_res, dep_res = await asyncio.gather(
+        db.orders.aggregate(sales_pipe).to_list(365),
+        db.expenses.aggregate(exp_pipe).to_list(365),
+        db.deposits.aggregate(dep_pipe).to_list(365),
+    )
+
+    sales_map = {s["_id"]: s["amount"] for s in sales_res}
+    exp_map   = {e["_id"]: e["amount"] for e in exp_res}
+    dep_map   = {d["_id"]: d["amount"] for d in dep_res}
+
+    all_dates = sorted(set(list(sales_map) + list(exp_map) + list(dep_map)))
+    timeline = []
+    running = 0.0
+    for d in all_dates:
+        inflow  = sales_map.get(d, 0) + dep_map.get(d, 0)
+        outflow = exp_map.get(d, 0)
+        running += inflow - outflow
+        timeline.append({"date": d, "inflow": inflow, "outflow": outflow,
+                          "net": inflow - outflow, "balance": running})
+
+    total_in  = sum(t["inflow"]  for t in timeline)
+    total_out = sum(t["outflow"] for t in timeline)
+    return {
+        "timeline": timeline,
+        "total_inflow": total_in,
+        "total_outflow": total_out,
+        "net_cash_flow": total_in - total_out,
+        "closing_balance": running,
+    }
+
+
+# ==================== INVOICE TRACKING ====================
+
+@router.get("/accounts/invoices")
+async def get_invoices(current_user: User = Depends(get_current_user)):
+    require_admin(current_user)
+
+    orders = await db.orders.find(
+        {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
+
+    now = datetime.now(timezone.utc)
+    invoices = []
+    for order in orders:
+        created = order.get("created_at", "")
+        try:
+            dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            days = (now - dt).days
+        except Exception:
+            days = 0
+
+        bucket = (
+            "0-7 days"   if days <= 7  else
+            "8-30 days"  if days <= 30 else
+            "31-60 days" if days <= 60 else
+            "60+ days"
+        )
+        invoices.append({**order, "days_outstanding": days,
+                          "aging_bucket": bucket, "overdue": days > 7})
+
+    aging: dict = {}
+    for inv in invoices:
+        b = inv["aging_bucket"]
+        aging.setdefault(b, {"count": 0, "total": 0.0})
+        aging[b]["count"] += 1
+        aging[b]["total"] += float(inv.get("total", 0))
+
+    return {
+        "invoices": invoices,
+        "total_outstanding": sum(float(i.get("total", 0)) for i in invoices),
+        "overdue_count": sum(1 for i in invoices if i["overdue"]),
+        "aging_summary": aging,
     }

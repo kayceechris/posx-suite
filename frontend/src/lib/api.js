@@ -254,6 +254,14 @@ export const api = {
     const qs = params.toString();
     return request(`/api/accounts/dashboard${qs ? `?${qs}` : ""}`);
   },
+  getCashFlow: (start_date, end_date) => {
+    const params = new URLSearchParams();
+    if (start_date) params.append("start_date", start_date);
+    if (end_date) params.append("end_date", end_date);
+    const qs = params.toString();
+    return request(`/api/accounts/cash-flow${qs ? `?${qs}` : ""}`);
+  },
+  getInvoices: () => request("/api/accounts/invoices"),
 
   // Deposits
   getDeposits: () => request("/api/deposits"),

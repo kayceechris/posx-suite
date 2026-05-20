@@ -60,11 +60,18 @@ const EXPANDABLE = {
     { id: "label-printer", label: "Label Printer" }, { id: "print-bridge", label: "Print Bridge" },
   ],
   accounts: [
-    { id: "dashboard", label: "Dashboard" }, { id: "profit-loss", label: "Profit & Loss" },
-    { id: "tax-summary", label: "Tax Summary" }, { id: "expenses", label: "All Expenses" },
-    { id: "create-expense", label: "Create Expense" }, { id: "expense-categories", label: "Expense Categories" },
-    { id: "deposits", label: "All Deposits" }, { id: "create-deposit", label: "Create Deposit" },
-    { id: "deposit-categories", label: "Deposit Categories" }, { id: "transfers", label: "Transfers Money" },
+    { id: "dashboard", label: "Dashboard" },
+    { id: "profit-loss", label: "Profit & Loss" },
+    { id: "cash-flow", label: "Cash Flow" },
+    { id: "invoices", label: "Invoice Tracking" },
+    { id: "tax-summary", label: "Tax & VAT" },
+    { id: "expenses", label: "All Expenses" },
+    { id: "create-expense", label: "Create Expense" },
+    { id: "expense-categories", label: "Expense Categories" },
+    { id: "deposits", label: "All Deposits" },
+    { id: "create-deposit", label: "Create Deposit" },
+    { id: "deposit-categories", label: "Deposit Categories" },
+    { id: "transfers", label: "Transfers Money" },
   ],
 };
 
@@ -102,6 +109,8 @@ const SUB_ITEM_PERMISSION = {
   "reports.payments": "view_payment_report",
   "users.types": "manage_user_types",
   "accounts.profit-loss": "view_profit_loss",
+  "accounts.cash-flow": "view_profit_loss",
+  "accounts.invoices": "view_financial_report",
   "accounts.create-expense": "manage_expenses",
   "accounts.create-deposit": "manage_expenses",
 };

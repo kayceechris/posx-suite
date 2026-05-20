@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
-  ArrowLeftRight, BookOpen, FolderOpen,
+  ArrowLeftRight, BookOpen, FolderOpen, AlertCircle,
   Minus, Plus, Receipt, RefreshCw, Tag, Trash2, TrendingDown,
-  TrendingUp, Wallet, X,
+  TrendingUp, Wallet, X, FileText, DollarSign, Clock, CheckCircle2,
+  BarChart2, CreditCard, Activity,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
@@ -835,6 +836,408 @@ function TaxSummary() {
   );
 }
 
+// ─── SVG Bar Chart ────────────────────────────────────────────────────────────
+function BarChart({ data, labelKey = "date", valueKey = "value", color = "#6366f1", height = 120 }) {
+  if (!data?.length) return null;
+  const max = Math.max(...data.map((d) => d[valueKey]), 1);
+  const W = 100 / data.length;
+  return (
+    <svg viewBox={`0 0 100 ${height}`} className="w-full" preserveAspectRatio="none" style={{ height }}>
+      {data.map((d, i) => {
+        const barH = (d[valueKey] / max) * (height - 16);
+        const x = i * W + W * 0.1;
+        const w = W * 0.8;
+        return (
+          <g key={i}>
+            <rect x={x} y={height - 16 - barH} width={w} height={barH}
+              fill={color} fillOpacity={0.85} rx={1} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function MiniLineChart({ data, valueKey = "value", color = "#6366f1", height = 60 }) {
+  if (!data?.length) return null;
+  const max = Math.max(...data.map((d) => d[valueKey]), 1);
+  const W = 100 / (data.length - 1 || 1);
+  const pts = data.map((d, i) => {
+    const x = i * W;
+    const y = height - 4 - ((d[valueKey] / max) * (height - 8));
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg viewBox={`0 0 100 ${height}`} className="w-full" preserveAspectRatio="none" style={{ height }}>
+      <polyline fill="none" stroke={color} strokeWidth="2" points={pts} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── CASH FLOW ────────────────────────────────────────────────────────────────
+function CashFlowView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [start, setStart] = useState(monthStart());
+  const [end, setEnd] = useState(today());
+  const [page, setPage] = useState(1);
+  const PAGE = 20;
+
+  const load = () => {
+    setLoading(true);
+    api.getCashFlow(start, end).then(setData).catch(console.error).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, [start, end]);
+
+  const timeline = data?.timeline || [];
+  const totalPages = Math.max(1, Math.ceil(timeline.length / PAGE));
+  const paged = timeline.slice((page - 1) * PAGE, page * PAGE);
+
+  const Spinner = () => <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-teal-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <Activity size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Cash Flow</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Inflows vs outflows with running balance</p>
+          </div>
+        </div>
+      </div>
+
+      <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
+
+      {loading ? <Spinner /> : !data ? (
+        <p className="text-center text-gray-400 py-16 text-sm">Failed to load. Try again.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: "Total Inflow",    value: formatCurrency(data.total_inflow),    iconBg: "bg-green-500",  icon: <TrendingUp size={20} className="text-white" />,   valueColor: "text-green-600" },
+              { label: "Total Outflow",   value: formatCurrency(data.total_outflow),   iconBg: "bg-red-500",    icon: <TrendingDown size={20} className="text-white" />, valueColor: "text-red-500" },
+              { label: "Net Cash Flow",   value: formatCurrency(data.net_cash_flow),   iconBg: data.net_cash_flow >= 0 ? "bg-blue-500" : "bg-orange-500", icon: <BarChart2 size={20} className="text-white" />, valueColor: data.net_cash_flow >= 0 ? "text-blue-600" : "text-orange-600" },
+              { label: "Closing Balance", value: formatCurrency(data.closing_balance), iconBg: "bg-indigo-500", icon: <Wallet size={20} className="text-white" />,       valueColor: "text-indigo-600" },
+            ].map((c) => <StatCard key={c.label} {...c} />)}
+          </div>
+
+          {timeline.length > 1 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm p-5 mb-6">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Daily Inflow vs Outflow</p>
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <p className="text-[10px] text-green-500 font-semibold mb-1">Inflow</p>
+                  <BarChart data={timeline} labelKey="date" valueKey="inflow" color="#22c55e" height={80} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] text-red-400 font-semibold mb-1">Outflow</p>
+                  <BarChart data={timeline} labelKey="date" valueKey="outflow" color="#f87171" height={80} />
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 font-semibold mt-3 mb-1">Running Balance</p>
+              <MiniLineChart data={timeline} valueKey="balance" color="#6366f1" height={50} />
+            </div>
+          )}
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-5 py-3">Date</th>
+                  <th className="text-right px-4 py-3">Inflow</th>
+                  <th className="text-right px-4 py-3">Outflow</th>
+                  <th className="text-right px-4 py-3">Net</th>
+                  <th className="text-right px-5 py-3">Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {paged.map((row) => (
+                  <tr key={row.date} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-5 py-3 text-sm text-gray-600 dark:text-gray-300">{fmtDate(row.date)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{formatCurrency(row.inflow)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-red-500">{formatCurrency(row.outflow)}</td>
+                    <td className={cn("px-4 py-3 text-right text-sm font-bold", row.net >= 0 ? "text-blue-600" : "text-orange-500")}>{row.net >= 0 ? "+" : ""}{formatCurrency(row.net)}</td>
+                    <td className="px-5 py-3 text-right text-sm font-black text-gray-900 dark:text-white tabular-nums">{formatCurrency(row.balance)}</td>
+                  </tr>
+                ))}
+                {timeline.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">No transactions in this period</td></tr>}
+              </tbody>
+            </table>
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <p className="text-xs text-gray-500">{(page - 1) * PAGE + 1}–{Math.min(page * PAGE, timeline.length)} of {timeline.length}</p>
+                <div className="flex gap-1">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40">Prev</button>
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── INVOICE TRACKING ────────────────────────────────────────────────────────
+const AGING_COLORS = {
+  "0-7 days":   { badge: "bg-green-100 text-green-700",  row: "" },
+  "8-30 days":  { badge: "bg-yellow-100 text-yellow-700", row: "bg-yellow-50/30 dark:bg-yellow-900/10" },
+  "31-60 days": { badge: "bg-orange-100 text-orange-700", row: "bg-orange-50/30 dark:bg-orange-900/10" },
+  "60+ days":   { badge: "bg-red-100 text-red-700",       row: "bg-red-50/30 dark:bg-red-900/10" },
+};
+
+function InvoiceTrackingView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    api.getInvoices().then(setData).catch(console.error).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const invoices = (data?.invoices || []).filter((inv) =>
+    !search || (inv.order_number || "").toLowerCase().includes(search.toLowerCase()) ||
+    (inv.customer_name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const BUCKET_ORDER = ["0-7 days", "8-30 days", "31-60 days", "60+ days"];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <FileText size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Invoice Tracking</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Outstanding & overdue invoices</p>
+          </div>
+        </div>
+        <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+          <RefreshCw size={15} /> Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : !data ? null : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <StatCard label="Total Outstanding" value={formatCurrency(data.total_outstanding)} iconBg="bg-blue-500"
+              icon={<CreditCard size={20} className="text-white" />} valueColor="text-blue-600" />
+            <StatCard label="Overdue Invoices" value={data.overdue_count} iconBg="bg-red-500"
+              icon={<AlertCircle size={20} className="text-white" />} valueColor="text-red-600" />
+            <StatCard label="Total Open" value={data.invoices.length} iconBg="bg-indigo-500"
+              icon={<FileText size={20} className="text-white" />} valueColor="text-indigo-600" />
+          </div>
+
+          {data.aging_summary && Object.keys(data.aging_summary).length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {BUCKET_ORDER.filter((b) => data.aging_summary[b]).map((bucket) => {
+                const info = data.aging_summary[bucket];
+                const colors = AGING_COLORS[bucket];
+                return (
+                  <div key={bucket} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-4 text-center">
+                    <span className={cn("inline-block px-2.5 py-0.5 rounded-full text-xs font-bold mb-2", colors.badge)}>{bucket}</span>
+                    <p className="text-2xl font-black text-gray-900 dark:text-white">{info.count}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatCurrency(info.total)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-3 mb-4">
+            <div className="relative flex-1 max-w-xs">
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order # or customer…"
+                className="w-full pl-4 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-5 py-3">Order #</th>
+                  <th className="text-left px-4 py-3">Customer</th>
+                  <th className="text-left px-4 py-3">Date</th>
+                  <th className="text-center px-4 py-3">Days Open</th>
+                  <th className="text-center px-4 py-3">Aging</th>
+                  <th className="text-right px-5 py-3">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {invoices.map((inv) => {
+                  const colors = AGING_COLORS[inv.aging_bucket] || AGING_COLORS["0-7 days"];
+                  return (
+                    <tr key={inv.id} className={cn("transition-colors hover:brightness-95", colors.row)}>
+                      <td className="px-5 py-3 font-semibold text-gray-900 dark:text-white text-sm">{inv.order_number || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{inv.customer_name || "Walk-in"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{fmtDate(inv.created_at)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn("font-bold text-sm", inv.overdue ? "text-red-500" : "text-gray-700 dark:text-gray-200")}>{inv.days_outstanding}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", colors.badge)}>{inv.aging_bucket}</span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-bold text-gray-900 dark:text-white text-sm tabular-nums">{formatCurrency(inv.total)}</td>
+                    </tr>
+                  );
+                })}
+                {invoices.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">{data.invoices.length === 0 ? "No outstanding invoices" : "No results for search"}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── VAT MANAGEMENT (enhanced TaxSummary) ────────────────────────────────────
+function VatManagementView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [start, setStart] = useState(monthStart());
+  const [end, setEnd] = useState(today());
+
+  const load = () => {
+    setLoading(true);
+    api.getAccountsDashboard(start, end).then(setData).catch(console.error).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, [start, end]);
+
+  const taxRate = 0.075;
+  const taxCollected = data ? data.sales * taxRate : 0;
+  const taxOnPurchases = data ? data.purchases * taxRate : 0;
+  const netVAT = taxCollected - taxOnPurchases;
+
+  // Next VAT filing deadline — Nigerian quarterly: Mar 21, Jun 21, Sep 21, Dec 21
+  const now = new Date();
+  const quarters = [
+    new Date(now.getFullYear(), 2, 21),
+    new Date(now.getFullYear(), 5, 21),
+    new Date(now.getFullYear(), 8, 21),
+    new Date(now.getFullYear(), 11, 21),
+    new Date(now.getFullYear() + 1, 2, 21),
+  ];
+  const nextDeadline = quarters.find((d) => d > now) || quarters[quarters.length - 1];
+  const daysToDeadline = Math.ceil((nextDeadline - now) / 86400000);
+  const deadlineUrgent = daysToDeadline <= 14;
+
+  const monthlyRows = data?.daily_sales
+    ? Object.entries(
+        data.daily_sales.reduce((acc, d) => {
+          const month = d.date?.slice(0, 7) || "Unknown";
+          acc[month] = (acc[month] || 0) + d.revenue;
+          return acc;
+        }, {})
+      ).map(([month, rev]) => ({ month, revenue: rev, tax: rev * taxRate }))
+    : [];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-violet-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <DollarSign size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Tax & VAT Management</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">VAT liability, filing deadlines & monthly breakdown</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={cn("flex items-start gap-3 p-4 rounded-xl border mb-6",
+        deadlineUrgent
+          ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+          : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800")}>
+        <Clock size={18} className={cn("flex-shrink-0 mt-0.5", deadlineUrgent ? "text-red-500" : "text-amber-500")} />
+        <div>
+          <p className={cn("text-sm font-bold", deadlineUrgent ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300")}>
+            Next VAT filing deadline: {nextDeadline.toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          <p className={cn("text-xs mt-0.5", deadlineUrgent ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
+            {daysToDeadline} day{daysToDeadline !== 1 ? "s" : ""} remaining · {deadlineUrgent ? "Filing soon — prepare your return" : "Quarterly VAT return"}
+          </p>
+        </div>
+      </div>
+
+      <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : data && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard label="Output VAT (Collected)" value={formatCurrency(taxCollected)} iconBg="bg-indigo-500"
+              icon={<TrendingUp size={20} className="text-white" />} valueColor="text-indigo-600" />
+            <StatCard label="Input VAT (Claimable)" value={formatCurrency(taxOnPurchases)} iconBg="bg-orange-500"
+              icon={<TrendingDown size={20} className="text-white" />} valueColor="text-orange-600" />
+            <StatCard label="Net VAT Payable" value={formatCurrency(netVAT)} iconBg={netVAT >= 0 ? "bg-red-500" : "bg-green-500"}
+              icon={<Wallet size={20} className="text-white" />} valueColor={netVAT >= 0 ? "text-red-600" : "text-green-600"} />
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 dark:text-white">VAT Calculation</h3>
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">Rate: 7.5%</span>
+            </div>
+            {[
+              { label: "Total Sales (Excl. VAT)",      value: data.sales,         color: "text-green-600" },
+              { label: "Output VAT @ 7.5%",            value: taxCollected,       color: "text-indigo-600" },
+              { label: "Total Purchases (Excl. VAT)",  value: data.purchases,     color: "text-orange-600" },
+              { label: "Input VAT @ 7.5%",             value: taxOnPurchases,     color: "text-orange-600" },
+              { label: "Net VAT Payable / (Refund)",   value: netVAT,             color: netVAT >= 0 ? "text-red-600" : "text-green-600", bold: true },
+            ].map(({ label, value, color, bold }) => (
+              <div key={label} className={cn("flex justify-between px-6 py-3.5 border-b border-gray-50 dark:border-gray-700", bold && "bg-gray-50 dark:bg-gray-900")}>
+                <span className={cn("text-sm text-gray-700 dark:text-gray-200", bold && "font-bold")}>{label}</span>
+                <span className={cn("text-sm font-semibold tabular-nums", color, bold && "font-black text-base")}>{formatCurrency(value)}</span>
+              </div>
+            ))}
+          </div>
+
+          {monthlyRows.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="font-bold text-gray-900 dark:text-white">Monthly VAT Breakdown</h3>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-6 py-3">Month</th>
+                    <th className="text-right px-4 py-3">Revenue</th>
+                    <th className="text-right px-6 py-3">VAT (7.5%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {monthlyRows.map(({ month, revenue, tax }) => (
+                    <tr key={month} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">{month}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-300 tabular-nums">{formatCurrency(revenue)}</td>
+                      <td className="px-6 py-3 text-right text-sm font-bold text-indigo-600 tabular-nums">{formatCurrency(tax)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 px-1">Configure your VAT rate in Settings → Tax Settings. Deadline dates are indicative (Nigerian quarterly schedule).</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
 export default function AccountsSection({ view = "dashboard", onViewChange }) {
   const go = (id) => onViewChange?.(id);
@@ -843,7 +1246,9 @@ export default function AccountsSection({ view = "dashboard", onViewChange }) {
     switch (view) {
       case "dashboard":          return <Dashboard />;
       case "profit-loss":        return <ProfitLoss />;
-      case "tax-summary":        return <TaxSummary />;
+      case "cash-flow":          return <CashFlowView />;
+      case "invoices":           return <InvoiceTrackingView />;
+      case "tax-summary":        return <VatManagementView />;
       case "expenses":           return <AllExpenses onAdd={() => go("create-expense")} />;
       case "create-expense":     return <CreateExpense onSaved={() => go("expenses")} />;
       case "expense-categories": return <CategoryManager type="expense" label="Expense Categories" color="red" />;
