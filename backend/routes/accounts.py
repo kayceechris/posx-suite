@@ -3,7 +3,7 @@ import calendar
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from database import db
 from models import (
@@ -362,13 +362,23 @@ async def get_cash_flow(
 # ==================== INVOICE TRACKING ====================
 
 @router.get("/accounts/invoices")
-async def get_invoices(current_user: User = Depends(get_current_user)):
+async def get_invoices(
+    days_back: int = 60,
+    current_user: User = Depends(get_current_user)
+):
     require_admin(current_user)
 
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+    cutoff_str = cutoff.isoformat()
+
+    # Include both open orders (outstanding) and recent completed orders (invoice register)
     orders = await db.orders.find(
-        {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+        {"$or": [
+            {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+            {"status": "completed", "created_at": {"$gte": cutoff_str}},
+        ]},
         {"_id": 0}
-    ).sort("created_at", 1).to_list(500)
+    ).sort("created_at", -1).to_list(500)
 
     now = datetime.now(timezone.utc)
     invoices = []
@@ -382,17 +392,25 @@ async def get_invoices(current_user: User = Depends(get_current_user)):
         except Exception:
             days = 0
 
+        is_open = order.get("status") in ("held", "sent_to_kitchen", "pending")
         bucket = (
             "0-7 days"   if days <= 7  else
             "8-30 days"  if days <= 30 else
             "31-60 days" if days <= 60 else
             "60+ days"
         )
-        invoices.append({**order, "days_outstanding": days,
-                          "aging_bucket": bucket, "overdue": days > 7})
+        invoices.append({
+            **order,
+            "days_outstanding": days,
+            "aging_bucket": bucket,
+            "overdue": is_open and days > 7,
+            "invoice_status": "open" if is_open else "settled",
+        })
 
+    # Total outstanding = open orders only
+    open_invoices = [i for i in invoices if i["invoice_status"] == "open"]
     aging: dict = {}
-    for inv in invoices:
+    for inv in open_invoices:
         b = inv["aging_bucket"]
         aging.setdefault(b, {"count": 0, "total": 0.0})
         aging[b]["count"] += 1
@@ -400,8 +418,8 @@ async def get_invoices(current_user: User = Depends(get_current_user)):
 
     return {
         "invoices": invoices,
-        "total_outstanding": sum(float(i.get("total", 0)) for i in invoices),
-        "overdue_count": sum(1 for i in invoices if i["overdue"]),
+        "total_outstanding": sum(float(i.get("total", 0)) for i in open_invoices),
+        "overdue_count": sum(1 for i in open_invoices if i["overdue"]),
         "aging_summary": aging,
     }
 

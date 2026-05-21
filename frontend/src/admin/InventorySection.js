@@ -8,6 +8,8 @@ import {
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import { useAuth } from "../context/AuthContext";
+import ExportBtn from "../components/ExportBtn";
+import { downloadCSV, printReport } from "../lib/export";
 
 function AccessDenied({ label }) {
   return (
@@ -143,9 +145,22 @@ function StockLevelsView() {
             {expiringCount > 0 && <> · <span className="text-red-500 font-semibold">{expiringCount} expiring</span></>}
           </p>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-          <RefreshCw size={15} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportBtn
+            onCSV={() => downloadCSV("stock_levels",
+              ["Product", "Outlet", "Qty", "Min", "Batch", "Expiry", "Status"],
+              stock.map((item) => [productName(item.product_id), outletName(item.outlet_id), item.quantity, item.min_quantity || 10, item.batch_number || "", item.expiry_date || "", isExpired(item) ? "Expired" : isExpiring(item) ? "Expiring" : isLow(item) ? "Low" : "OK"]))}
+            onPrint={() => printReport({
+              title: "Stock Levels",
+              summaryRows: [["Total Entries", String(stock.length)], ["Low Stock", String(lowCount)], ["Expiring", String(expiringCount)]],
+              headers: ["Product", "Outlet", "Qty", "Min", "Batch", "Expiry", "Status"],
+              rows: stock.map((item) => [productName(item.product_id), outletName(item.outlet_id), item.quantity, item.min_quantity || 10, item.batch_number || "—", item.expiry_date || "—", isExpired(item) ? "Expired" : isExpiring(item) ? "Expiring" : isLow(item) ? "Low" : "OK"]),
+            })}
+          />
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
       </div>
 
       {lowCount > 0 && (
@@ -406,6 +421,18 @@ function StockCountView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ExportBtn
+            onCSV={() => downloadCSV("stock_count",
+              ["Product", "System Qty", "Counted", "Variance"],
+              products.map((p) => { const sys = systemQty(p.id); const c = counts[p.id] ?? ""; const v = variance(p.id); return [p.name, sys, c || "—", v == null ? "—" : v]; }))}
+            onPrint={() => printReport({
+              title: "Stock Count",
+              subtitle: outlets.find((o) => o.id === outletId)?.name || "",
+              summaryRows: [["Products", String(products.length)], ["Counted", String(filledCount)]],
+              headers: ["Product", "System Qty", "Counted", "Variance"],
+              rows: products.map((p) => { const sys = systemQty(p.id); const c = counts[p.id] ?? ""; const v = variance(p.id); return [p.name, String(sys), c || "—", v == null ? "—" : v > 0 ? `+${v}` : String(v)]; }),
+            })}
+          />
           <button
             onClick={() => setScanMode((v) => !v)}
             className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors",
@@ -931,9 +958,22 @@ function ReorderView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{lowStock.length} item{lowStock.length !== 1 ? "s" : ""} at or below minimum stock level</p>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-          <RefreshCw size={15} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportBtn
+            onCSV={() => downloadCSV("reorder_alerts",
+              ["Product", "Outlet", "Current", "Min", "Suggested Order"],
+              lowStock.map((item) => [productName(item.product_id), outletName(item.outlet_id), item.quantity, item.min_quantity || 10, deficit(item)]))}
+            onPrint={() => printReport({
+              title: "Reorder Alerts",
+              summaryRows: [["Items Needing Reorder", String(lowStock.length)]],
+              headers: ["Product", "Outlet", "Current", "Min", "Suggested Order"],
+              rows: lowStock.map((item) => [productName(item.product_id), outletName(item.outlet_id), item.quantity, item.min_quantity || 10, deficit(item)]),
+            })}
+          />
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
       </div>
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -1081,10 +1121,23 @@ function WasteView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Log spoilage, damage, and other stock losses</p>
           </div>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
-          <Plus size={16} /> Record Waste
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportBtn
+            onCSV={() => downloadCSV("waste_log",
+              ["Product", "Qty", "Reason", "Notes", "Date"],
+              entries.map((e) => [productName(e.product_id), e.quantity, e.reason, e.notes || "", new Date(e.created_at).toLocaleDateString()]))}
+            onPrint={() => printReport({
+              title: "Waste Recording Log",
+              summaryRows: summary.map((s) => [s.reason, `${s.total_qty} (${s.count} entries)`]),
+              headers: ["Product", "Qty", "Reason", "Notes", "Date"],
+              rows: entries.map((e) => [productName(e.product_id), e.quantity, e.reason, e.notes || "—", new Date(e.created_at).toLocaleDateString()]),
+            })}
+          />
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
+            <Plus size={16} /> Record Waste
+          </button>
+        </div>
       </div>
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -1255,7 +1308,7 @@ function ValuationView() {
         </div>
       )}
 
-      <div className="flex gap-3 mb-4">
+      <div className="flex gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
@@ -1266,6 +1319,20 @@ function ValuationView() {
           <option value="">All Outlets</option>
           {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
+        {data && (
+          <ExportBtn
+            onCSV={() => downloadCSV("stock_valuation",
+              ["Product", "Outlet", "Qty", "Cost Price", "Sell Price", "Cost Value", "Retail Value"],
+              items.map((i) => [i.product_name, outletName(i.outlet_id), i.quantity, i.cost_price, i.selling_price, i.cost_value, i.retail_value]))}
+            onPrint={() => printReport({
+              title: "Stock Valuation",
+              summaryRows: [["Total Cost Value", formatCurrency(data.total_cost_value)], ["Total Retail Value", formatCurrency(data.total_retail_value)], ["Potential Profit", formatCurrency(data.potential_profit)]],
+              headers: ["Product", "Outlet", "Qty", "Cost Price", "Sell Price", "Cost Value", "Retail Value"],
+              rows: items.map((i) => [i.product_name, outletName(i.outlet_id), i.quantity, formatCurrency(i.cost_price), formatCurrency(i.selling_price), formatCurrency(i.cost_value), formatCurrency(i.retail_value)]),
+              landscape: true,
+            })}
+          />
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
@@ -1374,9 +1441,25 @@ function ConsolidatedView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">All products across all outlets side by side</p>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-          <RefreshCw size={15} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {data && (
+            <ExportBtn
+              onCSV={() => {
+                const hdrs = ["Product", ...(data.outlets || []).map((o) => o.name), "Total"];
+                const rows = (data.products || []).map((row) => [row.product_name, ...(data.outlets || []).map((o) => row.outlets[o.id]?.quantity ?? 0), row.total]);
+                downloadCSV("consolidated_stock", hdrs, rows);
+              }}
+              onPrint={() => {
+                const hdrs = ["Product", ...(data.outlets || []).map((o) => o.name), "Total"];
+                const rows = (data.products || []).map((row) => [row.product_name, ...(data.outlets || []).map((o) => row.outlets[o.id]?.quantity ?? "—"), row.total]);
+                printReport({ title: "Consolidated Stock View", headers: hdrs, rows, landscape: true });
+              }}
+            />
+          )}
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-xs mb-4">

@@ -3,10 +3,12 @@ import {
   ArrowLeftRight, BookOpen, FolderOpen, AlertCircle,
   Minus, Plus, Receipt, RefreshCw, Tag, Trash2, TrendingDown,
   TrendingUp, Wallet, X, FileText, DollarSign, Clock, CheckCircle2,
-  BarChart2, CreditCard, Activity, Users, Target, Globe, Scale, Landmark,
+  BarChart2, CreditCard, Activity, Users, Target, Globe, Scale, Landmark, Eye,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import ExportBtn from "../components/ExportBtn";
+import { downloadCSV, printReport } from "../lib/export";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function today() { return new Date().toISOString().split("T")[0]; }
@@ -69,6 +71,42 @@ function DateBar({ start, end, onStart, onEnd, onRefresh }) {
   );
 }
 
+// ─── Pagination Controls ──────────────────────────────────────────────────────
+function Pagination({ page, totalPages, count, pageSize, onPage }) {
+  if (totalPages <= 1) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end   = Math.min(page * pageSize, count);
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+      <p className="text-xs text-gray-500">{start}–{end} of {count}</p>
+      <div className="flex gap-1 items-center">
+        <button onClick={() => onPage(Math.max(1, page - 1))} disabled={page === 1}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40">Prev</button>
+        <span className="px-2 py-1.5 text-xs text-gray-500">{page}/{totalPages}</span>
+        <button onClick={() => onPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40">Next</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+function DetailModal({ title, fields, onClose, extra }) {
+  return (
+    <Modal title={title} onClose={onClose} wide>
+      <dl className="space-y-3">
+        {fields.map(([label, value]) => (
+          <div key={label} className="flex items-start justify-between gap-4 py-1 border-b border-gray-50 dark:border-gray-700 last:border-0">
+            <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider flex-shrink-0 pt-0.5 w-36">{label}</dt>
+            <dd className="text-sm font-semibold text-gray-900 dark:text-white text-right break-words max-w-[260px]">{value ?? "—"}</dd>
+          </div>
+        ))}
+      </dl>
+      {extra && <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">{extra}</div>}
+    </Modal>
+  );
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard() {
   const [data, setData] = useState(null);
@@ -103,6 +141,27 @@ function Dashboard() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">Dashboard</h2>
+        {data && (
+          <ExportBtn
+            onCSV={() => {
+              const rows = [
+                ...Object.entries(data.payment_breakdown || {}).map(([m, i]) => ["Payment", m, i.count, i.total]),
+                ...Object.entries(data.expense_by_category || {}).map(([c, a]) => ["Expense Category", c, "", a]),
+              ];
+              downloadCSV(`dashboard_${start}_${end}`, ["Section", "Label", "Count", "Amount"], rows);
+            }}
+            onPrint={() => printReport({
+              title: "Accounts Dashboard",
+              subtitle: `${start} to ${end}`,
+              summaryRows: cards.map((c) => [c.label, c.value]),
+              headers: ["Section", "Label", "Count", "Amount"],
+              rows: [
+                ...Object.entries(data.payment_breakdown || {}).map(([m, i]) => ["Payment", m, i.count, formatCurrency(i.total)]),
+                ...Object.entries(data.expense_by_category || {}).map(([c, a]) => ["Expense", c, "", formatCurrency(a)]),
+              ],
+            })}
+          />
+        )}
       </div>
 
       <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
@@ -184,6 +243,29 @@ function ProfitLoss() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">Profit & Loss</h2>
+        {data && (
+          <ExportBtn
+            onCSV={() => downloadCSV(`profit_loss_${start}_${end}`, ["Item", "Amount"], [
+              ["Total Sales", data.sales], ["Other Deposits", data.deposits_total || 0],
+              ["Total Revenue", data.sales + (data.deposits_total || 0)],
+              ["COGS", data.cogs], ["Gross Profit", data.gross_profit],
+              ...Object.entries(data.expense_by_category || {}).map(([c, a]) => [c, a]),
+              ["Total Expenses", data.expenses_total], ["Net Profit / Loss", data.net_profit],
+            ])}
+            onPrint={() => printReport({
+              title: "Profit & Loss Statement",
+              subtitle: `${start} to ${end}`,
+              headers: ["Item", "Amount"],
+              rows: [
+                ["Total Sales", formatCurrency(data.sales)], ["Other Deposits", formatCurrency(data.deposits_total || 0)],
+                ["Total Revenue", formatCurrency(data.sales + (data.deposits_total || 0))],
+                ["COGS", formatCurrency(data.cogs)], ["Gross Profit", formatCurrency(data.gross_profit)],
+                ...Object.entries(data.expense_by_category || {}).map(([c, a]) => [c, formatCurrency(a)]),
+                ["Total Expenses", formatCurrency(data.expenses_total)], ["Net Profit / Loss", formatCurrency(data.net_profit)],
+              ],
+            })}
+          />
+        )}
       </div>
       <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
 
@@ -241,10 +323,13 @@ function ProfitLoss() {
 function AllExpenses({ onAdd }) {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [viewExp, setViewExp] = useState(null);
+  const PAGE = 25;
 
   const load = () => {
     setLoading(true);
-    api.getExpenses().then(setExpenses).catch(console.error).finally(() => setLoading(false));
+    api.getExpenses().then((data) => { setExpenses(data); setPage(1); }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -254,13 +339,30 @@ function AllExpenses({ onAdd }) {
     try { await api.deleteExpense(e.id); load(); } catch (err) { alert(err.message); }
   };
 
+  const totalPages = Math.max(1, Math.ceil(expenses.length / PAGE));
+  const paged = expenses.slice((page - 1) * PAGE, page * PAGE);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">All Expenses</h2>
-        <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold text-sm hover:bg-red-600 transition-colors">
-          <Plus size={16} /> Record Expense
-        </button>
+        <div className="flex items-center gap-2">
+          {expenses.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV("expenses", ["Date", "Category", "Description", "Amount"],
+                expenses.map((e) => [fmtDate(e.date), e.category, e.description, e.amount]))}
+              onPrint={() => printReport({
+                title: "All Expenses",
+                summaryRows: [["Total", formatCurrency(expenses.reduce((s, e) => s + e.amount, 0))]],
+                headers: ["Date", "Category", "Description", "Amount"],
+                rows: expenses.map((e) => [fmtDate(e.date), e.category, e.description, formatCurrency(e.amount)]),
+              })}
+            />
+          )}
+          <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold text-sm hover:bg-red-600 transition-colors">
+            <Plus size={16} /> Record Expense
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -278,16 +380,19 @@ function AllExpenses({ onAdd }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {expenses.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+              {paged.map((e) => (
+                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors cursor-pointer" onClick={() => setViewExp(e)}>
                   <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm">{fmtDate(e.date)}</td>
                   <td className="px-5 py-3">
                     <span className="px-2.5 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full text-xs font-semibold">{e.category}</span>
                   </td>
                   <td className="px-5 py-3 text-gray-700 dark:text-gray-200 text-sm">{e.description}</td>
                   <td className="px-5 py-3 font-bold text-red-500 text-sm text-right tabular-nums">{formatCurrency(e.amount)}</td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  <td className="px-5 py-3" onClick={(ev) => ev.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setViewExp(e)} className="text-gray-300 hover:text-indigo-500 transition-colors"><Eye size={15} /></button>
+                      <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -296,7 +401,23 @@ function AllExpenses({ onAdd }) {
               )}
             </tbody>
           </table>
+          <Pagination page={page} totalPages={totalPages} count={expenses.length} pageSize={PAGE} onPage={setPage} />
         </div>
+      )}
+
+      {viewExp && (
+        <DetailModal
+          title="Expense Detail"
+          onClose={() => setViewExp(null)}
+          fields={[
+            ["Date",        fmtDate(viewExp.date)],
+            ["Category",    viewExp.category],
+            ["Description", viewExp.description],
+            ["Amount",      formatCurrency(viewExp.amount)],
+            ["Payment Method", viewExp.payment_method || "—"],
+            ["Reference",   viewExp.reference || "—"],
+          ]}
+        />
       )}
     </div>
   );
@@ -380,10 +501,13 @@ function CreateExpense({ onSaved }) {
 function AllDeposits({ onAdd }) {
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [viewDep, setViewDep] = useState(null);
+  const PAGE = 25;
 
   const load = () => {
     setLoading(true);
-    api.getDeposits().then(setDeposits).catch(console.error).finally(() => setLoading(false));
+    api.getDeposits().then((data) => { setDeposits(data); setPage(1); }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -393,13 +517,30 @@ function AllDeposits({ onAdd }) {
     try { await api.deleteDeposit(d.id); load(); } catch (err) { alert(err.message); }
   };
 
+  const totalPages = Math.max(1, Math.ceil(deposits.length / PAGE));
+  const paged = deposits.slice((page - 1) * PAGE, page * PAGE);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">All Deposits</h2>
-        <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl font-semibold text-sm hover:bg-green-600 transition-colors">
-          <Plus size={16} /> Add Deposit
-        </button>
+        <div className="flex items-center gap-2">
+          {deposits.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV("deposits", ["Date", "Category", "Description", "Method", "Amount"],
+                deposits.map((d) => [fmtDate(d.date), d.category, d.description, d.payment_method, d.amount]))}
+              onPrint={() => printReport({
+                title: "All Deposits",
+                summaryRows: [["Total", formatCurrency(deposits.reduce((s, d) => s + d.amount, 0))]],
+                headers: ["Date", "Category", "Description", "Method", "Amount"],
+                rows: deposits.map((d) => [fmtDate(d.date), d.category, d.description, d.payment_method, formatCurrency(d.amount)]),
+              })}
+            />
+          )}
+          <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl font-semibold text-sm hover:bg-green-600 transition-colors">
+            <Plus size={16} /> Add Deposit
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -418,8 +559,8 @@ function AllDeposits({ onAdd }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {deposits.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+              {paged.map((d) => (
+                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors cursor-pointer" onClick={() => setViewDep(d)}>
                   <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm">{fmtDate(d.date)}</td>
                   <td className="px-5 py-3">
                     <span className="px-2.5 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full text-xs font-semibold">{d.category}</span>
@@ -427,8 +568,11 @@ function AllDeposits({ onAdd }) {
                   <td className="px-5 py-3 text-gray-700 dark:text-gray-200 text-sm">{d.description}</td>
                   <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm capitalize">{d.payment_method}</td>
                   <td className="px-5 py-3 font-bold text-green-600 text-sm text-right tabular-nums">{formatCurrency(d.amount)}</td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => del(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  <td className="px-5 py-3" onClick={(ev) => ev.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setViewDep(d)} className="text-gray-300 hover:text-indigo-500 transition-colors"><Eye size={15} /></button>
+                      <button onClick={() => del(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -437,7 +581,23 @@ function AllDeposits({ onAdd }) {
               )}
             </tbody>
           </table>
+          <Pagination page={page} totalPages={totalPages} count={deposits.length} pageSize={PAGE} onPage={setPage} />
         </div>
+      )}
+
+      {viewDep && (
+        <DetailModal
+          title="Deposit Detail"
+          onClose={() => setViewDep(null)}
+          fields={[
+            ["Date",        fmtDate(viewDep.date)],
+            ["Category",    viewDep.category],
+            ["Description", viewDep.description],
+            ["Amount",      formatCurrency(viewDep.amount)],
+            ["Payment Method", viewDep.payment_method || "—"],
+            ["Reference",   viewDep.reference || "—"],
+          ]}
+        />
       )}
     </div>
   );
@@ -635,16 +795,22 @@ function Transfers() {
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [viewTransfer, setViewTransfer] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE = 25;
   const [form, setForm] = useState({ from_account: "Cash", to_account: "Bank", amount: "", description: "", date: today(), reference: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const load = () => {
     setLoading(true);
-    api.getTransfers().then(setTransfers).catch(console.error).finally(() => setLoading(false));
+    api.getTransfers().then((data) => { setTransfers(data); setPage(1); }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
+
+  const totalPagesT = Math.max(1, Math.ceil(transfers.length / PAGE));
+  const pagedT = transfers.slice((page - 1) * PAGE, page * PAGE);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -668,10 +834,24 @@ function Transfers() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">Transfers Money</h2>
-        <button onClick={() => { setShowAdd(true); setErr(""); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
-          <Plus size={16} /> New Transfer
-        </button>
+        <div className="flex items-center gap-2">
+          {transfers.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV("transfers", ["Date", "From", "To", "Description", "Amount"],
+                transfers.map((t) => [fmtDate(t.date), t.from_account, t.to_account, t.description || "", t.amount]))}
+              onPrint={() => printReport({
+                title: "Transfers",
+                summaryRows: [["Total", formatCurrency(transfers.reduce((s, t) => s + t.amount, 0))]],
+                headers: ["Date", "From", "To", "Description", "Amount"],
+                rows: transfers.map((t) => [fmtDate(t.date), t.from_account, t.to_account, t.description || "—", formatCurrency(t.amount)]),
+              })}
+            />
+          )}
+          <button onClick={() => { setShowAdd(true); setErr(""); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+            <Plus size={16} /> New Transfer
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -691,8 +871,8 @@ function Transfers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {transfers.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+              {pagedT.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors cursor-pointer" onClick={() => setViewTransfer(t)}>
                   <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm">{fmtDate(t.date)}</td>
                   <td className="px-5 py-3">
                     <span className="px-2.5 py-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full text-xs font-semibold">{t.from_account}</span>
@@ -703,8 +883,11 @@ function Transfers() {
                   </td>
                   <td className="px-5 py-3 text-gray-600 dark:text-gray-300 text-sm">{t.description || "—"}</td>
                   <td className="px-5 py-3 font-bold text-indigo-600 text-sm text-right tabular-nums">{formatCurrency(t.amount)}</td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => del(t)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  <td className="px-5 py-3" onClick={(ev) => ev.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setViewTransfer(t)} className="text-gray-300 hover:text-indigo-500 transition-colors"><Eye size={15} /></button>
+                      <button onClick={() => del(t)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -713,7 +896,23 @@ function Transfers() {
               )}
             </tbody>
           </table>
+          <Pagination page={page} totalPages={totalPagesT} count={transfers.length} pageSize={PAGE} onPage={setPage} />
         </div>
+      )}
+
+      {viewTransfer && (
+        <DetailModal
+          title="Transfer Detail"
+          onClose={() => setViewTransfer(null)}
+          fields={[
+            ["Date",        fmtDate(viewTransfer.date)],
+            ["From Account", viewTransfer.from_account],
+            ["To Account",  viewTransfer.to_account],
+            ["Amount",      formatCurrency(viewTransfer.amount)],
+            ["Description", viewTransfer.description || "—"],
+            ["Reference",   viewTransfer.reference || "—"],
+          ]}
+        />
       )}
 
       {showAdd && (
@@ -907,6 +1106,19 @@ function CashFlowView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Inflows vs outflows with running balance</p>
           </div>
         </div>
+        {data && (
+          <ExportBtn
+            onCSV={() => downloadCSV(`cash_flow_${start}_${end}`, ["Date", "Inflow", "Outflow", "Net", "Balance"],
+              timeline.map((r) => [fmtDate(r.date), r.inflow, r.outflow, r.net, r.balance]))}
+            onPrint={() => printReport({
+              title: "Cash Flow Statement",
+              subtitle: `${start} to ${end}`,
+              summaryRows: [["Total Inflow", formatCurrency(data.total_inflow)], ["Total Outflow", formatCurrency(data.total_outflow)], ["Net Cash Flow", formatCurrency(data.net_cash_flow)], ["Closing Balance", formatCurrency(data.closing_balance)]],
+              headers: ["Date", "Inflow", "Outflow", "Net", "Balance"],
+              rows: timeline.map((r) => [fmtDate(r.date), formatCurrency(r.inflow), formatCurrency(r.outflow), formatCurrency(r.net), formatCurrency(r.balance)]),
+            })}
+          />
+        )}
       </div>
 
       <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
@@ -994,17 +1206,27 @@ function InvoiceTrackingView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [viewInv, setViewInv] = useState(null);
+  const PAGE = 25;
 
   const load = () => {
     setLoading(true);
     api.getInvoices().then(setData).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
 
-  const invoices = (data?.invoices || []).filter((inv) =>
-    !search || (inv.order_number || "").toLowerCase().includes(search.toLowerCase()) ||
-    (inv.customer_name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const invoices = (data?.invoices || []).filter((inv) => {
+    const matchSearch = !search || (inv.order_number || "").toLowerCase().includes(search.toLowerCase()) ||
+      (inv.customer_name || "").toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || inv.invoice_status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const totalPagesInv = Math.max(1, Math.ceil(invoices.length / PAGE));
+  const pagedInv = invoices.slice((page - 1) * PAGE, page * PAGE);
 
   const BUCKET_ORDER = ["0-7 days", "8-30 days", "31-60 days", "60+ days"];
 
@@ -1020,9 +1242,23 @@ function InvoiceTrackingView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Outstanding & overdue invoices</p>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-          <RefreshCw size={15} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {data && (
+            <ExportBtn
+              onCSV={() => downloadCSV("invoices", ["Order #", "Customer", "Date", "Days Open", "Aging", "Amount"],
+                (data.invoices || []).map((inv) => [inv.order_number || "—", inv.customer_name || "Walk-in", fmtDate(inv.created_at), inv.days_outstanding, inv.aging_bucket, inv.total]))}
+              onPrint={() => printReport({
+                title: "Invoice Tracking",
+                summaryRows: [["Total Outstanding", formatCurrency(data.total_outstanding)], ["Overdue Invoices", String(data.overdue_count)], ["Total Open", String((data.invoices || []).length)]],
+                headers: ["Order #", "Customer", "Date", "Days Open", "Aging", "Amount"],
+                rows: (data.invoices || []).map((inv) => [inv.order_number || "—", inv.customer_name || "Walk-in", fmtDate(inv.created_at), inv.days_outstanding, inv.aging_bucket, formatCurrency(inv.total)]),
+              })}
+            />
+          )}
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -1054,11 +1290,18 @@ function InvoiceTrackingView() {
             </div>
           )}
 
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 max-w-xs">
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order # or customer…"
                 className="w-full pl-4 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
             </div>
+            {["all", "open", "settled"].map((f) => (
+              <button key={f} onClick={() => setStatusFilter(f)}
+                className={cn("px-4 py-2 rounded-xl text-sm font-semibold capitalize transition-colors",
+                  statusFilter === f ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700")}>
+                {f === "all" ? "All" : f === "open" ? "Open (Unpaid)" : "Settled"}
+              </button>
+            ))}
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
@@ -1068,16 +1311,17 @@ function InvoiceTrackingView() {
                   <th className="text-left px-5 py-3">Order #</th>
                   <th className="text-left px-4 py-3">Customer</th>
                   <th className="text-left px-4 py-3">Date</th>
-                  <th className="text-center px-4 py-3">Days Open</th>
+                  <th className="text-center px-4 py-3">Days</th>
                   <th className="text-center px-4 py-3">Aging</th>
+                  <th className="text-center px-4 py-3">Status</th>
                   <th className="text-right px-5 py-3">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {invoices.map((inv) => {
+                {pagedInv.map((inv) => {
                   const colors = AGING_COLORS[inv.aging_bucket] || AGING_COLORS["0-7 days"];
                   return (
-                    <tr key={inv.id} className={cn("transition-colors hover:brightness-95", colors.row)}>
+                    <tr key={inv.id} className={cn("transition-colors hover:brightness-95 cursor-pointer", colors.row)} onClick={() => setViewInv(inv)}>
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-white text-sm">{inv.order_number || "—"}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{inv.customer_name || "Walk-in"}</td>
                       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{fmtDate(inv.created_at)}</td>
@@ -1087,15 +1331,53 @@ function InvoiceTrackingView() {
                       <td className="px-4 py-3 text-center">
                         <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", colors.badge)}>{inv.aging_bucket}</span>
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold",
+                          inv.invoice_status === "open" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400")}>
+                          {inv.invoice_status === "open" ? "Open" : "Settled"}
+                        </span>
+                      </td>
                       <td className="px-5 py-3 text-right font-bold text-gray-900 dark:text-white text-sm tabular-nums">{formatCurrency(inv.total)}</td>
                     </tr>
                   );
                 })}
-                {invoices.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">{data.invoices.length === 0 ? "No outstanding invoices" : "No results for search"}</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={7} className="px-5 py12 text-center text-gray-400 text-sm">{(data.invoices || []).length === 0 ? "No invoices found" : "No results match your filter"}</td></tr>}
               </tbody>
             </table>
+            <Pagination page={page} totalPages={totalPagesInv} count={invoices.length} pageSize={PAGE} onPage={setPage} />
           </div>
         </>
+      )}
+
+      {viewInv && (
+        <DetailModal
+          title={`Invoice — ${viewInv.order_number || "Order"}`}
+          onClose={() => setViewInv(null)}
+          fields={[
+            ["Order #",       viewInv.order_number || "—"],
+            ["Customer",      viewInv.customer_name || "Walk-in"],
+            ["Date",          fmtDate(viewInv.created_at)],
+            ["Amount",        formatCurrency(viewInv.total)],
+            ["Days Open",     String(viewInv.days_outstanding)],
+            ["Aging Bucket",  viewInv.aging_bucket],
+            ["Status",        viewInv.invoice_status === "open" ? "Open (Unpaid)" : "Settled"],
+            ["Overdue",       viewInv.overdue ? "Yes" : "No"],
+            ["Order Status",  viewInv.status || "—"],
+          ]}
+          extra={viewInv.items?.length ? (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Order Items</p>
+              <div className="space-y-1">
+                {viewInv.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700 dark:text-gray-200">{item.qty || item.quantity}× {item.name}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white tabular-nums">{formatCurrency((item.price || 0) * (item.qty || item.quantity || 1))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        />
       )}
     </div>
   );
@@ -1154,6 +1436,19 @@ function VatManagementView() {
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">VAT liability, filing deadlines & monthly breakdown</p>
           </div>
         </div>
+        {data && (
+          <ExportBtn
+            onCSV={() => downloadCSV(`vat_${start}_${end}`, ["Month", "Revenue", "VAT (7.5%)"],
+              monthlyRows.map((r) => [r.month, r.revenue, r.tax]))}
+            onPrint={() => printReport({
+              title: "Tax & VAT Report",
+              subtitle: `${start} to ${end}`,
+              summaryRows: [["Output VAT Collected", formatCurrency(taxCollected)], ["Input VAT Claimable", formatCurrency(taxOnPurchases)], ["Net VAT Payable", formatCurrency(netVAT)]],
+              headers: ["Month", "Revenue", "VAT (7.5%)"],
+              rows: monthlyRows.map((r) => [r.month, formatCurrency(r.revenue), formatCurrency(r.tax)]),
+            })}
+          />
+        )}
       </div>
 
       <div className={cn("flex items-start gap-3 p-4 rounded-xl border mb-6",
@@ -1273,6 +1568,20 @@ function GeneralLedgerView() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">General Ledger</h2>
+        {data && entries.length > 0 && (
+          <ExportBtn
+            onCSV={() => downloadCSV(`ledger_${start}_${end}`, ["Date", "Type", "Description", "Reference", "Debit", "Credit", "Balance"],
+              entries.map((e) => [fmtDate(e.date), e.type, e.description, e.reference || "", e.debit > 0 ? e.debit : "", e.credit > 0 ? e.credit : "", e.balance]))}
+            onPrint={() => printReport({
+              title: "General Ledger",
+              subtitle: `${start} to ${end}`,
+              summaryRows: [["Total Credits", formatCurrency(data.total_credits)], ["Total Debits", formatCurrency(data.total_debits)], ["Net Balance", formatCurrency(data.net_balance)]],
+              headers: ["Date", "Type", "Description", "Debit", "Credit", "Balance"],
+              rows: entries.map((e) => [fmtDate(e.date), e.type, e.description, e.debit > 0 ? formatCurrency(e.debit) : "—", e.credit > 0 ? formatCurrency(e.credit) : "—", formatCurrency(e.balance)]),
+              landscape: true,
+            })}
+          />
+        )}
       </div>
       <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} onRefresh={load} />
 
@@ -1385,11 +1694,42 @@ function BalanceSheetView() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">Balance Sheet</h2>
+        <div className="flex items-center gap-2">
+        {data && (
+          <ExportBtn
+            onCSV={() => downloadCSV(`balance_sheet_${asOf}`, ["Section", "Item", "Amount"], [
+              ["Assets", "Cash & Equivalents", data.assets.cash_and_equivalents],
+              ["Assets", "Inventory Value", data.assets.inventory],
+              ["Assets", "Accounts Receivable", data.assets.accounts_receivable],
+              ["Assets", "Total Assets", data.assets.total],
+              ["Liabilities", "Accounts Payable", data.liabilities.accounts_payable],
+              ["Liabilities", "Total Liabilities", data.liabilities.total],
+              ["Equity", "Retained Earnings", data.equity.retained_earnings],
+              ["Equity", "Total Equity", data.equity.total],
+            ])}
+            onPrint={() => printReport({
+              title: "Balance Sheet",
+              subtitle: `As of ${asOf}`,
+              headers: ["Section", "Item", "Amount"],
+              rows: [
+                ["Assets", "Cash & Equivalents", formatCurrency(data.assets.cash_and_equivalents)],
+                ["Assets", "Inventory Value", formatCurrency(data.assets.inventory)],
+                ["Assets", "Accounts Receivable", formatCurrency(data.assets.accounts_receivable)],
+                ["Assets", "Total Assets", formatCurrency(data.assets.total)],
+                ["Liabilities", "Accounts Payable", formatCurrency(data.liabilities.accounts_payable)],
+                ["Liabilities", "Total Liabilities", formatCurrency(data.liabilities.total)],
+                ["Equity", "Retained Earnings", formatCurrency(data.equity.retained_earnings)],
+                ["Equity", "Total Equity", formatCurrency(data.equity.total)],
+              ],
+            })}
+          />
+        )}
         <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
           <Scale size={15} className="text-gray-400" />
           <span className="text-xs text-gray-400 font-medium">As of</span>
           <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)}
             className="text-sm text-gray-700 dark:text-gray-200 focus:outline-none bg-transparent" />
+        </div>
         </div>
       </div>
 
@@ -1445,16 +1785,22 @@ function BankReconciliationView() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(today().slice(0, 7));
   const [showAdd, setShowAdd] = useState(false);
+  const [viewBank, setViewBank] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE = 25;
   const [form, setForm] = useState({ date: today(), description: "", amount: "", type: "credit", reference: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const load = () => {
     setLoading(true);
-    api.getBankStatements(period).then(setEntries).catch(console.error).finally(() => setLoading(false));
+    api.getBankStatements(period).then((data) => { setEntries(data); setPage(1); }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [period]);
+
+  const totalPagesBank = Math.max(1, Math.ceil(entries.length / PAGE));
+  const pagedBank = entries.slice((page - 1) * PAGE, page * PAGE);
 
   const submit = async (e) => {
     e.preventDefault(); setSaving(true); setErr("");
@@ -1483,6 +1829,19 @@ function BankReconciliationView() {
         <div className="flex items-center gap-3">
           <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
             className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          {entries.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV(`bank_reconciliation_${period}`, ["Date", "Description", "Reference", "Type", "Amount"],
+                entries.map((e) => [fmtDate(e.date), e.description, e.reference || "", e.type, e.amount]))}
+              onPrint={() => printReport({
+                title: "Bank Reconciliation",
+                subtitle: `Period: ${period}`,
+                summaryRows: [["Total Credits", formatCurrency(totalCredits)], ["Total Debits", formatCurrency(totalDebits)], ["Net Balance", formatCurrency(netBalance)]],
+                headers: ["Date", "Description", "Reference", "Type", "Amount"],
+                rows: entries.map((e) => [fmtDate(e.date), e.description, e.reference || "—", e.type.toUpperCase(), formatCurrency(e.amount)]),
+              })}
+            />
+          )}
           <button onClick={() => { setShowAdd(true); setErr(""); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
             <Plus size={16} /> Add Entry
@@ -1512,8 +1871,8 @@ function BankReconciliationView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {entries.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+              {pagedBank.map((e) => (
+                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors cursor-pointer" onClick={() => setViewBank(e)}>
                   <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.date)}</td>
                   <td className="px-5 py-3 text-gray-700 dark:text-gray-200">{e.description}</td>
                   <td className="px-5 py-3 text-gray-400 text-xs">{e.reference || "—"}</td>
@@ -1524,8 +1883,11 @@ function BankReconciliationView() {
                     </span>
                   </td>
                   <td className={cn("px-5 py-3 text-right font-bold tabular-nums", e.type === "credit" ? "text-green-600" : "text-red-500")}>{formatCurrency(e.amount)}</td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  <td className="px-5 py-3" onClick={(ev) => ev.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setViewBank(e)} className="text-gray-300 hover:text-indigo-500 transition-colors"><Eye size={15} /></button>
+                      <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1534,7 +1896,23 @@ function BankReconciliationView() {
               )}
             </tbody>
           </table>
+          <Pagination page={page} totalPages={totalPagesBank} count={entries.length} pageSize={PAGE} onPage={setPage} />
         </div>
+      )}
+
+      {viewBank && (
+        <DetailModal
+          title="Bank Statement Entry"
+          onClose={() => setViewBank(null)}
+          fields={[
+            ["Date",        fmtDate(viewBank.date)],
+            ["Type",        viewBank.type?.toUpperCase()],
+            ["Description", viewBank.description],
+            ["Amount",      formatCurrency(viewBank.amount)],
+            ["Reference",   viewBank.reference || "—"],
+            ["Period",      period],
+          ]}
+        />
       )}
 
       {showAdd && (
@@ -1629,6 +2007,19 @@ function BudgetingView() {
         <div className="flex items-center gap-3">
           <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
             className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          {budgets.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV(`budgets_${period}`, ["Category", "Type", "Budget", "Actual", "Variance"],
+                filtered.map((b) => [b.category, b.budget_type, b.budget_amount, b.actual || 0, (b.actual || 0) - b.budget_amount]))}
+              onPrint={() => printReport({
+                title: "Budgeting & Forecast",
+                subtitle: `Period: ${period}`,
+                summaryRows: [["Total Budget", formatCurrency(totalBudget)], ["Total Actual", formatCurrency(totalActual)], ["Variance", formatCurrency(totalActual - totalBudget)]],
+                headers: ["Category", "Type", "Budget", "Actual", "Variance"],
+                rows: filtered.map((b) => [b.category, b.budget_type, formatCurrency(b.budget_amount), formatCurrency(b.actual || 0), formatCurrency((b.actual || 0) - b.budget_amount)]),
+              })}
+            />
+          )}
           <button onClick={() => { setShowAdd(true); setErr(""); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
             <Plus size={16} /> Set Budget
@@ -1751,18 +2142,23 @@ function PayrollView() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(today().slice(0, 7));
   const [showAdd, setShowAdd] = useState(false);
+  const [viewPayroll, setViewPayroll] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE = 25;
   const [form, setForm] = useState({ employee_name: "", employee_id: "", period: today().slice(0, 7), basic_pay: "", allowances: "0", deductions: "0", payment_method: "bank transfer", notes: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const load = () => {
     setLoading(true);
-    api.getPayrollEntries(period).then(setEntries).catch(console.error).finally(() => setLoading(false));
+    api.getPayrollEntries(period).then((data) => { setEntries(data); setPage(1); }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [period]);
 
   const netPay = (f) => (parseFloat(f.basic_pay) || 0) + (parseFloat(f.allowances) || 0) - (parseFloat(f.deductions) || 0);
+  const totalPagesP = Math.max(1, Math.ceil(entries.length / PAGE));
+  const pagedP = entries.slice((page - 1) * PAGE, page * PAGE);
 
   const submit = async (e) => {
     e.preventDefault(); setSaving(true); setErr("");
@@ -1799,6 +2195,19 @@ function PayrollView() {
         <div className="flex items-center gap-3">
           <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)}
             className="px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none" />
+          {entries.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV(`payroll_${period}`, ["Employee", "ID", "Basic", "Allowances", "Deductions", "Net Pay", "Method", "Status"],
+                entries.map((e) => [e.employee_name, e.employee_id || "", e.basic_pay, e.allowances, e.deductions, e.net_pay, e.payment_method, e.status]))}
+              onPrint={() => printReport({
+                title: "Payroll",
+                subtitle: `Period: ${period}`,
+                summaryRows: [["Total Payroll", formatCurrency(totalPayroll)], ["Employees", String(entries.length)], ["Paid", `${paidCount} / ${entries.length}`]],
+                headers: ["Employee", "Basic", "Allowances", "Deductions", "Net Pay", "Method", "Status"],
+                rows: entries.map((e) => [e.employee_name, formatCurrency(e.basic_pay), formatCurrency(e.allowances), formatCurrency(e.deductions), formatCurrency(e.net_pay), e.payment_method, e.status]),
+              })}
+            />
+          )}
           <button onClick={() => { setShowAdd(true); setErr(""); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 transition-colors">
             <Plus size={16} /> Add Entry
@@ -1831,8 +2240,8 @@ function PayrollView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
+                {pagedP.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors cursor-pointer" onClick={() => setViewPayroll(e)}>
                     <td className="px-5 py-3">
                       <p className="font-semibold text-gray-900 dark:text-white">{e.employee_name}</p>
                       {e.employee_id && <p className="text-xs text-gray-400">{e.employee_id}</p>}
@@ -1842,7 +2251,7 @@ function PayrollView() {
                     <td className="px-4 py-3 text-right tabular-nums text-red-500">{formatCurrency(e.deductions)}</td>
                     <td className="px-4 py-3 text-right font-bold tabular-nums text-violet-600">{formatCurrency(e.net_pay)}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs capitalize whitespace-nowrap">{e.payment_method}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
                       {e.status === "paid" ? (
                         <span className="px-2 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-full text-[11px] font-bold">Paid</span>
                       ) : (
@@ -1852,8 +2261,11 @@ function PayrollView() {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
+                      <div className="flex items-center gap-2 justify-end">
+                        <button onClick={() => setViewPayroll(e)} className="text-gray-300 hover:text-indigo-500 transition-colors"><Eye size={15} /></button>
+                        <button onClick={() => del(e)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1863,7 +2275,27 @@ function PayrollView() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} totalPages={totalPagesP} count={entries.length} pageSize={PAGE} onPage={setPage} />
         </div>
+      )}
+
+      {viewPayroll && (
+        <DetailModal
+          title={`Payroll — ${viewPayroll.employee_name}`}
+          onClose={() => setViewPayroll(null)}
+          fields={[
+            ["Employee",        viewPayroll.employee_name],
+            ["Employee ID",     viewPayroll.employee_id || "—"],
+            ["Period",          viewPayroll.period],
+            ["Basic Pay",       formatCurrency(viewPayroll.basic_pay)],
+            ["Allowances",      formatCurrency(viewPayroll.allowances)],
+            ["Deductions",      formatCurrency(viewPayroll.deductions)],
+            ["Net Pay",         formatCurrency(viewPayroll.net_pay)],
+            ["Payment Method",  viewPayroll.payment_method],
+            ["Status",          viewPayroll.status === "paid" ? "Paid" : "Pending"],
+            ["Notes",           viewPayroll.notes || "—"],
+          ]}
+        />
       )}
 
       {showAdd && (
@@ -1993,10 +2425,24 @@ function MultiCurrencyView() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900 dark:text-white">Currencies & Exchange Rates</h2>
-        <button onClick={() => { setShowAdd(true); setForm({ code: "", name: "", symbol: "", rate: "" }); setErr(""); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
-          <Plus size={16} /> Add Currency
-        </button>
+        <div className="flex items-center gap-2">
+          {currencies.length > 0 && (
+            <ExportBtn
+              onCSV={() => downloadCSV("exchange_rates", ["Code", "Name", "Symbol", "Rate (per 1 NGN)"],
+                currencies.map((c) => [c.code, c.name, c.symbol, c.rate]))}
+              onPrint={() => printReport({
+                title: "Exchange Rates",
+                subtitle: "Base currency: NGN (₦)",
+                headers: ["Code", "Name", "Symbol", "Rate (per 1 NGN)"],
+                rows: currencies.map((c) => [c.code, c.name, c.symbol, c.rate]),
+              })}
+            />
+          )}
+          <button onClick={() => { setShowAdd(true); setForm({ code: "", name: "", symbol: "", rate: "" }); setErr(""); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+            <Plus size={16} /> Add Currency
+          </button>
+        </div>
       </div>
 
       {/* Quick converter */}

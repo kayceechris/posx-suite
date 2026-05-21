@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Calendar, ChevronDown, ChevronRight, X, BarChart2 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
+import ExportBtn from "../components/ExportBtn";
+import { downloadCSV, printReport } from "../lib/export";
 
 const VIEW_LABELS = {
   sales: "Sales",
@@ -81,6 +83,20 @@ function SalesTab() {
       <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
       {loading ? <Spinner /> : data && (
         <>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`sales_${dates.start}_${dates.end}`,
+                ["Date", "Orders", "Revenue"],
+                (data.daily_sales || []).map((d) => [d.date, d.orders, d.revenue]))}
+              onPrint={() => printReport({
+                title: "Sales Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Revenue", formatCurrency(data.total_revenue)], ["Total Orders", String(data.total_orders)], ["Avg Order Value", formatCurrency(data.avg_order_value)]],
+                headers: ["Date", "Orders", "Revenue"],
+                rows: (data.daily_sales || []).map((d) => [d.date, d.orders, formatCurrency(d.revenue)]),
+              })}
+            />
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
             <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
@@ -178,6 +194,19 @@ function CostTab() {
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
         <>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV("cost_analysis",
+                ["Product", "Qty", "Cost", "Revenue", "Profit"],
+                (data.products || []).map((p) => [p.name, p.quantity ?? "", p.cost, p.revenue, p.profit]))}
+              onPrint={() => printReport({
+                title: "Cost Analysis",
+                summaryRows: [["Total Revenue", formatCurrency(data.total_revenue)], ["Total Cost", formatCurrency(data.total_cost)], ["Gross Profit", formatCurrency(data.total_profit)]],
+                headers: ["Product", "Qty", "Cost", "Revenue", "Profit"],
+                rows: (data.products || []).map((p) => [p.name, p.quantity ?? "—", formatCurrency(p.cost), formatCurrency(p.revenue), formatCurrency(p.profit)]),
+              })}
+            />
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
             <StatCard label="Total Cost" value={formatCurrency(data.total_cost)} color="text-orange-500 dark:text-orange-400" bg="bg-orange-50 dark:bg-orange-900/20" />
@@ -419,8 +448,19 @@ function StaffTab() {
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <h3 className="font-bold text-gray-900 dark:text-white">Staff Sales Performance</h3>
+            <ExportBtn
+              onCSV={() => downloadCSV("staff_performance",
+                ["Staff", "Role", "Orders", "Revenue"],
+                (data.staff || []).map((s) => [s.name || "Unknown", s.role || "unknown", s.orders, s.revenue]))}
+              onPrint={() => printReport({
+                title: "Staff Performance Report",
+                subtitle: `${dateRange.start} to ${dateRange.end}`,
+                headers: ["Staff", "Role", "Orders", "Revenue"],
+                rows: (data.staff || []).map((s) => [s.name || "Unknown", s.role || "unknown", s.orders, formatCurrency(s.revenue)]),
+              })}
+            />
           </div>
 
           {/* Mobile cards */}
@@ -616,6 +656,19 @@ function PaymentsTab() {
       <DateFilter onApply={load} />
       {loading ? <Spinner /> : data && (
         <>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV("payment_methods",
+                ["Method", "Total", "Transactions"],
+                (data.methods || []).map((m) => [m.method || "Unknown", m.total, m.count]))}
+              onPrint={() => printReport({
+                title: "Payment Methods Report",
+                subtitle: `${dateRange.start} to ${dateRange.end}`,
+                headers: ["Method", "Total", "Transactions"],
+                rows: (data.methods || []).map((m) => [m.method || "Unknown", formatCurrency(m.total), m.count]),
+              })}
+            />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
             {(data.methods || []).map((m, i) => (
               <button key={i} onClick={() => setSelectedMethod(m.method)}
