@@ -1,15 +1,21 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Calendar, ChevronDown, ChevronRight, X, BarChart2 } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, X, BarChart2, Tag, Layers, Percent, ClipboardList, Clock, Receipt } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import ExportBtn from "../components/ExportBtn";
 import { downloadCSV, printReport } from "../lib/export";
 
 const VIEW_LABELS = {
-  sales: "Sales",
-  cost: "Cost Analysis",
-  staff: "Staff Performance",
-  payments: "Payment Methods",
+  sales:         "Sales",
+  cost:          "Cost Analysis",
+  staff:         "Staff Performance",
+  payments:      "Payment Methods",
+  items:         "Sales by Item",
+  category:      "Sales by Category",
+  discounts:     "Discount Report",
+  "daily-summary": "Daily Summary",
+  shifts:        "Shift Report",
+  tax:           "Tax Report",
 };
 
 function today() { return new Date().toISOString().split("T")[0]; }
@@ -703,6 +709,484 @@ function PaymentsTab() {
   );
 }
 
+// ─── Sales by Item ────────────────────────────────────────────────────────────
+
+function SalesByItemTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+  const [search, setSearch] = useState("");
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getSalesByItem({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const items = (data?.items || []).filter((i) =>
+    !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.category || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <StatCard label="Total Items Sold" value={data.total_items_sold} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
+            <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+            <StatCard label="Unique Items" value={(data.items || []).length} color="text-purple-600 dark:text-purple-400" bg="bg-purple-50 dark:bg-purple-900/20" />
+          </div>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search item or category…"
+              className="flex-1 min-w-0 max-w-xs px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-blue-400" />
+            <ExportBtn
+              onCSV={() => downloadCSV(`sales_by_item_${dates.start}_${dates.end}`,
+                ["#", "Item", "Category", "Qty Sold", "Orders", "Revenue"],
+                (data.items || []).map((i, idx) => [idx + 1, i.name, i.category || "—", i.quantity, i.order_count, i.revenue]))}
+              onPrint={() => printReport({
+                title: "Sales by Item",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Items Sold", String(data.total_items_sold)], ["Total Revenue", formatCurrency(data.total_revenue)]],
+                headers: ["#", "Item", "Category", "Qty", "Revenue"],
+                rows: (data.items || []).map((i, idx) => [idx + 1, i.name, i.category || "—", i.quantity, formatCurrency(i.revenue)]),
+              })}
+            />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-4 py-3 w-8">#</th>
+                    <th className="text-left px-4 py-3">Item</th>
+                    <th className="text-left px-4 py-3">Category</th>
+                    <th className="text-right px-4 py-3">Qty Sold</th>
+                    <th className="text-right px-4 py-3">Orders</th>
+                    <th className="text-right px-4 py-3">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {items.map((item, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-3 text-gray-400 text-sm">{i + 1}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.name}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full text-xs font-semibold">{item.category || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-blue-600 dark:text-blue-400 text-sm">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-sm">{item.order_count}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(item.revenue)}</td>
+                    </tr>
+                  ))}
+                  {items.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">No items found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Sales by Category ────────────────────────────────────────────────────────
+
+function SalesByCategoryTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getSalesByCategory({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const cats = data?.categories || [];
+  const maxRev = cats.length ? Math.max(...cats.map((c) => c.revenue), 1) : 1;
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+            <StatCard label="Categories" value={cats.length} color="text-indigo-600 dark:text-indigo-400" bg="bg-indigo-50 dark:bg-indigo-900/20" />
+          </div>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`sales_by_category_${dates.start}_${dates.end}`,
+                ["Category", "Qty Sold", "Orders", "Revenue"],
+                cats.map((c) => [c.category, c.quantity, c.orders, c.revenue]))}
+              onPrint={() => printReport({
+                title: "Sales by Category",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Revenue", formatCurrency(data.total_revenue)], ["Categories", String(cats.length)]],
+                headers: ["Category", "Qty Sold", "Orders", "Revenue"],
+                rows: cats.map((c) => [c.category, c.quantity, c.orders, formatCurrency(c.revenue)]),
+              })}
+            />
+          </div>
+          <div className="space-y-3">
+            {cats.map((c, i) => {
+              const pct = Math.max((c.revenue / maxRev) * 100, 2);
+              const COLORS = ["bg-indigo-500", "bg-blue-500", "bg-green-500", "bg-amber-500", "bg-red-400", "bg-purple-500", "bg-pink-500", "bg-teal-500"];
+              const color = COLORS[i % COLORS.length];
+              return (
+                <div key={c.category} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-400 w-5">{i + 1}</span>
+                      <span className="font-bold text-gray-900 dark:text-white text-sm">{c.category}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-green-600 dark:text-green-400 text-sm tabular-nums">{formatCurrency(c.revenue)}</p>
+                      <p className="text-xs text-gray-400">{c.quantity} sold · {c.orders} orders</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                    <div className={cn("h-2 rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {cats.length === 0 && <p className="py-12 text-center text-gray-400 text-sm">No category data for this period</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Discount Report ──────────────────────────────────────────────────────────
+
+function DiscountTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getDiscountReport({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const orders = data?.orders || [];
+  const fmtDate = (s) => s ? new Date(s).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "—";
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <StatCard label="Total Discounted" value={formatCurrency(data.total_discounts)} color="text-red-500 dark:text-red-400" bg="bg-red-50 dark:bg-red-900/20" />
+            <StatCard label="Orders Discounted" value={data.total_orders_discounted} color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-900/20" />
+            <StatCard label="Revenue (After)" value={formatCurrency(data.total_revenue_after_discount)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+          </div>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`discounts_${dates.start}_${dates.end}`,
+                ["Order #", "Date", "Customer", "Type", "Discount", "Subtotal", "Total"],
+                orders.map((o) => [o.order_number, fmtDate(o.created_at), o.customer_name, o.discount_type, o.discount_amount, o.subtotal, o.total]))}
+              onPrint={() => printReport({
+                title: "Discount Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Discounts", formatCurrency(data.total_discounts)], ["Orders", String(data.total_orders_discounted)]],
+                headers: ["Order #", "Date", "Customer", "Discount", "Total"],
+                rows: orders.map((o) => [o.order_number, fmtDate(o.created_at), o.customer_name, formatCurrency(o.discount_amount), formatCurrency(o.total)]),
+              })}
+            />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px]">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-4 py-3">Order #</th>
+                    <th className="text-left px-4 py-3">Date</th>
+                    <th className="text-left px-4 py-3">Customer</th>
+                    <th className="text-left px-4 py-3">Type</th>
+                    <th className="text-right px-4 py-3">Discount</th>
+                    <th className="text-right px-4 py-3">Subtotal</th>
+                    <th className="text-right px-4 py-3">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {orders.map((o, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">{fmtDate(o.created_at)}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-200 text-sm">{o.customer_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-full text-xs font-semibold capitalize">{o.discount_type || "manual"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-red-500 text-sm tabular-nums">-{formatCurrency(o.discount_amount)}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-sm tabular-nums">{formatCurrency(o.subtotal)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400 text-sm tabular-nums">{formatCurrency(o.total)}</td>
+                    </tr>
+                  ))}
+                  {orders.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">No discounted orders in this period</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Daily Summary ────────────────────────────────────────────────────────────
+
+function DailySummaryTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getDailySummary({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const days = data?.days || [];
+  const fmtDate = (s) => new Date(s + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+            <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
+            <StatCard label="Items Sold" value={data.total_items_sold} color="text-indigo-600 dark:text-indigo-400" bg="bg-indigo-50 dark:bg-indigo-900/20" />
+            <StatCard label="Best Day" value={data.best_day ? fmtDate(data.best_day) : "—"} color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-900/20" />
+          </div>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`daily_summary_${dates.start}_${dates.end}`,
+                ["Date", "Orders", "Revenue", "Items Sold", "Avg Order", "Discounts", "Unique Customers"],
+                days.map((d) => [d.date, d.orders, d.revenue, d.items_sold, d.avg_order_value, d.discounts, d.unique_customers]))}
+              onPrint={() => printReport({
+                title: "Daily Summary Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Revenue", formatCurrency(data.total_revenue)], ["Total Orders", String(data.total_orders)], ["Items Sold", String(data.total_items_sold)]],
+                headers: ["Date", "Orders", "Revenue", "Items", "Avg Order"],
+                rows: days.map((d) => [d.date, d.orders, formatCurrency(d.revenue), d.items_sold, formatCurrency(d.avg_order_value)]),
+              })}
+            />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px]">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-4 py-3">Date</th>
+                    <th className="text-right px-4 py-3">Orders</th>
+                    <th className="text-right px-4 py-3">Revenue</th>
+                    <th className="text-right px-4 py-3">Items</th>
+                    <th className="text-right px-4 py-3">Avg Order</th>
+                    <th className="text-right px-4 py-3">Discounts</th>
+                    <th className="text-right px-4 py-3">Customers</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {days.map((d, i) => (
+                    <tr key={i} className={cn("hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors", d.date === data.best_day && "bg-green-50/50 dark:bg-green-900/10")}>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="font-semibold text-gray-900 dark:text-white">{fmtDate(d.date)}</span>
+                        {d.date === data.best_day && <span className="ml-2 text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full px-2 py-0.5 font-bold">Best</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400 text-sm">{d.orders}</td>
+                      <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400 text-sm tabular-nums">{formatCurrency(d.revenue)}</td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300 text-sm">{d.items_sold}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-sm tabular-nums">{formatCurrency(d.avg_order_value)}</td>
+                      <td className="px-4 py-3 text-right text-red-400 text-sm tabular-nums">{d.discounts > 0 ? `-${formatCurrency(d.discounts)}` : "—"}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-sm">{d.unique_customers || "—"}</td>
+                    </tr>
+                  ))}
+                  {days.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">No data for this period</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Shift Report ─────────────────────────────────────────────────────────────
+
+const SHIFT_ICONS = { Morning: "🌅", Afternoon: "☀️", Evening: "🌆", Night: "🌙" };
+const SHIFT_COLORS = {
+  Morning:   { card: "border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700",   bar: "bg-amber-500",   text: "text-amber-600 dark:text-amber-400" },
+  Afternoon: { card: "border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700",       bar: "bg-blue-500",    text: "text-blue-600 dark:text-blue-400" },
+  Evening:   { card: "border-indigo-200 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-700", bar: "bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400" },
+  Night:     { card: "border-gray-300 bg-gray-50 dark:bg-gray-700/40 dark:border-gray-600",       bar: "bg-gray-500",    text: "text-gray-600 dark:text-gray-400" },
+};
+
+function ShiftReportTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getShiftReport({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const shifts = data?.shifts || [];
+  const maxRev = shifts.length ? Math.max(...shifts.map((s) => s.revenue), 1) : 1;
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+            <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+            <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
+            {data.busiest_shift && <StatCard label="Busiest Shift" value={`${SHIFT_ICONS[data.busiest_shift] || ""} ${data.busiest_shift}`} color="text-indigo-600 dark:text-indigo-400" bg="bg-indigo-50 dark:bg-indigo-900/20" />}
+          </div>
+          <div className="flex justify-end mb-4">
+            <ExportBtn
+              onCSV={() => downloadCSV(`shifts_${dates.start}_${dates.end}`,
+                ["Shift", "Hours", "Orders", "Items Sold", "Revenue"],
+                shifts.map((s) => [s.shift, s.hours, s.orders, s.items_sold, s.revenue]))}
+              onPrint={() => printReport({
+                title: "Shift Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Total Revenue", formatCurrency(data.total_revenue)], ["Busiest Shift", data.busiest_shift || "—"]],
+                headers: ["Shift", "Hours", "Orders", "Items", "Revenue"],
+                rows: shifts.map((s) => [s.shift, s.hours, s.orders, s.items_sold, formatCurrency(s.revenue)]),
+              })}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {shifts.map((s) => {
+              const colors = SHIFT_COLORS[s.shift] || SHIFT_COLORS["Night"];
+              const pct = Math.max((s.revenue / maxRev) * 100, 2);
+              return (
+                <div key={s.shift} className={cn("rounded-2xl border-2 p-5 shadow-sm", colors.card)}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-black text-gray-900 dark:text-white text-lg">{SHIFT_ICONS[s.shift]} {s.shift}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{s.hours}</p>
+                    </div>
+                    {s.shift === data.busiest_shift && (
+                      <span className="text-[10px] bg-white/70 dark:bg-gray-900/50 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-full px-2 py-0.5 font-bold">Busiest</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div><p className="text-xs text-gray-400">Orders</p><p className={cn("font-black text-lg", colors.text)}>{s.orders}</p></div>
+                    <div><p className="text-xs text-gray-400">Items</p><p className={cn("font-black text-lg", colors.text)}>{s.items_sold}</p></div>
+                    <div><p className="text-xs text-gray-400">Revenue</p><p className={cn("font-black text-sm tabular-nums", colors.text)}>{formatCurrency(s.revenue)}</p></div>
+                  </div>
+                  <div className="w-full bg-white/50 dark:bg-gray-900/30 rounded-full h-2">
+                    <div className={cn("h-2 rounded-full transition-all", colors.bar)} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Tax Report ───────────────────────────────────────────────────────────────
+
+function TaxReportTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+  const TAX_RATE = 0.075;
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getDailySummary({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const days = data?.days || [];
+  const taxCollected = data ? data.total_revenue * TAX_RATE : 0;
+  const fmtDate = (s) => new Date(s + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <StatCard label="Gross Revenue" value={formatCurrency(data.total_revenue)} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
+            <StatCard label="Tax Collected (7.5%)" value={formatCurrency(taxCollected)} color="text-red-600 dark:text-red-400" bg="bg-red-50 dark:bg-red-900/20" />
+            <StatCard label="Net Revenue" value={formatCurrency(data.total_revenue - taxCollected)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+          </div>
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`tax_report_${dates.start}_${dates.end}`,
+                ["Date", "Gross Revenue", "Tax (7.5%)", "Net Revenue"],
+                days.map((d) => [d.date, d.revenue, (d.revenue * TAX_RATE).toFixed(2), (d.revenue * (1 - TAX_RATE)).toFixed(2)]))}
+              onPrint={() => printReport({
+                title: "Tax Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [["Gross Revenue", formatCurrency(data.total_revenue)], ["Tax Collected (7.5%)", formatCurrency(taxCollected)], ["Net Revenue", formatCurrency(data.total_revenue - taxCollected)]],
+                headers: ["Date", "Gross Revenue", "Tax (7.5%)", "Net Revenue"],
+                rows: days.map((d) => [d.date, formatCurrency(d.revenue), formatCurrency(d.revenue * TAX_RATE), formatCurrency(d.revenue * (1 - TAX_RATE))]),
+              })}
+            />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-4 py-3">Date</th>
+                    <th className="text-right px-4 py-3">Gross Revenue</th>
+                    <th className="text-right px-4 py-3">Tax (7.5%)</th>
+                    <th className="text-right px-4 py-3">Net Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {days.map((d, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{fmtDate(d.date)}</td>
+                      <td className="px-4 py-3 text-right text-blue-600 dark:text-blue-400 font-semibold text-sm tabular-nums">{formatCurrency(d.revenue)}</td>
+                      <td className="px-4 py-3 text-right text-red-500 font-semibold text-sm tabular-nums">{formatCurrency(d.revenue * TAX_RATE)}</td>
+                      <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-bold text-sm tabular-nums">{formatCurrency(d.revenue * (1 - TAX_RATE))}</td>
+                    </tr>
+                  ))}
+                  {days.length === 0 && <tr><td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-sm">No data for this period</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-3 px-1">Tax rate: 7.5% — configure in Settings → Tax Settings.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function ReportsSection({ view = "sales" }) {
@@ -718,10 +1202,16 @@ export default function ReportsSection({ view = "sales" }) {
         </div>
       </div>
 
-      {view === "sales" && <SalesTab />}
-      {view === "cost" && <CostTab />}
-      {view === "staff" && <StaffTab />}
-      {view === "payments" && <PaymentsTab />}
+      {view === "sales"         && <SalesTab />}
+      {view === "cost"          && <CostTab />}
+      {view === "staff"         && <StaffTab />}
+      {view === "payments"      && <PaymentsTab />}
+      {view === "items"         && <SalesByItemTab />}
+      {view === "category"      && <SalesByCategoryTab />}
+      {view === "discounts"     && <DiscountTab />}
+      {view === "daily-summary" && <DailySummaryTab />}
+      {view === "shifts"        && <ShiftReportTab />}
+      {view === "tax"           && <TaxReportTab />}
     </div>
   );
 }

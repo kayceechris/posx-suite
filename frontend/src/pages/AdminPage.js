@@ -34,8 +34,16 @@ const EXPANDABLE = {
     { id: "image-library", label: "Image Library" },
   ],
   reports: [
-    { id: "sales", label: "Sales" }, { id: "cost", label: "Cost Analysis" },
-    { id: "staff", label: "Staff Performance" }, { id: "payments", label: "Payment Methods" },
+    { id: "sales",         label: "Sales" },
+    { id: "cost",          label: "Cost Analysis" },
+    { id: "staff",         label: "Staff Performance" },
+    { id: "payments",      label: "Payment Methods" },
+    { id: "items",         label: "Sales by Item" },
+    { id: "category",      label: "Sales by Category" },
+    { id: "discounts",     label: "Discount Report" },
+    { id: "daily-summary", label: "Daily Summary" },
+    { id: "shifts",        label: "Shift Report" },
+    { id: "tax",           label: "Tax Report" },
   ],
   inventory: [
     { id: "stock", label: "Stock Levels" },
@@ -117,6 +125,12 @@ const SUB_ITEM_PERMISSION = {
   "reports.cost":               "view_financial_report",
   "reports.staff":              "view_staff_report",
   "reports.payments":           "view_payment_report",
+  "reports.items":              "view_product_report",
+  "reports.category":           "view_sales_report",
+  "reports.discounts":          "view_sales_report",
+  "reports.daily-summary":      "view_daily_summary",
+  "reports.shifts":             "view_staff_report",
+  "reports.tax":                "view_financial_report",
   // ── Users ───────────────────────────────────────────────────────────────────
   "users.types":                "manage_user_types",
   // ── Accounts ────────────────────────────────────────────────────────────────

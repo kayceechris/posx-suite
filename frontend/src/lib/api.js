@@ -311,6 +311,36 @@ export const api = {
     if (filters.end_date) params.append("end_date", filters.end_date);
     return request(`/api/reports/payment-methods?${params.toString()}`);
   },
+  getSalesByItem: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/sales-by-item?${params.toString()}`);
+  },
+  getSalesByCategory: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/sales-by-category?${params.toString()}`);
+  },
+  getDiscountReport: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/discounts?${params.toString()}`);
+  },
+  getDailySummary: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/daily-summary?${params.toString()}`);
+  },
+  getShiftReport: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/shifts?${params.toString()}`);
+  },
 
   // Payment types
   getPaymentTypes: () => request("/api/payment-types"),
