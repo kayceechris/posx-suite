@@ -19,100 +19,105 @@ function PaymentModal({ total, onClose, onConfirm, paymentTypes, customerName, o
     { name: "cash", label: "Cash" },
     { name: "card", label: "Card" },
     { name: "mobile", label: "Mobile Pay" },
+    { name: "credit", label: "Credit (Pay Later)" },
   ];
   const methods = paymentTypes?.length
-    ? paymentTypes.map((p) => ({ name: p.name, label: p.name }))
+    ? [...paymentTypes.map((p) => ({ name: p.name, label: p.name })), { name: "credit", label: "Credit (Pay Later)" }]
     : defaults;
   const [method, setMethod] = useState(methods[0]?.name || "cash");
   const [amountPaid, setAmountPaid] = useState(total.toFixed(2));
 
+  const isCredit = method === "credit";
   const paid = parseFloat(amountPaid) || 0;
   const change = Math.max(0, paid - total);
+  const canConfirm = !isCredit || customerName?.trim();
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm overflow-hidden max-h-[95vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden max-h-[95vh] overflow-y-auto">
         {/* Total header */}
-        <div className="bg-emerald-500 p-6 text-white text-center">
+        <div className={`p-5 text-white text-center ${isCredit ? "bg-amber-500" : "bg-emerald-500"}`}>
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/75 mb-1">Total Amount</p>
           <p className="text-4xl font-black tabular-nums">{formatCurrency(total)}</p>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Customer name */}
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
-              Customer Name (Optional)
-            </label>
-            <input
-              value={customerName}
-              onChange={(e) => onCustomerNameChange(e.target.value)}
-              placeholder="Enter customer name"
-              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
-            />
-          </div>
-
-          {/* Payment method */}
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
-              Payment Method
-            </label>
-            <div className="relative">
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-emerald-400 appearance-none transition-colors font-semibold"
-              >
-                {methods.map((m) => <option key={m.name} value={m.name}>{m.label}</option>)}
-              </select>
-              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Amount paid */}
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
-              Amount Paid
-            </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-emerald-400 transition-colors font-bold text-xl"
-            />
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => setAmountPaid(total.toFixed(2))}
-                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-all"
-              >
-                Exact
-              </button>
-              {[10, 20, 50, 100].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setAmountPaid(amt.toFixed(2))}
-                  className="flex-1 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-all"
+        <div className="p-5 space-y-3">
+          {/* Payment method + customer name side by side on wider screens */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
+                Payment Method
+              </label>
+              <div className="relative">
+                <select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value)}
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-emerald-400 appearance-none font-semibold"
                 >
-                  {amt}
-                </button>
-              ))}
+                  {methods.map((m) => <option key={m.name} value={m.name}>{m.label}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
+                Customer Name {isCredit ? <span className="text-red-400">*</span> : "(Optional)"}
+              </label>
+              <input
+                value={customerName}
+                onChange={(e) => onCustomerNameChange(e.target.value)}
+                placeholder={isCredit ? "Required for credit" : "Enter customer name"}
+                className={`w-full px-3 py-2.5 border-2 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 focus:outline-none transition-colors ${isCredit && !customerName?.trim() ? "border-red-300 dark:border-red-600 focus:border-red-400" : "border-gray-200 dark:border-gray-600 focus:border-emerald-400"}`}
+              />
             </div>
           </div>
 
-          {/* Change */}
-          <div className="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-200 dark:border-emerald-700/50 rounded-2xl px-5 py-3.5 flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Change</span>
-            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCurrency(change)}</span>
-          </div>
+          {/* Credit info box */}
+          {isCredit && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-700/50 rounded-xl px-4 py-3">
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Credit Sale — Payment Deferred</p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">This order will appear as an open invoice in Accounts.</p>
+            </div>
+          )}
+
+          {/* Amount paid — hidden for credit */}
+          {!isCredit && (
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
+                Amount Paid
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                className="w-full px-4 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-emerald-400 transition-colors font-bold text-xl"
+              />
+              <div className="flex gap-1.5 mt-2">
+                <button onClick={() => setAmountPaid(total.toFixed(2))} className="flex-1 py-2 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-all">Exact</button>
+                {[10, 20, 50, 100].map((amt) => (
+                  <button key={amt} onClick={() => setAmountPaid(amt.toFixed(2))} className="flex-1 py-2 border border-gray-200 dark:border-gray-600 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95 transition-all">{amt}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Change — hidden for credit */}
+          {!isCredit && (
+            <div className="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-200 dark:border-emerald-700/50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Change</span>
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{formatCurrency(change)}</span>
+            </div>
+          )}
 
           {/* Confirm */}
           <button
-            onClick={() => onConfirm(method, customerName)}
-            className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-base hover:bg-emerald-600 active:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+            onClick={() => canConfirm && onConfirm(method, customerName)}
+            disabled={!canConfirm}
+            className={`w-full py-4 text-white rounded-2xl font-black text-base transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${isCredit ? "bg-amber-500 hover:bg-amber-600 active:bg-amber-700" : "bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700"}`}
           >
             <CheckCircle2 size={18} />
-            Confirm Payment
+            {isCredit ? "Record Credit Sale" : "Confirm Payment"}
           </button>
           <button
             onClick={onClose}

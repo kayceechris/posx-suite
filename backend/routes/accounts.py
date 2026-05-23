@@ -371,10 +371,11 @@ async def get_invoices(
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
     cutoff_str = cutoff.isoformat()
 
-    # Include both open orders (outstanding) and recent completed orders (invoice register)
+    # Include open orders, credit orders (always open until paid), and recent completed orders
     orders = await db.orders.find(
         {"$or": [
             {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+            {"status": "completed", "payment_method": "credit"},
             {"status": "completed", "created_at": {"$gte": cutoff_str}},
         ]},
         {"_id": 0}
@@ -392,7 +393,10 @@ async def get_invoices(
         except Exception:
             days = 0
 
-        is_open = order.get("status") in ("held", "sent_to_kitchen", "pending")
+        is_open = (
+            order.get("status") in ("held", "sent_to_kitchen", "pending") or
+            (order.get("status") == "completed" and order.get("payment_method") == "credit")
+        )
         bucket = (
             "0-7 days"   if days <= 7  else
             "8-30 days"  if days <= 30 else
