@@ -345,12 +345,16 @@ export default function ReservationsSection() {
   const [selectedOutlet, setSelectedOutlet] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null); // null | { mode: "add" } | { mode: "edit", reservation }
+  const [modal, setModal] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
-      const filters = { date };
+      // No date filter = show all; date set = filter to that day
+      const filters = {};
+      if (date) filters.date = date;
       if (selectedOutlet) filters.outlet_id = selectedOutlet;
       const [res, tbl, out] = await Promise.all([
         api.getReservations(filters),
@@ -361,7 +365,7 @@ export default function ReservationsSection() {
       setTables(tbl);
       setOutlets(out);
     } catch (err) {
-      console.error(err);
+      setLoadError(err.message || "Failed to load reservations");
     } finally {
       setLoading(false);
     }
@@ -518,6 +522,14 @@ export default function ReservationsSection() {
         ))}
       </div>
 
+      {/* Load error */}
+      {loadError && (
+        <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-xl px-4 py-3 mb-4 text-sm">
+          <AlertCircle size={15} className="flex-shrink-0" />
+          <span>{loadError}</span>
+        </div>
+      )}
+
       {/* List */}
       {loading ? (
         <div className="flex justify-center py-20">
@@ -526,9 +538,11 @@ export default function ReservationsSection() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <CalendarDays size={48} className="text-gray-200 dark:text-gray-700 mb-4" />
-          <p className="font-bold text-gray-500 dark:text-gray-400">No reservations</p>
+          <p className="font-bold text-gray-500 dark:text-gray-400">No reservations{date ? ` for ${date}` : ""}</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-            {search ? "Try a different search" : "Create one with the button above"}
+            {search ? "Try a different search" :
+             date ? <span>Try a different date or <button onClick={() => setDate("")} className="text-purple-500 underline">clear the date filter</button></span> :
+             "Create one with the button above"}
           </p>
         </div>
       ) : (
