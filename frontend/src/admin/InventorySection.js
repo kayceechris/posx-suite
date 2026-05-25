@@ -1632,6 +1632,311 @@ function ConsolidatedView() {
   );
 }
 
+// ─── Receive Stock Modal ──────────────────────────────────────────────────────
+
+function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onReceived }) {
+  const [outletId, setOutletId] = useState(initialOutletId || outlets[0]?.id || "");
+  const [productId, setProductId] = useState("");
+  const [received, setReceived] = useState("");
+  const [minQty, setMinQty] = useState("10");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [currentQty, setCurrentQty] = useState(null);
+  const [loadingQty, setLoadingQty] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!productId || !outletId) { setCurrentQty(null); return; }
+    setLoadingQty(true);
+    api.getStock(outletId, "main")
+      .then((stock) => {
+        const s = stock.find((x) => x.product_id === productId);
+        setCurrentQty(s?.quantity ?? 0);
+        if (s?.min_quantity) setMinQty(String(s.min_quantity));
+      })
+      .catch(console.error)
+      .finally(() => setLoadingQty(false));
+  }, [productId, outletId]);
+
+  const filteredProducts = products.filter(
+    (p) => !search || p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!received || parseInt(received) <= 0) { setError("Enter a valid quantity to receive."); return; }
+    setSaving(true); setError("");
+    try {
+      const newQty = (currentQty ?? 0) + parseInt(received);
+      await api.updateStock({
+        product_id: productId, outlet_id: outletId, store: "main",
+        quantity: newQty,
+        min_quantity: parseInt(minQty) || 10,
+        batch_number: batchNumber || null,
+        expiry_date: expiryDate || null,
+      });
+      const pName = products.find((p) => p.id === productId)?.name || productId;
+      onReceived(`${pName} — ${parseInt(received)} units received into Main Store`);
+    } catch (err) { setError(err.message); setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Receive Stock</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Add incoming goods to Main Store</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Outlet</label>
+              <select required value={outletId} onChange={(e) => setOutletId(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Search Product</label>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type to filter…"
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Product</label>
+            <select required value={productId} onChange={(e) => setProductId(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+              <option value="">Select product…</option>
+              {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {productId && (
+              <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                {loadingQty ? "Loading…" : <span>Current Main Store qty: <span className="font-bold text-gray-800 dark:text-white">{currentQty ?? 0}</span></span>}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Quantity Received</label>
+              <input required type="number" min="1" value={received} onChange={(e) => setReceived(e.target.value)}
+                placeholder="e.g. 50"
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+              {productId && received && (
+                <p className="text-xs mt-1 text-green-600 dark:text-green-400 font-semibold">
+                  New total: {(currentQty ?? 0) + (parseInt(received) || 0)}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Min Qty Alert</label>
+              <input type="number" min="0" value={minQty} onChange={(e) => setMinQty(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Batch Number</label>
+              <input type="text" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="Optional"
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Expiry Date</label>
+              <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+          <button type="submit" disabled={saving}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            {saving ? "Receiving…" : "Receive into Main Store"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Store View ──────────────────────────────────────────────────────────
+
+function MainStoreView() {
+  const [stock, setStock] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [outlets, setOutlets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [outletId, setOutletId] = useState("");
+  const [showReceive, setShowReceive] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const loadStock = (oid) => {
+    const id = oid || outletId;
+    if (!id) return;
+    setLoading(true);
+    api.getStock(id, "main")
+      .then(setStock)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    Promise.all([api.getProducts(), api.getOutlets()])
+      .then(([p, o]) => {
+        setProducts(p.filter((pr) => pr.active !== false));
+        setOutlets(o);
+        if (o.length > 0) { setOutletId(o[0].id); loadStock(o[0].id); }
+      })
+      .catch(console.error);
+  }, []); // eslint-disable-line
+
+  useEffect(() => { if (outletId) loadStock(outletId); }, [outletId]); // eslint-disable-line
+
+  const productName = (id) => products.find((p) => p.id === id)?.name || id;
+  const totalUnits = stock.reduce((s, x) => s + (parseInt(x.quantity) || 0), 0);
+  const lowCount = stock.filter((s) => parseInt(s.quantity) <= parseInt(s.min_quantity || 10)).length;
+  const filtered = stock.filter((s) => !search || productName(s.product_id).toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <ShoppingBag size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Main Store</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Central warehouse — receive goods here, then dispatch to Kitchen &amp; Bar via requisitions</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => loadStock(outletId)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> Refresh
+          </button>
+          <button onClick={() => setShowReceive(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
+            <Plus size={16} /> Receive Stock
+          </button>
+        </div>
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[
+          { label: "Products", value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
+          { label: "Total Units", value: totalUnits.toLocaleString(), color: "text-gray-900 dark:text-white", bg: "bg-gray-50 dark:bg-gray-800" },
+          { label: "Low Stock", value: lowCount, color: lowCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: lowCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
+        ].map((c) => (
+          <div key={c.label} className={cn("rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-4 text-center", c.bg)}>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{c.label}</p>
+            <p className={cn("text-2xl font-black leading-tight truncate", c.color)}>{c.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 max-w-xs">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
+        </div>
+        <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
+          className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white">
+          {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      </div>
+
+      {loading ? <Spinner color="blue" /> : stock.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 px-8 py-16 text-center">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShoppingBag size={28} className="text-blue-400" />
+          </div>
+          <p className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">Main Store is Empty</p>
+          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">Add stock here first. Kitchen and Bar stores will then requisition items from Main Store.</p>
+          <button onClick={() => setShowReceive(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
+            <Plus size={16} /> Receive Stock Now
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[520px]">
+            <thead>
+              <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                <th className="text-left px-4 py-3">Product</th>
+                <th className="text-center px-3 py-3">Qty</th>
+                <th className="text-center px-3 py-3">Min</th>
+                <th className="text-left px-3 py-3">Batch</th>
+                <th className="text-left px-3 py-3">Expiry</th>
+                <th className="text-center px-3 py-3">Status</th>
+                <th className="text-center px-3 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {filtered.map((item, i) => {
+                const low = parseInt(item.quantity) <= parseInt(item.min_quantity || 10);
+                const expired = item.expiry_date && new Date(item.expiry_date) < new Date();
+                const expiring = !expired && item.expiry_date && ((new Date(item.expiry_date) - new Date()) / 86400000) <= 30;
+                return (
+                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className={cn("font-black text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
+                    </td>
+                    <td className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{item.min_quantity || 10}</td>
+                    <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{item.batch_number || "—"}</td>
+                    <td className="px-3 py-3 text-xs">
+                      {item.expiry_date
+                        ? <span className={cn(expired ? "text-red-600 font-semibold" : expiring ? "text-orange-500 font-semibold" : "text-gray-500 dark:text-gray-400")}>{item.expiry_date}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      {expired ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Expired</span>
+                        : expiring ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">Expiring</span>
+                        : low ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">Low</span>
+                        : <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">OK</span>}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <button onClick={() => setShowReceive(true)}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                        Receive More
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 text-sm">No products found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showReceive && (
+        <ReceiveStockModal
+          products={products}
+          outlets={outlets}
+          initialOutletId={outletId}
+          onClose={() => setShowReceive(false)}
+          onReceived={(msg) => {
+            setShowReceive(false);
+            loadStock(outletId);
+            setToast({ msg, type: "success" });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────────
 export default function InventorySection({ view = "stock" }) {
   const { user } = useAuth();
@@ -1639,6 +1944,7 @@ export default function InventorySection({ view = "stock" }) {
   const perms = user?.permissions || [];
   const can = (p) => isPrivileged || perms.includes(p);
 
+  if (view === "main-store")     return can("update_stock")             ? <MainStoreView />     : <AccessDenied label="Main Store" />;
   if (view === "stock-count")    return can("update_stock")             ? <StockCountView />    : <AccessDenied label="Stock Count" />;
   if (view === "update-stock")   return can("update_stock")             ? <UpdateStockView />   : <AccessDenied label="Update Stock" />;
   if (view === "transfer-stock") return can("transfer_stock")           ? <TransferStockView /> : <AccessDenied label="Transfer Stock" />;

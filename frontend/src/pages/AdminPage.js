@@ -49,6 +49,7 @@ const EXPANDABLE = {
   ],
   inventory: [
     { id: "stock", label: "Stock Levels" },
+    { id: "main-store", label: "Main Store" },
     { id: "stock-count", label: "Stock Count" },
     { id: "update-stock", label: "Update Stock" },
     { id: "transfer-stock", label: "Transfer Stock" },
@@ -115,6 +116,7 @@ const SECTION_PERMISSION = {
 const SUB_ITEM_PERMISSION = {
   // ── Inventory ───────────────────────────────────────────────────────────────
   "inventory.stock":            "view_inventory",
+  "inventory.main-store":       "update_stock",
   "inventory.stock-count":      "manage_stock_count",
   "inventory.update-stock":     "update_stock",
   "inventory.transfer-stock":   "transfer_stock",

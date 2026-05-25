@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Plus, RefreshCw,
-  Trash2, X, ChevronDown, ChevronUp, ArrowRight,
+  Trash2, X, ChevronDown, ChevronUp, ArrowRight, Package,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -34,15 +34,144 @@ function Toast({ msg, type, onClose }) {
   );
 }
 
-function Spinner() {
+function Spinner({ color = "blue" }) {
   return (
-    <div className="flex justify-center py-20">
-      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="flex justify-center py-12">
+      <div className={`w-7 h-7 border-4 border-${color}-600 border-t-transparent rounded-full animate-spin`} />
     </div>
   );
 }
 
-function ReqCard({ req, products, outlets, onAction, isPrivileged }) {
+// ── Fulfill Modal ─────────────────────────────────────────────────────────────
+
+function FulfillModal({ req, products, outlets, onClose, onFulfilled, setToast }) {
+  const [mainStock, setMainStock] = useState([]);
+  const [loadingStock, setLoadingStock] = useState(true);
+  const [qtys, setQtys] = useState({});
+  const [fulfilling, setFulfilling] = useState(false);
+
+  const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
+  const productName = (id) => products.find((p) => p.id === id)?.name || id;
+  const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? 0;
+
+  useEffect(() => {
+    setLoadingStock(true);
+    api.getStock(req.outlet_id, "main")
+      .then((stock) => {
+        setMainStock(stock);
+        const init = {};
+        req.items.forEach((item) => {
+          const avail = stock.find((s) => s.product_id === item.product_id)?.quantity ?? 0;
+          init[item.product_id] = Math.min(item.quantity_requested, avail);
+        });
+        setQtys(init);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingStock(false));
+  }, [req.outlet_id, req.items]);
+
+  const handleFulfill = async () => {
+    const total = Object.values(qtys).reduce((s, v) => s + (parseInt(v) || 0), 0);
+    if (total === 0) { setToast({ msg: "All transfer quantities are 0 — nothing to transfer.", type: "error" }); return; }
+    setFulfilling(true);
+    try {
+      await api.fulfillRequisition(req.id, qtys);
+      onFulfilled();
+    } catch (err) {
+      setToast({ msg: err.message, type: "error" });
+      setFulfilling(false);
+    }
+  };
+
+  const insufficientCount = req.items.filter((item) => mainQty(item.product_id) < item.quantity_requested).length;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Transfer Stock</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {STORE_LABELS.main} → <span className="font-semibold">{STORE_LABELS[req.from_store] || req.from_store}</span>
+              {" · "}{outletName(req.outlet_id)}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+
+        {loadingStock ? <Spinner /> : (
+          <div className="p-6">
+            {insufficientCount > 0 && (
+              <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl mb-4">
+                <AlertTriangle size={15} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-300">
+                  {insufficientCount} item{insufficientCount > 1 ? "s have" : " has"} less available in Main Store than requested. Transfer quantities are capped automatically — add more stock to Main Store if needed.
+                </p>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm mb-5">
+                <thead>
+                  <tr className="text-[11px] font-bold text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left pb-2.5">Product</th>
+                    <th className="text-center pb-2.5 px-2">Req</th>
+                    <th className="text-center pb-2.5 px-2">In Main</th>
+                    <th className="text-center pb-2.5 px-2">Transfer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                  {req.items.map((item) => {
+                    const avail = mainQty(item.product_id);
+                    const isShort = avail < item.quantity_requested;
+                    return (
+                      <tr key={item.product_id}>
+                        <td className="py-2.5 pr-2 font-medium text-gray-800 dark:text-gray-200 text-xs leading-tight">{productName(item.product_id)}</td>
+                        <td className="py-2.5 px-2 text-center font-mono font-bold text-gray-600 dark:text-gray-300 text-sm">{item.quantity_requested}</td>
+                        <td className="py-2.5 px-2 text-center">
+                          <span className={cn("font-mono font-black text-sm", isShort ? "text-red-500" : "text-green-600 dark:text-green-400")}>
+                            {avail}
+                          </span>
+                          {isShort && <span className="block text-[10px] text-red-400 font-semibold">Low</span>}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <input
+                            type="number" min="0" max={avail}
+                            value={qtys[item.product_id] ?? 0}
+                            onChange={(e) => setQtys((prev) => ({
+                              ...prev,
+                              [item.product_id]: Math.min(parseInt(e.target.value) || 0, avail),
+                            }))}
+                            className="w-20 px-2 py-1.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-center font-mono focus:outline-none focus:border-green-500 bg-white dark:bg-gray-700 dark:text-white"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={onClose}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleFulfill} disabled={fulfilling}
+                className="flex-1 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {fulfilling ? "Transferring…" : "Confirm Transfer"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Requisition Card ──────────────────────────────────────────────────────────
+
+function ReqCard({ req, products, outlets, onApprove, onReject, onDelete, onFulfillOpen, isPrivileged }) {
   const [expanded, setExpanded] = useState(false);
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
@@ -51,7 +180,7 @@ function ReqCard({ req, products, outlets, onAction, isPrivileged }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer" onClick={() => setExpanded((v) => !v)}>
+      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={() => setExpanded((v) => !v)}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900 dark:text-white text-sm">{outletName(req.outlet_id)}</p>
@@ -79,12 +208,13 @@ function ReqCard({ req, products, outlets, onAction, isPrivileged }) {
           {req.notes && (
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 italic">"{req.notes}"</p>
           )}
+
           <table className="w-full text-sm mb-4">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase">
                 <th className="text-left py-1.5">Product</th>
                 <th className="text-center py-1.5">Requested</th>
-                {req.status === "fulfilled" && <th className="text-center py-1.5">Fulfilled</th>}
+                {req.status === "fulfilled" && <th className="text-center py-1.5 text-green-600">Transferred</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -101,37 +231,42 @@ function ReqCard({ req, products, outlets, onAction, isPrivileged }) {
           </table>
 
           {isPrivileged && (
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               {req.status === "pending" && (
                 <>
-                  <button onClick={() => onAction("approve", req.id)}
+                  <button onClick={() => onApprove(req.id)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
                     Approve
                   </button>
-                  <button onClick={() => onAction("reject", req.id)}
+                  <button onClick={() => onReject(req.id)}
                     className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 rounded-xl text-sm font-semibold hover:bg-red-200 transition-colors">
                     Reject
                   </button>
-                  <button onClick={() => onAction("delete", req.id)}
-                    className="ml-auto px-3 py-2 text-gray-400 hover:text-red-500 transition-colors">
+                  <button onClick={() => onDelete(req.id)} className="ml-auto text-gray-300 hover:text-red-500 transition-colors p-1.5">
                     <Trash2 size={15} />
                   </button>
                 </>
               )}
               {req.status === "approved" && (
                 <>
-                  <button onClick={() => onAction("fulfill", req.id)}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                    <Package size={13} className="text-blue-500" />
+                    <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Ready to transfer from Main Store</span>
+                  </div>
+                  <button onClick={() => onFulfillOpen(req)}
                     className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors">
-                    Fulfill & Transfer Stock
+                    Transfer Stock
                   </button>
-                  <button onClick={() => onAction("reject", req.id)}
+                  <button onClick={() => onReject(req.id)}
                     className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 rounded-xl text-sm font-semibold hover:bg-red-200 transition-colors">
                     Reject
                   </button>
                 </>
               )}
-              {req.status === "fulfilled" && req.fulfilled_by_name && (
-                <p className="text-xs text-gray-400">Fulfilled by {req.fulfilled_by_name} on {req.fulfilled_at ? new Date(req.fulfilled_at).toLocaleDateString() : "—"}</p>
+              {req.status === "fulfilled" && (
+                <p className="text-xs text-gray-400">
+                  Transferred by {req.fulfilled_by_name || "—"} on {req.fulfilled_at ? new Date(req.fulfilled_at).toLocaleDateString() : "—"}
+                </p>
               )}
             </div>
           )}
@@ -141,6 +276,8 @@ function ReqCard({ req, products, outlets, onAction, isPrivileged }) {
   );
 }
 
+// ── Create Requisition Modal ──────────────────────────────────────────────────
+
 function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated }) {
   const [outletId, setOutletId] = useState(outlets[0]?.id || "");
   const [fromStore, setFromStore] = useState("kitchen");
@@ -148,6 +285,7 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
   const [items, setItems] = useState([{ product_id: "", product_name: "", quantity_requested: 1 }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [mainStock, setMainStock] = useState([]);
 
   const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
   const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
@@ -157,6 +295,14 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
     : fromStore === "bar"
     ? products.filter((p) => drinkGroupIds.includes(p.category_id))
     : products;
+
+  // Load main store stock when outlet changes
+  useEffect(() => {
+    if (!outletId) return;
+    api.getStock(outletId, "main").then(setMainStock).catch(console.error);
+  }, [outletId]);
+
+  const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? null;
 
   const setItem = (idx, key, val) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
@@ -179,14 +325,25 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
     } catch (err) { setError(err.message); setSaving(false); }
   };
 
+  const mainStoreEmpty = mainStock.length === 0;
+
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h3 className="font-bold text-gray-900 dark:text-white">New Requisition</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {mainStoreEmpty && (
+            <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl">
+              <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+                Main Store has no stock for this outlet. The requisition will be created but cannot be fulfilled until stock is added to Main Store.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Outlet</label>
@@ -214,23 +371,38 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
               </button>
             </div>
             <div className="space-y-2">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <select required value={item.product_id} onChange={(e) => handleProductChange(idx, e.target.value)}
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-                    <option value="">Select product…</option>
-                    {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                  <input type="number" min="1" required value={item.quantity_requested}
-                    onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
-                    className="w-20 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm text-center focus:outline-none focus:border-blue-500" />
-                  {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
-              ))}
+              {items.map((item, idx) => {
+                const avail = item.product_id ? mainQty(item.product_id) : null;
+                const isShort = avail !== null && item.quantity_requested > avail;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex gap-2 items-center">
+                      <select required value={item.product_id} onChange={(e) => handleProductChange(idx, e.target.value)}
+                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+                        <option value="">Select product…</option>
+                        {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      <input type="number" min="1" required value={item.quantity_requested}
+                        onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
+                        className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
+                          isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
+                      {items.length > 1 && (
+                        <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                    {item.product_id && (
+                      <p className={cn("text-[11px] pl-1 font-semibold",
+                        avail === null ? "text-gray-400" : isShort ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400")}>
+                        {avail === null ? "Loading main store availability…" : isShort
+                          ? `⚠ Only ${avail} available in Main Store`
+                          : `✓ ${avail} available in Main Store`}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -251,6 +423,8 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
   );
 }
 
+// ── Main Section ──────────────────────────────────────────────────────────────
+
 export default function RequisitionsSection() {
   const { user } = useAuth();
   const isPrivileged = user?.role === "admin" || user?.role === "manager";
@@ -262,6 +436,7 @@ export default function RequisitionsSection() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [fulfillReq, setFulfillReq] = useState(null);
   const [toast, setToast] = useState(null);
 
   const load = () => {
@@ -284,29 +459,38 @@ export default function RequisitionsSection() {
 
   useEffect(() => { load(); }, []);
 
-  const handleAction = async (action, id) => {
+  const handleApprove = async (id) => {
     try {
-      if (action === "approve") await api.approveRequisition(id);
-      else if (action === "reject") await api.rejectRequisition(id);
-      else if (action === "fulfill") {
-        if (!window.confirm("Transfer stock from Main Store to the requesting store? This action cannot be undone.")) return;
-        await api.fulfillRequisition(id);
-      } else if (action === "delete") {
-        if (!window.confirm("Delete this requisition?")) return;
-        await api.deleteRequisition(id);
-      }
-      setToast({ msg: `Requisition ${action}d successfully.`, type: "success" });
+      await api.approveRequisition(id);
+      setToast({ msg: "Requisition approved — ready for stock transfer.", type: "success" });
       load();
-    } catch (err) {
-      setToast({ msg: err.message, type: "error" });
-    }
+    } catch (err) { setToast({ msg: err.message, type: "error" }); }
   };
 
-  const counts = requisitions.reduce((acc, r) => {
-    acc[r.status] = (acc[r.status] || 0) + 1;
-    return acc;
-  }, {});
+  const handleReject = async (id) => {
+    try {
+      await api.rejectRequisition(id);
+      setToast({ msg: "Requisition rejected.", type: "success" });
+      load();
+    } catch (err) { setToast({ msg: err.message, type: "error" }); }
+  };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this requisition?")) return;
+    try {
+      await api.deleteRequisition(id);
+      setToast({ msg: "Requisition deleted.", type: "success" });
+      load();
+    } catch (err) { setToast({ msg: err.message, type: "error" }); }
+  };
+
+  const handleFulfilled = () => {
+    setFulfillReq(null);
+    setToast({ msg: "Stock transferred successfully — Main Store updated.", type: "success" });
+    load();
+  };
+
+  const counts = requisitions.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   const displayed = tab === "all" ? requisitions : requisitions.filter((r) => r.status === tab);
 
   return (
@@ -319,7 +503,7 @@ export default function RequisitionsSection() {
           <div>
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Requisitions</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
-              Kitchen & Bar stock requests from Main Store
+              Kitchen &amp; Bar request stock from Main Store
             </p>
           </div>
         </div>
@@ -340,13 +524,13 @@ export default function RequisitionsSection() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Pending",   key: "pending",   color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
-          { label: "Approved",  key: "approved",  color: "text-blue-600 dark:text-blue-400",   bg: "bg-blue-50 dark:bg-blue-900/20" },
-          { label: "Fulfilled", key: "fulfilled", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
-          { label: "Rejected",  key: "rejected",  color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-900/20" },
+          { label: "Approved",  key: "approved",  color: "text-blue-600 dark:text-blue-400",     bg: "bg-blue-50 dark:bg-blue-900/20" },
+          { label: "Fulfilled", key: "fulfilled", color: "text-green-600 dark:text-green-400",   bg: "bg-green-50 dark:bg-green-900/20" },
+          { label: "Rejected",  key: "rejected",  color: "text-red-600 dark:text-red-400",       bg: "bg-red-50 dark:bg-red-900/20" },
         ].map((s) => (
           <div key={s.key} className={cn("rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-4 text-center", s.bg)}>
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{s.label}</p>
-            <p className={cn("text-3xl font-black", s.color)}>{counts[s.key] || 0}</p>
+            <p className={cn("text-3xl font-black leading-tight truncate", s.color)}>{counts[s.key] || 0}</p>
           </div>
         ))}
       </div>
@@ -367,11 +551,17 @@ export default function RequisitionsSection() {
         ))}
       </div>
 
-      {loading ? <Spinner /> : (
+      {loading ? <Spinner color="blue" /> : (
         <div className="space-y-3">
           {displayed.map((req) => (
-            <ReqCard key={req.id} req={req} products={products} outlets={outlets}
-              onAction={handleAction} isPrivileged={isPrivileged} />
+            <ReqCard
+              key={req.id} req={req} products={products} outlets={outlets}
+              isPrivileged={isPrivileged}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onDelete={handleDelete}
+              onFulfillOpen={(r) => setFulfillReq(r)}
+            />
           ))}
           {displayed.length === 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 px-6 py-12 text-center">
@@ -384,11 +574,20 @@ export default function RequisitionsSection() {
 
       {showCreate && (
         <CreateRequisitionModal
-          products={products}
-          outlets={outlets}
-          groups={groups}
+          products={products} outlets={outlets} groups={groups}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); setToast({ msg: "Requisition submitted.", type: "success" }); }}
+        />
+      )}
+
+      {fulfillReq && (
+        <FulfillModal
+          req={fulfillReq}
+          products={products}
+          outlets={outlets}
+          setToast={setToast}
+          onClose={() => setFulfillReq(null)}
+          onFulfilled={handleFulfilled}
         />
       )}
     </div>
