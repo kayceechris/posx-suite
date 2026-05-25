@@ -1726,14 +1726,14 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
           </div>
 
           {/* Items table — scrollable */}
-          <div className="flex-1 overflow-y-auto px-6 min-h-0">
-            <table className="w-full text-sm">
+          <div className="flex-1 overflow-y-auto overflow-x-auto px-6 min-h-0">
+            <table className="w-full min-w-[680px] text-sm">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left py-2 pr-2">Product</th>
-                  <th className="text-center py-2 px-2 w-24">Current</th>
-                  <th className="text-center py-2 px-2 w-24">+ Receive</th>
-                  <th className="text-center py-2 px-2 w-24">New Total</th>
+                  <th className="text-left py-2 pr-2 min-w-[200px]">Product</th>
+                  <th className="text-center py-2 px-2 w-20">Current</th>
+                  <th className="text-center py-2 px-2 w-20">+ Receive</th>
+                  <th className="text-center py-2 px-2 w-20">New Total</th>
                   <th className="text-center py-2 px-2 w-20">Min Qty</th>
                   <th className="text-left py-2 px-2 w-28">Batch #</th>
                   <th className="text-left py-2 px-2 w-32">Expiry</th>
