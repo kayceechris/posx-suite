@@ -623,3 +623,39 @@ class WasteEntryCreate(BaseModel):
     quantity: int
     reason: str
     notes: Optional[str] = None
+
+
+# ==================== RESERVATION MODELS ====================
+
+class Reservation(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    table_id: str
+    table_number: str
+    outlet_id: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int = 2
+    date: str                   # YYYY-MM-DD
+    time: str                   # HH:MM (24h)
+    duration: int = 90          # minutes
+    notes: Optional[str] = None
+    status: str = "confirmed"   # confirmed | seated | cancelled | no_show
+    created_by: str
+    created_by_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ReservationCreate(BaseModel):
+    table_id: str
+    table_number: str
+    outlet_id: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int = 2
+    date: str
+    time: str
+    duration: int = 90
+    notes: Optional[str] = None

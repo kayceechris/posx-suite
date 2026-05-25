@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2 } from "lucide-react";
+import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -95,18 +95,26 @@ function TransferModal({ entityId, isBarTab, currentOwnerId, onClose, onTransfer
 }
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
-function tableStatus(entity, userId, isBarTab) {
+function fmt12(time24) {
+  if (!time24) return "";
+  const [h, m] = time24.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function tableStatus(entity, userId, isBarTab, reservation) {
   if (entity.status === "occupied") {
     const ownerKey = isBarTab ? "staff_id" : "waiter_id";
     return String(entity[ownerKey]) === String(userId) ? "mine" : "occupied";
   }
   if (entity.status === "reserved") return "reserved";
+  if (reservation) return "reserved";
   return "available";
 }
 
 // ─── Entity Card ──────────────────────────────────────────────────────────────
-function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onClick, onRelease, onTransfer }) {
-  const status = tableStatus(entity, userId, isBarTab);
+function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reservation, onClick, onRelease, onTransfer }) {
+  const status = tableStatus(entity, userId, isBarTab, reservation);
   const isPrivileged = ["admin", "manager"].includes(userRole);
   const canRelease = isPrivileged || (status === "mine" && (userPermissions?.includes("release_tables") || userPermissions?.includes("manage_tables")));
   const canTransfer = isPrivileged || (status === "mine" && userPermissions?.includes("transfer_tables"));
@@ -116,7 +124,7 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onCli
     available: { card: "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 hover:shadow-green-100", icon: "bg-green-500", label: "text-green-700 dark:text-green-400" },
     mine:      { card: "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:border-blue-400 hover:shadow-blue-100",    icon: "bg-blue-500",  label: "text-blue-700 dark:text-blue-400"  },
     occupied:  { card: "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 hover:border-red-400 hover:shadow-red-100",        icon: "bg-red-500",   label: "text-red-700 dark:text-red-400"   },
-    reserved:  { card: "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700",                                         icon: "bg-yellow-500",label: "text-yellow-700 dark:text-yellow-400"},
+    reserved:  { card: "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 hover:border-purple-400",               icon: "bg-purple-500", label: "text-purple-700 dark:text-purple-400" },
   };
   const s = styles[status];
   const Icon = status === "available" ? Unlock : LockKeyhole;
@@ -131,11 +139,30 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, onCli
       {/* Clickable top area */}
       <button onClick={() => onClick(entity)} className="w-full flex flex-col items-center gap-2 active:scale-95">
         <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm", s.icon)}>
-          <Icon size={24} className="text-white" strokeWidth={2} />
+          {status === "reserved" && reservation
+            ? <CalendarDays size={24} className="text-white" strokeWidth={2} />
+            : <Icon size={24} className="text-white" strokeWidth={2} />
+          }
         </div>
         <p className={cn("text-2xl font-black", s.label)}>{entity.number}</p>
         <p className={cn("text-xs font-bold uppercase tracking-wider", s.label)}>{statusLabel}</p>
         {entity.seats && <p className="text-xs text-gray-400 dark:text-gray-500">{entity.seats} seats</p>}
+
+        {/* Reservation info */}
+        {status === "reserved" && reservation && (
+          <div className="w-full mt-1 bg-purple-100 dark:bg-purple-900/40 rounded-xl px-2.5 py-2 space-y-0.5">
+            <p className="text-[11px] font-black text-purple-800 dark:text-purple-200 truncate">{reservation.customer_name}</p>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-0.5 text-[10px] text-purple-600 dark:text-purple-300 font-semibold">
+                <Clock size={9} /> {fmt12(reservation.time)}
+              </span>
+              <span className="flex items-center gap-0.5 text-[10px] text-purple-600 dark:text-purple-300 font-semibold">
+                <Users size={9} /> {reservation.party_size}
+              </span>
+            </div>
+          </div>
+        )}
+
         {(status === "occupied" || status === "mine") && (
           <span className={`text-[11px] font-bold truncate max-w-full px-2 py-0.5 rounded-full ${
             status === "mine"
@@ -182,6 +209,7 @@ export default function TablesPage() {
   const [activeTab, setActiveTab] = useState("table");
   const [tables, setTables] = useState([]);
   const [barTabs, setBarTabs] = useState([]);
+  const [reservationMap, setReservationMap] = useState({}); // table_id → reservation
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [transferTarget, setTransferTarget] = useState(null);
@@ -204,9 +232,19 @@ export default function TablesPage() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [t, b] = await Promise.all([api.getTables(), api.getBarTabs()]);
+      const [t, b, upcoming] = await Promise.all([
+        api.getTables(),
+        api.getBarTabs(),
+        api.getUpcomingReservations().catch(() => []),
+      ]);
       setTables(t);
       setBarTabs(b);
+      // Build table_id → reservation map (first upcoming per table wins)
+      const map = {};
+      for (const r of upcoming) {
+        if (!map[r.table_id]) map[r.table_id] = r;
+      }
+      setReservationMap(map);
     } catch {
       showToast("Failed to load data", "error");
     } finally {
@@ -318,6 +356,7 @@ export default function TablesPage() {
               { label: "Available", color: "bg-green-400" },
               { label: activeTab === "table" ? "Your Tables" : "Your Bar Tabs", color: "bg-blue-400" },
               { label: "Occupied", color: "bg-red-400" },
+              { label: "Reserved", color: "bg-purple-400" },
             ].map(({ label, color }) => (
               <div key={label} className="flex items-center gap-2">
                 <div className={cn("w-3.5 h-3.5 rounded-full", color)} />
@@ -352,6 +391,7 @@ export default function TablesPage() {
                   userRole={user?.role}
                   userPermissions={user?.permissions}
                   isBarTab={isBarTabView}
+                  reservation={!isBarTabView ? reservationMap[entity.id] : null}
                   onClick={(e) => handleEntityClick(e, isBarTabView)}
                   onRelease={(e) => handleRelease(e, isBarTabView)}
                   onTransfer={(e) => setTransferTarget({ entity: e, isBarTab: isBarTabView })}

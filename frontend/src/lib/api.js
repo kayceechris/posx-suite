@@ -463,6 +463,24 @@ export const api = {
     return `${BASE_URL}${path}`;
   },
 
+  // Reservations
+  getReservations: (filters = {}) => {
+    const p = new URLSearchParams();
+    if (filters.date)      p.append("date", filters.date);
+    if (filters.outlet_id) p.append("outlet_id", filters.outlet_id);
+    if (filters.status)    p.append("status", filters.status);
+    if (filters.table_id)  p.append("table_id", filters.table_id);
+    const qs = p.toString();
+    return request(`/api/reservations${qs ? `?${qs}` : ""}`);
+  },
+  getUpcomingReservations: () => request("/api/reservations/upcoming"),
+  createReservation: (data) =>
+    request("/api/reservations", { method: "POST", body: JSON.stringify(data) }),
+  updateReservation: (id, data) =>
+    request(`/api/reservations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteReservation: (id) =>
+    request(`/api/reservations/${id}`, { method: "DELETE" }),
+
   // Brands
   getBrands: () => request("/api/brands"),
   createBrand: (data) => request("/api/brands", { method: "POST", body: JSON.stringify(data) }),

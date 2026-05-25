@@ -28,6 +28,7 @@ from routes.taxes import router as taxes_router
 from routes.bar_tabs import router as bar_tabs_router
 from routes.recipes import router as recipes_router
 from routes.waste import router as waste_router
+from routes.reservations import router as reservations_router
 
 all_routers = [
     auth_router,
@@ -58,4 +59,5 @@ all_routers = [
     bar_tabs_router,
     recipes_router,
     waste_router,
+    reservations_router,
 ]

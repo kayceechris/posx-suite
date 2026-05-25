@@ -20,6 +20,7 @@ import ReportsSection from "../admin/ReportsSection";
 import AccountsSection from "../admin/AccountsSection";
 import TablesSection from "../admin/TablesSection";
 import BarTabsAdminSection from "../admin/BarTabsAdminSection";
+import ReservationsSection from "../admin/ReservationsSection";
 import SettingsSection from "../admin/SettingsSection";
 import PurchasesSection from "../admin/PurchasesSection";
 
@@ -60,7 +61,11 @@ const EXPANDABLE = {
     { id: "approved", label: "Approved Orders" },
     { id: "suppliers", label: "Suppliers" },
   ],
-  floor: [{ id: "tables", label: "Tables" }, { id: "bar-tabs", label: "Bar Tabs" }],
+  floor: [
+    { id: "tables", label: "Tables" },
+    { id: "bar-tabs", label: "Bar Tabs" },
+    { id: "reservations", label: "Reservations" },
+  ],
   settings: [
     { id: "company", label: "Company" }, { id: "receipt", label: "Receipt & Bill" },
     { id: "currencies", label: "Currencies" }, { id: "payment-types", label: "Payment Types" },
@@ -362,6 +367,7 @@ export default function AdminPage() {
             {activeSection === "accounts" && <AccountsSection view={subViews.accounts} onViewChange={(v) => handleSubClick("accounts", v)} />}
             {activeSection === "floor" && subViews.floor === "tables" && <TablesSection />}
             {activeSection === "floor" && subViews.floor === "bar-tabs" && <BarTabsAdminSection />}
+            {activeSection === "floor" && subViews.floor === "reservations" && <ReservationsSection />}
             {activeSection === "settings" && <SettingsSection view={subViews.settings} onViewChange={(v) => handleSubClick("settings", v)} />}
             {activeSection === "purchases" && (
               <PurchasesSection
