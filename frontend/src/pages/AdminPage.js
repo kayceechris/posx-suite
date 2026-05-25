@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Building2, Package, Warehouse, ShoppingBag, UserCircle,
   ClipboardList, BarChart2, BookOpen, ArrowLeft, LogOut, ChevronRight, ChevronDown,
-  Menu, Moon, ShoppingCart, DollarSign, Sun, UserCheck, Box, LayoutGrid, Settings,
+  Menu, Moon, ShoppingCart, DollarSign, Sun, UserCheck, Box, LayoutGrid, Settings, Store,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
@@ -49,16 +49,17 @@ const EXPANDABLE = {
   ],
   inventory: [
     { id: "stock", label: "Stock Levels" },
-    { id: "main-store", label: "Main Store" },
-    { id: "stores", label: "Store Management" },
     { id: "stock-count", label: "Stock Count" },
     { id: "update-stock", label: "Update Stock" },
-    { id: "transfer-stock", label: "Transfer Stock" },
     { id: "requisitions", label: "Requisitions" },
     { id: "reorder", label: "Reorder Alerts" },
     { id: "waste", label: "Waste Recording" },
     { id: "valuation", label: "Stock Valuation" },
     { id: "consolidated", label: "Consolidated View" },
+  ],
+  stores: [
+    { id: "main-store", label: "Main Store" },
+    { id: "create-store", label: "Create Store" },
   ],
   purchases: [
     { id: "pending", label: "Pending Orders" },
@@ -104,6 +105,7 @@ const SECTION_PERMISSION = {
   outlets: "view_outlets",
   products: "view_products",
   inventory: "view_inventory",
+  stores: "update_stock",
   purchases: "view_purchases",
   customers: "view_customers",
   orders: "view_orders",
@@ -117,16 +119,16 @@ const SECTION_PERMISSION = {
 const SUB_ITEM_PERMISSION = {
   // ── Inventory ───────────────────────────────────────────────────────────────
   "inventory.stock":            "view_inventory",
-  "inventory.main-store":       "update_stock",
-  "inventory.stores":           "update_stock",
   "inventory.stock-count":      "manage_stock_count",
   "inventory.update-stock":     "update_stock",
-  "inventory.transfer-stock":   "transfer_stock",
   "inventory.requisitions":     "view_inventory",
   "inventory.reorder":          "view_reorder_alerts",
   "inventory.waste":            "record_waste",
   "inventory.valuation":        "view_stock_valuation",
   "inventory.consolidated":     "view_consolidated_stock",
+  // ── Store Management ────────────────────────────────────────────────────────
+  "stores.main-store":          "update_stock",
+  "stores.create-store":        "update_stock",
   // ── Products ────────────────────────────────────────────────────────────────
   "products.create-product":    "create_product",
   "products.import":            "import_products",
@@ -172,6 +174,7 @@ const NAV_ITEMS = [
   { id: "outlets", label: "Outlets", icon: Building2, expandable: true },
   { id: "products", label: "Products", icon: Package, expandable: true },
   { id: "inventory", label: "Inventory", icon: Warehouse, expandable: true },
+  { id: "stores", label: "Store Management", icon: Store, expandable: true },
   { id: "purchases", label: "Purchases", icon: ShoppingBag, expandable: true },
   { id: "customers", label: "Customers", icon: UserCircle },
   { id: "orders", label: "Orders", icon: ClipboardList },
@@ -188,7 +191,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [expandedSection, setExpandedSection] = useState(null);
-  const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard" });
+  const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", stores: "main-store", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard" });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -369,6 +372,7 @@ export default function AdminPage() {
             )}
             {activeSection === "inventory" && subViews.inventory !== "requisitions" && <InventorySection view={subViews.inventory} />}
             {activeSection === "inventory" && subViews.inventory === "requisitions" && <RequisitionsSection />}
+            {activeSection === "stores" && <InventorySection view={subViews.stores === "create-store" ? "stores" : subViews.stores} />}
             {activeSection === "customers" && <CustomersSection />}
             {activeSection === "orders" && <OrdersSection />}
             {activeSection === "reports" && <ReportsSection view={subViews.reports} />}
