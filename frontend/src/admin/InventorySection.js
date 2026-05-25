@@ -2132,20 +2132,17 @@ function MainStoreView() {
 // ─── Stores View (Store Management) ──────────────────────────────────────────
 
 function StoresView() {
-  const [outlets, setOutlets] = useState([]);
-  const [outletId, setOutletId] = useState("");
   const [stores, setStores] = useState([]);
   const [stockCounts, setStockCounts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editStore, setEditStore] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const loadStores = (oid) => {
-    const id = oid || outletId;
-    if (!id) return;
+  const loadStores = () => {
     setLoading(true);
-    Promise.all([api.getStores(id), api.getStock(id)])
+    Promise.all([api.getStores(), api.getStock()])
       .then(([s, stock]) => {
         setStores(s);
         const counts = {};
@@ -2157,20 +2154,32 @@ function StoresView() {
   };
 
   useEffect(() => {
-    api.getOutlets().then(o => {
-      setOutlets(o);
-      if (o.length > 0) { setOutletId(o[0].id); loadStores(o[0].id); }
-    }).catch(console.error);
+    api.getStores().then(s => {
+      if (s.length === 0) {
+        // Auto-initialize default stores for existing deployments
+        setInitializing(true);
+        api.initStores()
+          .then(() => loadStores())
+          .catch(console.error)
+          .finally(() => setInitializing(false));
+      } else {
+        api.getStock().then(stock => {
+          setStores(s);
+          const counts = {};
+          stock.forEach(item => { counts[item.store] = (counts[item.store] || 0) + 1; });
+          setStockCounts(counts);
+          setLoading(false);
+        }).catch(() => { setStores(s); setLoading(false); });
+      }
+    }).catch(() => setLoading(false));
   }, []); // eslint-disable-line
-
-  useEffect(() => { if (outletId) loadStores(outletId); }, [outletId]); // eslint-disable-line
 
   const handleDelete = async (store) => {
     if (!window.confirm(`Delete "${store.name}"? This cannot be undone.`)) return;
     try {
-      await api.deleteStore(store.id, outletId);
+      await api.deleteStore(store.id);
       setToast({ msg: `"${store.name}" deleted.`, type: "success" });
-      loadStores(outletId);
+      loadStores();
     } catch (err) {
       setToast({ msg: err.message, type: "error" });
     }
@@ -2185,7 +2194,7 @@ function StoresView() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Store Management</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Main Store is built-in. Create Kitchen, Bar, or any custom child stores here.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Global stores shared across all outlets. Main Store is built-in and protected.</p>
           </div>
         </div>
         <button onClick={() => setShowCreate(true)}
@@ -2196,14 +2205,14 @@ function StoresView() {
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="flex gap-3 mb-4">
-        <select value={outletId} onChange={e => setOutletId(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
-          {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-      </div>
+      {initializing && (
+        <div className="flex items-center gap-3 p-4 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          Initializing default stores…
+        </div>
+      )}
 
-      {loading ? <Spinner color="indigo" /> : (
+      {loading && !initializing ? <Spinner color="indigo" /> : !loading && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
           <table className="w-full">
             <thead>
@@ -2211,13 +2220,13 @@ function StoresView() {
                 <th className="text-left px-5 py-3">Store Name</th>
                 <th className="text-left px-4 py-3">Type</th>
                 <th className="text-left px-4 py-3">Color</th>
-                <th className="text-center px-4 py-3">Stock Items</th>
+                <th className="text-center px-4 py-3">Total Stock Items</th>
                 <th className="text-center px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {stores.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 text-sm">No stores found for this outlet.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 text-sm">No stores yet.</td></tr>
               )}
               {stores.map(store => (
                 <tr key={store.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
@@ -2240,7 +2249,7 @@ function StoresView() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-sm font-bold text-gray-900 dark:text-white">{stockCounts[store.id] || 0}</span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{(stockCounts[store.id] || 0).toLocaleString()}</span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     {store.is_main ? (
@@ -2267,30 +2276,25 @@ function StoresView() {
 
       {showCreate && (
         <StoreFormModal
-          outlets={outlets}
-          initialOutletId={outletId}
           onClose={() => setShowCreate(false)}
-          onSaved={(msg) => { setShowCreate(false); loadStores(outletId); setToast({ msg, type: "success" }); }}
+          onSaved={(msg) => { setShowCreate(false); loadStores(); setToast({ msg, type: "success" }); }}
         />
       )}
 
       {editStore && (
         <StoreFormModal
           store={editStore}
-          outlets={outlets}
-          initialOutletId={outletId}
           onClose={() => setEditStore(null)}
-          onSaved={(msg) => { setEditStore(null); loadStores(outletId); setToast({ msg, type: "success" }); }}
+          onSaved={(msg) => { setEditStore(null); loadStores(); setToast({ msg, type: "success" }); }}
         />
       )}
     </div>
   );
 }
 
-function StoreFormModal({ store, outlets, initialOutletId, onClose, onSaved }) {
+function StoreFormModal({ store, onClose, onSaved }) {
   const isEdit = !!store;
   const [name, setName] = useState(store?.name || "");
-  const [outletId, setOutletId] = useState(store?.outlet_id || initialOutletId || outlets[0]?.id || "");
   const [color, setColor] = useState(store?.color || "indigo");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2300,10 +2304,10 @@ function StoreFormModal({ store, outlets, initialOutletId, onClose, onSaved }) {
     setSaving(true); setError("");
     try {
       if (isEdit) {
-        await api.updateStore(store.id, store.outlet_id, { name: name.trim(), color });
+        await api.updateStore(store.id, { name: name.trim(), color });
         onSaved(`"${name.trim()}" updated.`);
       } else {
-        await api.createStore({ name: name.trim(), outlet_id: outletId, color });
+        await api.createStore({ name: name.trim(), color });
         onSaved(`"${name.trim()}" created.`);
       }
     } catch (err) {
@@ -2320,15 +2324,6 @@ function StoreFormModal({ store, outlets, initialOutletId, onClose, onSaved }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4">
-          {!isEdit && (
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Outlet</label>
-              <select value={outletId} onChange={e => setOutletId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
-                {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            </div>
-          )}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Store Name</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Pastry Kitchen"

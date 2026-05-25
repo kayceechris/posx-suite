@@ -232,17 +232,15 @@ export const api = {
     });
   },
 
-  // Stores management
-  getStores: (outlet_id) => {
-    const qs = outlet_id ? `?outlet_id=${encodeURIComponent(outlet_id)}` : "";
-    return request(`/api/stores${qs}`);
-  },
+  // Stores management (global — not outlet-scoped)
+  initStores: () => request("/api/init-stores", { method: "POST" }),
+  getStores: () => request("/api/stores"),
   createStore: (data) =>
     request("/api/stores", { method: "POST", body: JSON.stringify(data) }),
-  updateStore: (id, outlet_id, data) =>
-    request(`/api/stores/${id}?outlet_id=${encodeURIComponent(outlet_id)}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteStore: (id, outlet_id) =>
-    request(`/api/stores/${id}?outlet_id=${encodeURIComponent(outlet_id)}`, { method: "DELETE" }),
+  updateStore: (id, data) =>
+    request(`/api/stores/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteStore: (id) =>
+    request(`/api/stores/${id}`, { method: "DELETE" }),
 
   // Requisitions
   getRequisitions: (outlet_id, status) => {
