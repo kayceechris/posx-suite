@@ -1155,6 +1155,7 @@ function CashFlowView() {
           )}
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
@@ -1178,6 +1179,7 @@ function CashFlowView() {
                 {timeline.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">No transactions in this period</td></tr>}
               </tbody>
             </table>
+            </div>
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <p className="text-xs text-gray-500">{(page - 1) * PAGE + 1}–{Math.min(page * PAGE, timeline.length)} of {timeline.length}</p>

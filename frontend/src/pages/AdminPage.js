@@ -386,9 +386,9 @@ export default function AdminPage() {
 function StatCard({ title, value, icon: Icon, bgColor, iconBg, valueColor }) {
   return (
     <div className={cn("rounded-2xl border-2 border-gray-300/80 dark:border-gray-600/80 p-4 sm:p-5 flex items-center justify-between shadow-sm", bgColor)}>
-      <div className="min-w-0 flex-1 mr-3">
+      <div className="min-w-0 flex-1 mr-3 overflow-hidden">
         <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 leading-tight">{title}</p>
-        <p className={cn("text-xl sm:text-3xl font-black break-all leading-tight", valueColor)}>{value}</p>
+        <p className={cn("text-xl sm:text-2xl font-black leading-tight truncate", valueColor)}>{value}</p>
       </div>
       <div className={cn("w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0", iconBg)}>
         <Icon size={22} className="text-white" />

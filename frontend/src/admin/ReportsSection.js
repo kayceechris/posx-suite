@@ -60,7 +60,7 @@ function StatCard({ label, value, color, bg }) {
   return (
     <div className={cn("rounded-2xl p-4 shadow-sm", bg)}>
       <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 leading-tight">{label}</p>
-      <p className={cn("text-lg sm:text-2xl font-black break-all leading-tight", color)}>{value}</p>
+      <p className={cn("text-lg sm:text-2xl font-black leading-tight truncate", color)}>{value}</p>
     </div>
   );
 }
@@ -684,7 +684,7 @@ function PaymentsTab() {
                 )}
               >
                 <p className="font-semibold text-gray-700 dark:text-gray-100 capitalize mb-2">{m.method || "Unknown"}</p>
-                <p className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 mb-1 break-all">{formatCurrency(m.total)}</p>
+                <p className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 mb-1 truncate">{formatCurrency(m.total)}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-300">{m.count} transaction{m.count !== 1 ? "s" : ""}</p>
               </button>
             ))}
