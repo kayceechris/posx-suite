@@ -21,6 +21,7 @@ import AccountsSection from "../admin/AccountsSection";
 import TablesSection from "../admin/TablesSection";
 import BarTabsAdminSection from "../admin/BarTabsAdminSection";
 import ReservationsSection from "../admin/ReservationsSection";
+import RequisitionsSection from "../admin/RequisitionsSection";
 import SettingsSection from "../admin/SettingsSection";
 import PurchasesSection from "../admin/PurchasesSection";
 
@@ -51,6 +52,7 @@ const EXPANDABLE = {
     { id: "stock-count", label: "Stock Count" },
     { id: "update-stock", label: "Update Stock" },
     { id: "transfer-stock", label: "Transfer Stock" },
+    { id: "requisitions", label: "Requisitions" },
     { id: "reorder", label: "Reorder Alerts" },
     { id: "waste", label: "Waste Recording" },
     { id: "valuation", label: "Stock Valuation" },
@@ -116,6 +118,7 @@ const SUB_ITEM_PERMISSION = {
   "inventory.stock-count":      "manage_stock_count",
   "inventory.update-stock":     "update_stock",
   "inventory.transfer-stock":   "transfer_stock",
+  "inventory.requisitions":     "view_inventory",
   "inventory.reorder":          "view_reorder_alerts",
   "inventory.waste":            "record_waste",
   "inventory.valuation":        "view_stock_valuation",
@@ -360,7 +363,8 @@ export default function AdminPage() {
             {activeSection === "products" && (
               <ProductsSection view={subViews.products} onViewChange={(v) => handleSubClick("products", v)} />
             )}
-            {activeSection === "inventory" && <InventorySection view={subViews.inventory} />}
+            {activeSection === "inventory" && subViews.inventory !== "requisitions" && <InventorySection view={subViews.inventory} />}
+            {activeSection === "inventory" && subViews.inventory === "requisitions" && <RequisitionsSection />}
             {activeSection === "customers" && <CustomersSection />}
             {activeSection === "orders" && <OrdersSection />}
             {activeSection === "reports" && <ReportsSection view={subViews.reports} />}

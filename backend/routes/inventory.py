@@ -10,10 +10,12 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/stock")
-async def get_stock(outlet_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+async def get_stock(outlet_id: Optional[str] = None, store: Optional[str] = None, current_user: User = Depends(get_current_user)):
     query = {}
     if outlet_id:
         query["outlet_id"] = outlet_id
+    if store:
+        query["store"] = store
     stocks = await db.stock.find(query, {"_id": 0}).to_list(1000)
     return stocks
 
@@ -23,14 +25,17 @@ async def update_stock(stock_data: StockUpdate, current_user: User = Depends(get
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    store = stock_data.store or "main"
     existing = await db.stock.find_one({
         "product_id": stock_data.product_id,
-        "outlet_id": stock_data.outlet_id
+        "outlet_id": stock_data.outlet_id,
+        "store": store,
     }, {"_id": 0})
 
     set_fields = {
         "quantity": stock_data.quantity,
         "min_quantity": stock_data.min_quantity,
+        "store": store,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if stock_data.batch_number is not None:
@@ -40,7 +45,7 @@ async def update_stock(stock_data: StockUpdate, current_user: User = Depends(get
 
     if existing:
         await db.stock.update_one(
-            {"product_id": stock_data.product_id, "outlet_id": stock_data.outlet_id},
+            {"product_id": stock_data.product_id, "outlet_id": stock_data.outlet_id, "store": store},
             {"$set": set_fields}
         )
     else:
@@ -78,30 +83,32 @@ async def create_stock_movement(movement_data: StockMovementCreate, current_user
     if movement.type == "in" and movement.to_outlet_id:
         existing = await db.stock.find_one({
             "product_id": movement.product_id,
-            "outlet_id": movement.to_outlet_id
+            "outlet_id": movement.to_outlet_id,
+            "store": "main",
         })
         if existing:
             await db.stock.update_one(
-                {"product_id": movement.product_id, "outlet_id": movement.to_outlet_id},
+                {"product_id": movement.product_id, "outlet_id": movement.to_outlet_id, "store": "main"},
                 {"$inc": {"quantity": movement.quantity}}
             )
     elif movement.type == "out" and movement.from_outlet_id:
         await db.stock.update_one(
-            {"product_id": movement.product_id, "outlet_id": movement.from_outlet_id},
+            {"product_id": movement.product_id, "outlet_id": movement.from_outlet_id, "store": "main"},
             {"$inc": {"quantity": -movement.quantity}}
         )
     elif movement.type == "transfer" and movement.from_outlet_id and movement.to_outlet_id:
         await db.stock.update_one(
-            {"product_id": movement.product_id, "outlet_id": movement.from_outlet_id},
+            {"product_id": movement.product_id, "outlet_id": movement.from_outlet_id, "store": "main"},
             {"$inc": {"quantity": -movement.quantity}}
         )
         existing = await db.stock.find_one({
             "product_id": movement.product_id,
-            "outlet_id": movement.to_outlet_id
+            "outlet_id": movement.to_outlet_id,
+            "store": "main",
         })
         if existing:
             await db.stock.update_one(
-                {"product_id": movement.product_id, "outlet_id": movement.to_outlet_id},
+                {"product_id": movement.product_id, "outlet_id": movement.to_outlet_id, "store": "main"},
                 {"$inc": {"quantity": movement.quantity}}
             )
 

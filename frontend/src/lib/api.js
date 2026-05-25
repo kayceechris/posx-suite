@@ -193,8 +193,13 @@ export const api = {
     request(`/api/products/${id}`, { method: "DELETE" }),
 
   // Inventory / Stock
-  getStock: (outlet_id) =>
-    request(`/api/stock${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
+  getStock: (outlet_id, store) => {
+    const params = new URLSearchParams();
+    if (outlet_id) params.set("outlet_id", outlet_id);
+    if (store) params.set("store", store);
+    const qs = params.toString();
+    return request(`/api/stock${qs ? `?${qs}` : ""}`);
+  },
   updateStock: (data) =>
     request("/api/stock", { method: "POST", body: JSON.stringify(data) }),
   getLowStock: () => request("/api/stock/low"),
@@ -202,6 +207,25 @@ export const api = {
     request(`/api/stock/valuation${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
   getConsolidatedStock: () => request("/api/stock/consolidated"),
   getExpiringStock: (days = 30) => request(`/api/stock/expiring?days=${days}`),
+
+  // Requisitions
+  getRequisitions: (outlet_id, status) => {
+    const params = new URLSearchParams();
+    if (outlet_id) params.set("outlet_id", outlet_id);
+    if (status) params.set("status", status);
+    const qs = params.toString();
+    return request(`/api/requisitions${qs ? `?${qs}` : ""}`);
+  },
+  createRequisition: (data) =>
+    request("/api/requisitions", { method: "POST", body: JSON.stringify(data) }),
+  approveRequisition: (id) =>
+    request(`/api/requisitions/${id}/approve`, { method: "PUT" }),
+  rejectRequisition: (id) =>
+    request(`/api/requisitions/${id}/reject`, { method: "PUT" }),
+  fulfillRequisition: (id, overrides) =>
+    request(`/api/requisitions/${id}/fulfill`, { method: "PUT", body: JSON.stringify({ overrides: overrides || {} }) }),
+  deleteRequisition: (id) =>
+    request(`/api/requisitions/${id}`, { method: "DELETE" }),
 
   // Waste / Spoilage
   getWasteEntries: (outlet_id) =>

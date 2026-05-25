@@ -70,16 +70,24 @@ function Spinner({ color = "blue" }) {
 // ─── Stock Levels ──────────────────────────────────────────────────────────────
 const STOCK_PAGE_SIZE = 25;
 
+const STORE_LABELS = { main: "Main Store", kitchen: "Kitchen Store", bar: "Bar Store" };
+const STORE_COLORS = {
+  main:    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  kitchen: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  bar:     "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+};
+
 function StockLevelsView() {
   const [stock, setStock] = useState([]);
   const [products, setProducts] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updateModal, setUpdateModal] = useState(null);
-  const [form, setForm] = useState({ product_id: "", outlet_id: "", quantity: "", min_quantity: "10", batch_number: "", expiry_date: "" });
+  const [form, setForm] = useState({ product_id: "", outlet_id: "", store: "main", quantity: "", min_quantity: "10", batch_number: "", expiry_date: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
+  const [storeFilter, setStoreFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   const load = () => {
@@ -102,15 +110,16 @@ function StockLevelsView() {
   };
   const isExpired = (item) => item.expiry_date && new Date(item.expiry_date) < new Date();
 
-  const displayed = tab === "low" ? stock.filter(isLow)
-    : tab === "expiring" ? stock.filter((s) => isExpiring(s) || isExpired(s))
-    : stock;
+  const storeFiltered = storeFilter === "all" ? stock : stock.filter((s) => (s.store || "main") === storeFilter);
+  const displayed = tab === "low" ? storeFiltered.filter(isLow)
+    : tab === "expiring" ? storeFiltered.filter((s) => isExpiring(s) || isExpired(s))
+    : storeFiltered;
   const totalStockPages = Math.max(1, Math.ceil(displayed.length / STOCK_PAGE_SIZE));
   const pagedStock = displayed.slice((page - 1) * STOCK_PAGE_SIZE, page * STOCK_PAGE_SIZE);
 
   const openUpdate = (item) => {
     setForm({
-      product_id: item.product_id, outlet_id: item.outlet_id,
+      product_id: item.product_id, outlet_id: item.outlet_id, store: item.store || "main",
       quantity: item.quantity, min_quantity: item.min_quantity || 10,
       batch_number: item.batch_number || "", expiry_date: item.expiry_date || "",
     });
@@ -122,7 +131,7 @@ function StockLevelsView() {
     e.preventDefault(); setSaving(true); setError("");
     try {
       await api.updateStock({
-        product_id: form.product_id, outlet_id: form.outlet_id,
+        product_id: form.product_id, outlet_id: form.outlet_id, store: form.store || "main",
         quantity: parseInt(form.quantity), min_quantity: parseInt(form.min_quantity),
         batch_number: form.batch_number || null,
         expiry_date: form.expiry_date || null,
@@ -176,6 +185,16 @@ function StockLevelsView() {
         </div>
       )}
 
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {[["all", "All Stores"], ["main", "Main Store"], ["kitchen", "Kitchen Store"], ["bar", "Bar Store"]].map(([v, l]) => (
+          <button key={v} onClick={() => { setStoreFilter(v); setPage(1); }}
+            className={cn("px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+              storeFilter === v ? "bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700")}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       <div className="flex gap-2 mb-4 flex-wrap">
         {[
           ["all", "All Stock"],
@@ -198,6 +217,7 @@ function StockLevelsView() {
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
                   <th className="text-left px-4 py-3">Product</th>
                   <th className="text-left px-4 py-3">Outlet</th>
+                  <th className="text-left px-3 py-3">Store</th>
                   <th className="text-center px-3 py-3">Qty</th>
                   <th className="text-center px-3 py-3">Min</th>
                   <th className="text-left px-3 py-3">Batch</th>
@@ -211,10 +231,16 @@ function StockLevelsView() {
                   const low = isLow(item);
                   const expired = isExpired(item);
                   const expiring = !expired && isExpiring(item);
+                  const storeKey = item.store || "main";
                   return (
                     <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap">{outletName(item.outlet_id)}</td>
+                      <td className="px-3 py-3">
+                        <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold", STORE_COLORS[storeKey] || STORE_COLORS.main)}>
+                          {STORE_LABELS[storeKey] || storeKey}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-center">
                         <span className={cn("font-bold text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
                       </td>
@@ -237,7 +263,7 @@ function StockLevelsView() {
                     </tr>
                   );
                 })}
-                {displayed.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No stock records</td></tr>}
+                {displayed.length === 0 && <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400 text-sm">No stock records</td></tr>}
               </tbody>
             </table>
             {totalStockPages > 1 && (
@@ -276,6 +302,9 @@ function StockLevelsView() {
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 text-sm">
                   <p className="font-semibold text-gray-900 dark:text-white">{productName(form.product_id)}</p>
                   <p className="text-gray-500 dark:text-gray-400">{outletName(form.outlet_id)}</p>
+                  <span className={cn("mt-1 inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold", STORE_COLORS[form.store || "main"] || STORE_COLORS.main)}>
+                    {STORE_LABELS[form.store || "main"]}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
