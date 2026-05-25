@@ -13,7 +13,8 @@ export function setCurrencySymbol(symbol) {
 
 export function formatCurrency(amount, symbol) {
   const sym = symbol !== undefined ? symbol : _currencySymbol;
-  return `${sym}${Number(amount || 0).toFixed(2)}`;
+  const num = Number(amount || 0);
+  return `${sym}${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function timeAgo(dateStr) {
