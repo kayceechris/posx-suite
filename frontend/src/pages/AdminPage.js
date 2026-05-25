@@ -29,7 +29,7 @@ const EXPANDABLE = {
   outlets: [{ id: "outlets", label: "All Outlets" }, { id: "terminals", label: "Terminals" }],
   products: [
     { id: "all-products", label: "All Products" }, { id: "create-product", label: "Create Product" },
-    { id: "categories", label: "Categories" }, { id: "brands", label: "Brands" },
+    { id: "groups", label: "Groups" }, { id: "brands", label: "Brands" },
     { id: "units", label: "Units" }, { id: "recipes", label: "Recipes" },
     { id: "print-labels", label: "Print Labels" }, { id: "import", label: "Import Products" },
     { id: "image-library", label: "Image Library" },
@@ -40,7 +40,7 @@ const EXPANDABLE = {
     { id: "staff",         label: "Staff Performance" },
     { id: "payments",      label: "Payment Methods" },
     { id: "items",         label: "Sales by Item" },
-    { id: "category",      label: "Sales by Category" },
+    { id: "category",      label: "Sales by Group" },
     { id: "discounts",     label: "Discount Report" },
     { id: "daily-summary", label: "Daily Summary" },
     { id: "shifts",        label: "Shift Report" },

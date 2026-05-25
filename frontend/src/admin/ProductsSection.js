@@ -50,14 +50,14 @@ function SectionHeader({ title, icon, iconBg = "bg-orange-100", action }) {
 // ─── All Products View ────────────────────────────────────────────────────────
 function AllProductsView({ autoOpen }) {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [brands, setBrands] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [terminals, setTerminals] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
+  const [filterGroup, setFilterGroup] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
   const [page, setPage] = useState(1);
   const [productModal, setProductModal] = useState(null);
@@ -67,11 +67,11 @@ function AllProductsView({ autoOpen }) {
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      api.getProducts(), api.getCategories(), api.getBrands(),
+      api.getProducts(), api.getGroups(), api.getBrands(),
       api.getOutlets(), api.getTerminals(), api.getUnits(),
     ])
-      .then(([p, c, b, o, t, u]) => {
-        setProducts(p); setCategories(c); setBrands(b);
+      .then(([p, g, b, o, t, u]) => {
+        setProducts(p); setGroups(g); setBrands(b);
         setOutlets(o); setTerminals(t); setUnits(u);
       })
       .catch(console.error)
@@ -88,7 +88,7 @@ function AllProductsView({ autoOpen }) {
 
   const filtered = products.filter((p) => {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterCategory && p.category_id !== filterCategory) return false;
+    if (filterGroup && p.category_id !== filterGroup) return false;
     if (filterBrand && p.brand_id !== filterBrand) return false;
     return true;
   });
@@ -98,10 +98,10 @@ function AllProductsView({ autoOpen }) {
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [search, filterCategory, filterBrand]);
+  useEffect(() => { setPage(1); }, [search, filterGroup, filterBrand]);
 
-  const catName = (id) => categories.find((c) => c.id === id)?.name || "";
-  const catColor = (id) => categories.find((c) => c.id === id)?.color || "#9CA3AF";
+  const groupName = (id) => groups.find((g) => g.id === id)?.name || "";
+  const groupColor = (id) => groups.find((g) => g.id === id)?.color || "#9CA3AF";
 
   const handleDelete = async (p) => {
     if (!window.confirm(`Delete "${p.name}"?`)) return;
@@ -109,7 +109,7 @@ function AllProductsView({ autoOpen }) {
     catch (err) { alert(err.message); }
   };
 
-  const clearFilters = filterCategory || filterBrand || search;
+  const clearFilters = filterGroup || filterBrand || search;
 
   return (
     <div>
@@ -151,10 +151,18 @@ function AllProductsView({ autoOpen }) {
             />
           </div>
           <div className="flex gap-2">
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)}
               className="flex-1 sm:flex-none px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-              <option value="">All categories</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">All groups</option>
+              {["food", "drinks"].map((mc) => {
+                const opts = groups.filter((g) => g.main_category === mc);
+                return opts.length > 0 ? (
+                  <optgroup key={mc} label={mc === "food" ? "Food" : "Drinks"}>
+                    {opts.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </optgroup>
+                ) : null;
+              })}
+              {groups.filter((g) => !g.main_category).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
               className="flex-1 sm:flex-none px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
@@ -162,7 +170,7 @@ function AllProductsView({ autoOpen }) {
               {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
             {clearFilters && (
-              <button onClick={() => { setSearch(""); setFilterCategory(""); setFilterBrand(""); }}
+              <button onClick={() => { setSearch(""); setFilterGroup(""); setFilterBrand(""); }}
                 className="p-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 hover:text-gray-700 dark:text-gray-200 hover:border-gray-300 transition-colors flex-shrink-0">
                 <X size={16} />
               </button>
@@ -170,21 +178,23 @@ function AllProductsView({ autoOpen }) {
           </div>
         </div>
 
-        {/* Category chips */}
-        {categories.length > 0 && (
+        {/* Group chips grouped by main_category */}
+        {groups.length > 0 && (
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <button onClick={() => setFilterCategory("")}
+            <button onClick={() => setFilterGroup("")}
               className={cn("px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                !filterCategory ? "bg-gray-900 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>
+                !filterGroup ? "bg-gray-900 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>
               All
             </button>
-            {categories.map((c) => (
-              <button key={c.id} onClick={() => setFilterCategory(c.id === filterCategory ? "" : c.id)}
-                className={cn("px-4 py-1.5 rounded-full text-sm font-semibold transition-colors text-white")}
-                style={{ backgroundColor: c.id === filterCategory ? c.color : c.color + "CC" }}>
-                {c.name}
-              </button>
-            ))}
+            {["food", "drinks", null].flatMap((mc) =>
+              groups.filter((g) => (mc ? g.main_category === mc : !g.main_category)).map((g) => (
+                <button key={g.id} onClick={() => setFilterGroup(g.id === filterGroup ? "" : g.id)}
+                  className={cn("px-4 py-1.5 rounded-full text-sm font-semibold transition-colors text-white")}
+                  style={{ backgroundColor: g.id === filterGroup ? g.color : g.color + "CC" }}>
+                  {g.name}
+                </button>
+              ))
+            )}
           </div>
         )}
       </div>
@@ -216,7 +226,7 @@ function AllProductsView({ autoOpen }) {
               </div>
               <div className="p-3">
                 <p className="font-bold text-gray-900 dark:text-white text-sm truncate">{p.name}</p>
-                <p className="text-xs mt-0.5" style={{ color: catColor(p.category_id) }}>{catName(p.category_id)}</p>
+                <p className="text-xs mt-0.5" style={{ color: groupColor(p.category_id) }}>{groupName(p.category_id)}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="font-bold text-green-600 text-sm">{formatCurrency(p.price)}</span>
                   <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold",
@@ -294,7 +304,7 @@ function AllProductsView({ autoOpen }) {
         <ProductModal
           mode={productModal.mode}
           product={productModal.product}
-          categories={categories}
+          groups={groups}
           brands={brands}
           units={units}
           outlets={outlets}
@@ -348,7 +358,7 @@ function resizeImageFile(file, maxPx = 800, quality = 0.82) {
   });
 }
 
-function ProductModal({ mode, product, categories, brands, units, outlets, terminals, onClose, onSaved }) {
+function ProductModal({ mode, product, groups, brands, units, outlets, terminals, onClose, onSaved }) {
   const [form, setForm] = useState(() => {
     if (mode === "edit" && product) {
       return {
@@ -368,7 +378,7 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
         terminal_prices: product.terminal_prices || [],
       };
     }
-    return { ...EMPTY_FORM, category_id: categories[0]?.id || "" };
+    return { ...EMPTY_FORM, category_id: groups[0]?.id || "" };
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -477,12 +487,24 @@ function ProductModal({ mode, product, categories, brands, units, outlets, termi
             className={input} placeholder="Product name…" autoFocus />
         </div>
 
-        {/* Category */}
+        {/* Group */}
         <div>
-          <label className={label}>Category</label>
+          <label className={label}>Group</label>
           <select required value={form.category_id} onChange={(e) => f("category_id", e.target.value)} className={input}>
-            <option value="">Select category…</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="">Select group…</option>
+            {["food", "drinks"].map((mc) => {
+              const opts = groups.filter((g) => g.main_category === mc);
+              return opts.length > 0 ? (
+                <optgroup key={mc} label={mc === "food" ? "Food" : "Drinks"}>
+                  {opts.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </optgroup>
+              ) : null;
+            })}
+            {groups.filter((g) => !g.main_category).length > 0 && (
+              <optgroup label="Other">
+                {groups.filter((g) => !g.main_category).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </optgroup>
+            )}
           </select>
         </div>
 
@@ -828,85 +850,168 @@ function BulkPriceModal({ products, outlets, terminals, onClose, onApplied }) {
   );
 }
 
-// ─── Categories View ──────────────────────────────────────────────────────────
-function CategoriesView() {
-  const [categories, setCategories] = useState([]);
+// ─── Groups View ──────────────────────────────────────────────────────────────
+const MC_LABELS = { food: "Food", drinks: "Drinks" };
+const MC_COLORS = {
+  food:   { bg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", dot: "bg-orange-500" },
+  drinks: { bg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",         dot: "bg-blue-500" },
+};
+
+function GroupsView() {
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", color: "#3B82F6" });
+  const [form, setForm] = useState({ name: "", color: "#3B82F6", main_category: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const load = () => {
     setLoading(true);
-    api.getCategories().then(setCategories).catch(console.error).finally(() => setLoading(false));
+    api.getGroups().then(setGroups).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6" }); setError(""); setModal(true); };
-  const openEdit = (c) => { setEditing(c); setForm({ name: c.name, color: c.color || "#3B82F6" }); setError(""); setModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6", main_category: "" }); setError(""); setModal(true); };
+  const openEdit = (g) => { setEditing(g); setForm({ name: g.name, color: g.color || "#3B82F6", main_category: g.main_category || "" }); setError(""); setModal(true); };
   const closeModal = () => { setModal(false); setEditing(null); };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError("");
     try {
-      if (editing) { await api.updateCategory(editing.id, form); }
-      else { await api.createCategory(form); }
+      if (editing) { await api.updateGroup(editing.id, form); }
+      else { await api.createGroup(form); }
       closeModal(); load();
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (c) => {
-    if (!window.confirm(`Delete category "${c.name}"?`)) return;
-    try { await api.deleteCategory(c.id); load(); }
+  const handleDelete = async (g) => {
+    if (!window.confirm(`Delete group "${g.name}"?`)) return;
+    try { await api.deleteGroup(g.id); load(); }
     catch (err) { alert(err.message); }
   };
+
+  // Split groups by main_category for display
+  const foodGroups   = groups.filter((g) => g.main_category === "food");
+  const drinksGroups = groups.filter((g) => g.main_category === "drinks");
+  const otherGroups  = groups.filter((g) => !g.main_category);
+
+  const GroupCard = ({ g }) => {
+    const mc = MC_COLORS[g.main_category] || null;
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full flex-shrink-0" style={{ backgroundColor: g.color }} />
+            <div className="min-w-0">
+              <span className="font-semibold text-gray-900 dark:text-white text-sm truncate block">{g.name}</span>
+              {mc && (
+                <span className={cn("inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-0.5", mc.bg)}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", mc.dot)} />
+                  {MC_LABELS[g.main_category]}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => openEdit(g)} className="text-gray-400 hover:text-blue-500 transition-colors p-1">
+              <Pencil size={14} />
+            </button>
+            <button onClick={() => handleDelete(g)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const Section = ({ label, icon, items }) => items.length === 0 ? null : (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{label} ({items.length})</h2>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {items.map((g) => <GroupCard key={g.id} g={g} />)}
+      </div>
+    </div>
+  );
 
   return (
     <div>
       <SectionHeader
-        title="Categories"
+        title="Groups"
         icon={<Tag size={20} className="text-orange-600" />}
         iconBg="bg-orange-100"
         action={
           <button onClick={openAdd}
             className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors">
-            <Plus size={16} /> Add Category
+            <Plus size={16} /> Add Group
           </button>
         }
       />
-      {loading ? <Spinner /> : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {categories.map((c) => (
-            <div key={c.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 p-4 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
-                <span className="font-semibold text-gray-900 dark:text-white text-sm truncate">{c.name}</span>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                <button onClick={() => openEdit(c)} className="text-gray-400 hover:text-blue-500 transition-colors p-1">
-                  <Pencil size={14} />
-                </button>
-                <button onClick={() => handleDelete(c)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
-                  <Trash2 size={14} />
-                </button>
-              </div>
+
+      {/* Two main categories banner */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[
+          { mc: "food",   label: "Food → Kitchen Store",   icon: <UtensilsCrossed size={18} className="text-orange-500" />, bg: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800", count: foodGroups.length },
+          { mc: "drinks", label: "Drinks → Bar Store",     icon: <ChefHat size={18} className="text-blue-500" />,          bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",       count: drinksGroups.length },
+        ].map(({ mc, label, icon, bg, count }) => (
+          <div key={mc} className={cn("rounded-2xl border-2 p-4 flex items-center gap-3", bg)}>
+            <div className="w-9 h-9 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm flex-shrink-0">{icon}</div>
+            <div>
+              <p className="font-bold text-gray-900 dark:text-white text-sm">{label}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{count} group{count !== 1 ? "s" : ""}</p>
             </div>
-          ))}
-          {categories.length === 0 && <p className="col-span-4 text-center text-gray-400 text-sm py-10">No categories yet</p>}
-        </div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : (
+        <>
+          <Section label="Food Groups" icon={<UtensilsCrossed size={13} className="text-orange-500" />} items={foodGroups} />
+          <Section label="Drinks Groups" icon={<ChefHat size={13} className="text-blue-500" />} items={drinksGroups} />
+          {otherGroups.length > 0 && <Section label="Other" icon={<Tag size={13} className="text-gray-400" />} items={otherGroups} />}
+          {groups.length === 0 && <p className="text-center text-gray-400 text-sm py-10">No groups yet — add one above</p>}
+        </>
       )}
 
       {modal && (
-        <Modal title={editing ? "Edit Category" : "Add Category"} onClose={closeModal}>
+        <Modal title={editing ? "Edit Group" : "Add Group"} onClose={closeModal}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Name</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Group Name</label>
               <input required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Starters, Cocktails, Soft Drinks…"
                 className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
             </div>
+
+            {/* Main Category picker */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Main Category</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "food",   label: "Food",   sub: "→ Kitchen Store", icon: <UtensilsCrossed size={16} />, active: "border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300" },
+                  { value: "drinks", label: "Drinks", sub: "→ Bar Store",     icon: <ChefHat size={16} />,         active: "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" },
+                ].map(({ value, label, sub, icon, active }) => (
+                  <button key={value} type="button"
+                    onClick={() => setForm({ ...form, main_category: form.main_category === value ? "" : value })}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-3 rounded-xl border-2 text-left transition-all",
+                      form.main_category === value ? active : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300"
+                    )}>
+                    {icon}
+                    <div>
+                      <p className="font-bold text-sm leading-tight">{label}</p>
+                      <p className="text-[10px] opacity-70">{sub}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Color</label>
               <div className="flex items-center gap-3">
@@ -1978,7 +2083,7 @@ function RecipesView() {
     setLoading(true);
     try {
       const [prods, cats, recs] = await Promise.all([
-        api.getProducts(), api.getCategories(), api.getRecipes(),
+        api.getProducts(), api.getGroups(), api.getRecipes(),
       ]);
       setProducts(prods);
       setCategories(cats);
@@ -2033,7 +2138,7 @@ function RecipesView() {
         </div>
         <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}
           className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500">
-          <option value="">All Categories</option>
+          <option value="">All Groups</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
@@ -2140,7 +2245,7 @@ export default function ProductsSection({ view = "all-products", onViewChange })
   switch (view) {
     case "all-products":   return <AllProductsView autoOpen={false} />;
     case "create-product": return <AllProductsView autoOpen={true} />;
-    case "categories":     return <CategoriesView />;
+    case "groups":         return <GroupsView />;
     case "brands":         return <BrandsView />;
     case "units":          return <UnitsView />;
     case "print-labels":   return <PrintLabelsView />;

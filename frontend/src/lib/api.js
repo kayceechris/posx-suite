@@ -172,14 +172,16 @@ export const api = {
   deletePeripheral: (id) =>
     request(`/api/peripherals/${id}`, { method: "DELETE" }),
 
-  // Categories
-  getCategories: () => request("/api/categories"),
-  createCategory: (data) =>
-    request("/api/categories", { method: "POST", body: JSON.stringify(data) }),
-  updateCategory: (id, data) =>
-    request(`/api/categories/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteCategory: (id) =>
-    request(`/api/categories/${id}`, { method: "DELETE" }),
+  // Groups (formerly Categories)
+  getGroups: () => request("/api/groups"),
+  createGroup: (data) =>
+    request("/api/groups", { method: "POST", body: JSON.stringify(data) }),
+  updateGroup: (id, data) =>
+    request(`/api/groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteGroup: (id) =>
+    request(`/api/groups/${id}`, { method: "DELETE" }),
+  // Legacy alias — keeps old callers working during transition
+  getCategories: () => request("/api/groups"),
 
   // Products
   getProducts: () => request("/api/products"),

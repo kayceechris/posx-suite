@@ -51,19 +51,21 @@ class OutletCreate(BaseModel):
     phone: Optional[str] = None
 
 
-# ==================== CATEGORY MODELS ====================
+# ==================== GROUP (formerly Category) MODELS ====================
 
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     color: str = "#3B82F6"
+    main_category: Optional[str] = None   # "food" | "drinks"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CategoryCreate(BaseModel):
     name: str
     color: Optional[str] = "#3B82F6"
+    main_category: Optional[str] = None   # "food" | "drinks"
 
 
 # ==================== PRODUCT MODELS ====================

@@ -8,46 +8,53 @@ from auth import get_current_user
 router = APIRouter(prefix="/api")
 
 
-# ==================== CATEGORY ROUTES ====================
+# ==================== GROUP ROUTES (collection: db.categories) ====================
 
-@router.get("/categories", response_model=List[Category])
-async def get_categories(current_user: User = Depends(get_current_user)):
-    categories = await db.categories.find({}, {"_id": 0}).to_list(1000)
-    return [Category(**c) for c in categories]
+@router.get("/groups", response_model=List[Category])
+async def get_groups(current_user: User = Depends(get_current_user)):
+    groups = await db.categories.find({}, {"_id": 0}).to_list(1000)
+    return [Category(**g) for g in groups]
 
 
-@router.post("/categories", response_model=Category)
-async def create_category(category_data: CategoryCreate, current_user: User = Depends(get_current_user)):
+@router.post("/groups", response_model=Category)
+async def create_group(group_data: CategoryCreate, current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    category = Category(**category_data.model_dump())
-    doc = category.model_dump()
+    group = Category(**group_data.model_dump())
+    doc = group.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.categories.insert_one(doc)
-    return category
+    return group
 
 
-@router.put("/categories/{category_id}", response_model=Category)
-async def update_category(category_id: str, category_data: dict, current_user: User = Depends(get_current_user)):
+@router.put("/groups/{group_id}", response_model=Category)
+async def update_group(group_id: str, group_data: dict, current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    update_data = {k: v for k, v in category_data.items() if k not in ("id", "created_at")}
-    result = await db.categories.update_one({"id": category_id}, {"$set": update_data})
+    update_data = {k: v for k, v in group_data.items() if k not in ("id", "created_at")}
+    result = await db.categories.update_one({"id": group_id}, {"$set": update_data})
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
-    updated = await db.categories.find_one({"id": category_id}, {"_id": 0})
+        raise HTTPException(status_code=404, detail="Group not found")
+    updated = await db.categories.find_one({"id": group_id}, {"_id": 0})
     return Category(**updated)
 
 
-@router.delete("/categories/{category_id}")
-async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
+@router.delete("/groups/{group_id}")
+async def delete_group(group_id: str, current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    result = await db.categories.delete_one({"id": category_id})
+    result = await db.categories.delete_one({"id": group_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return {"message": "Category deleted successfully"}
+        raise HTTPException(status_code=404, detail="Group not found")
+    return {"message": "Group deleted successfully"}
+
+
+# Keep /api/categories as a read-only alias so existing integrations don't break
+@router.get("/categories", response_model=List[Category])
+async def get_categories_alias(current_user: User = Depends(get_current_user)):
+    groups = await db.categories.find({}, {"_id": 0}).to_list(1000)
+    return [Category(**g) for g in groups]
 
 
 # ==================== PRODUCT ROUTES ====================
