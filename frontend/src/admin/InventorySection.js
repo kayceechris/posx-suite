@@ -665,6 +665,7 @@ function StockCountView() {
 // ─── Update Stock ──────────────────────────────────────────────────────────────
 function UpdateStockView() {
   const { products, outlets, loading } = useBaseData();
+  const [stores, setStores] = useState([]);
   const [stock, setStock] = useState([]);
   const [storeId, setStoreId] = useState("main");
   const [search, setSearch] = useState("");
@@ -676,6 +677,10 @@ function UpdateStockView() {
   const [toast, setToast] = useState(null);
 
   const outletId = outlets[0]?.id || "";
+
+  useEffect(() => {
+    api.getStores().then(setStores).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!outletId) return;
@@ -757,9 +762,9 @@ function UpdateStockView() {
         </div>
         <select value={storeId} onChange={(e) => setStoreId(e.target.value)}
           className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white dark:bg-gray-800 dark:text-white font-semibold">
-          <option value="main">Main Store</option>
-          <option value="kitchen">Kitchen Store</option>
-          <option value="bar">Bar Store</option>
+          {stores.length > 0
+            ? stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)
+            : Object.entries(STORE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
 
