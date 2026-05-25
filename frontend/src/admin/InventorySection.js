@@ -684,11 +684,11 @@ function UpdateStockView() {
 
   useEffect(() => {
     if (!outletId) return;
-    api.getStock(outletId).then(setStock).catch(console.error);
+    api.getStock(outletId, storeId).then(setStock).catch(console.error);
     setEditingId(null);
-  }, [outlets]);
+  }, [outletId, storeId]); // eslint-disable-line
 
-  const stockFor = (pid) => stock.find((s) => s.product_id === pid && (s.store || "main") === storeId);
+  const stockFor = (pid) => stock.find((s) => s.product_id === pid);
 
   const openEdit = (p) => {
     const s = stockFor(p.id);
@@ -705,7 +705,7 @@ function UpdateStockView() {
         batch_number: editForm.batch_number || null,
         expiry_date: editForm.expiry_date || null,
       });
-      const refreshed = await api.getStock(outletId);
+      const refreshed = await api.getStock(outletId, storeId);
       setStock(refreshed);
       setEditingId(null);
       setToast({ msg: "Stock updated successfully.", type: "success" });
