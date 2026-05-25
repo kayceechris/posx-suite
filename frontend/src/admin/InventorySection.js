@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck,
   Edit3, RefreshCw, Search, X, Trash2, Plus, Barcode,
   TrendingDown, LayoutGrid, DollarSign, PackageX, Calendar,
-  ShoppingBag, Lock,
+  ShoppingBag, Lock, Upload, Store,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
@@ -76,6 +76,31 @@ const STORE_COLORS = {
   kitchen: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   bar:     "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
 };
+
+// color name → tailwind badge classes (for dynamic stores)
+const COLOR_BADGE_MAP = {
+  blue:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  orange: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  purple: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  green:  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  red:    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  teal:   "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  pink:   "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
+  indigo: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  gray:   "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+};
+const colorBadge = (color) => COLOR_BADGE_MAP[color] || COLOR_BADGE_MAP.indigo;
+
+const COLOR_OPTIONS = [
+  { value: "blue",   label: "Blue"   },
+  { value: "orange", label: "Orange" },
+  { value: "purple", label: "Purple" },
+  { value: "green",  label: "Green"  },
+  { value: "red",    label: "Red"    },
+  { value: "teal",   label: "Teal"   },
+  { value: "pink",   label: "Pink"   },
+  { value: "indigo", label: "Indigo" },
+];
 
 function StockLevelsView() {
   const { user } = useAuth();
@@ -1765,6 +1790,159 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
   );
 }
 
+// ─── Import CSV Modal ─────────────────────────────────────────────────────────
+
+function ImportCsvModal({ outlets, initialOutletId, onClose, onImported }) {
+  const [outletId, setOutletId] = useState(initialOutletId || (outlets[0]?.id || ""));
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef(null);
+
+  const downloadTemplate = () => {
+    const csv = "product_name,quantity,min_quantity,batch_number,expiry_date\nCoca-Cola,100,20,,\nChicken Breast,50,10,BATCH001,2026-12-31\n";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "main_store_import_template.csv";
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  const handleFile = (f) => {
+    setFile(f); setResult(null);
+    if (!f) { setPreview([]); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const lines = e.target.result.split("\n").filter(Boolean);
+      const headers = lines[0]?.split(",").map(h => h.replace(/^"|"$/g, "").trim());
+      const rows = lines.slice(1, 6).map(line => {
+        const vals = line.split(",").map(v => v.replace(/^"|"$/g, "").trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+        return obj;
+      });
+      setPreview(rows);
+    };
+    reader.readAsText(f);
+  };
+
+  const handleImport = async () => {
+    if (!file || !outletId) return;
+    setLoading(true);
+    try {
+      const res = await api.importStockCsv(outletId, "main", file);
+      setResult(res);
+      onImported?.();
+    } catch (err) {
+      setResult({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+              <Upload size={16} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Import Stock via CSV</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300 space-y-1">
+            <p className="font-semibold">CSV Format</p>
+            <p className="font-mono text-xs">product_name, quantity, min_quantity, batch_number (opt), expiry_date (opt)</p>
+            <button onClick={downloadTemplate} className="mt-2 text-xs font-bold underline hover:no-underline">
+              Download template CSV
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Outlet</label>
+            <select value={outletId} onChange={e => setOutletId(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
+              {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">CSV File</label>
+            <div onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors">
+              <Upload size={24} className="mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {file ? <span className="font-semibold text-gray-900 dark:text-white">{file.name}</span> : "Click to select a CSV file"}
+              </p>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
+                onChange={e => handleFile(e.target.files?.[0] || null)} />
+            </div>
+          </div>
+
+          {preview.length > 0 && !result && (
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Preview (first {preview.length} rows)</p>
+              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-800 text-gray-400 uppercase">
+                    <tr>{["Product", "Qty", "Min Qty", "Batch", "Expiry"].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-bold">{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {preview.map((row, i) => (
+                      <tr key={i} className="bg-white dark:bg-gray-900">
+                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.product_name}</td>
+                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{row.quantity}</td>
+                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{row.min_quantity}</td>
+                        <td className="px-3 py-2 text-gray-500">{row.batch_number || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{row.expiry_date || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {result && !result.error && (
+            <div className={cn("rounded-xl p-4 text-sm space-y-1", result.skipped > 0 ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300" : "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300")}>
+              <p className="font-bold">Import complete</p>
+              <p>{result.imported} item(s) imported · {result.skipped} skipped</p>
+              {result.errors?.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-xs opacity-80 list-disc pl-4">
+                  {result.errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+          {result?.error && (
+            <div className="rounded-xl p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm font-semibold">{result.error}</div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 pb-6">
+          <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+            {result && !result.error ? "Close" : "Cancel"}
+          </button>
+          {(!result || result.error) && (
+            <button onClick={handleImport} disabled={!file || !outletId || loading}
+              className="px-5 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50">
+              {loading ? "Importing…" : "Import to Main Store"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Store View ──────────────────────────────────────────────────────────
 
 function MainStoreView() {
@@ -1774,6 +1952,7 @@ function MainStoreView() {
   const [loading, setLoading] = useState(true);
   const [outletId, setOutletId] = useState("");
   const [showReceive, setShowReceive] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
 
@@ -1820,6 +1999,10 @@ function MainStoreView() {
           <button onClick={() => loadStock(outletId)}
             className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
             <RefreshCw size={15} /> Refresh
+          </button>
+          <button onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <Upload size={15} /> Import CSV
           </button>
           <button onClick={() => setShowReceive(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
@@ -1933,6 +2116,246 @@ function MainStoreView() {
           }}
         />
       )}
+
+      {showImport && (
+        <ImportCsvModal
+          outlets={outlets}
+          initialOutletId={outletId}
+          onClose={() => setShowImport(false)}
+          onImported={() => loadStock(outletId)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Stores View (Store Management) ──────────────────────────────────────────
+
+function StoresView() {
+  const [outlets, setOutlets] = useState([]);
+  const [outletId, setOutletId] = useState("");
+  const [stores, setStores] = useState([]);
+  const [stockCounts, setStockCounts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editStore, setEditStore] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const loadStores = (oid) => {
+    const id = oid || outletId;
+    if (!id) return;
+    setLoading(true);
+    Promise.all([api.getStores(id), api.getStock(id)])
+      .then(([s, stock]) => {
+        setStores(s);
+        const counts = {};
+        stock.forEach(item => { counts[item.store] = (counts[item.store] || 0) + 1; });
+        setStockCounts(counts);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    api.getOutlets().then(o => {
+      setOutlets(o);
+      if (o.length > 0) { setOutletId(o[0].id); loadStores(o[0].id); }
+    }).catch(console.error);
+  }, []); // eslint-disable-line
+
+  useEffect(() => { if (outletId) loadStores(outletId); }, [outletId]); // eslint-disable-line
+
+  const handleDelete = async (store) => {
+    if (!window.confirm(`Delete "${store.name}"? This cannot be undone.`)) return;
+    try {
+      await api.deleteStore(store.id, outletId);
+      setToast({ msg: `"${store.name}" deleted.`, type: "success" });
+      loadStores(outletId);
+    } catch (err) {
+      setToast({ msg: err.message, type: "error" });
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <Store size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Store Management</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Main Store is built-in. Create Kitchen, Bar, or any custom child stores here.</p>
+          </div>
+        </div>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+          <Plus size={16} /> New Store
+        </button>
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="flex gap-3 mb-4">
+        <select value={outletId} onChange={e => setOutletId(e.target.value)}
+          className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
+          {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      </div>
+
+      {loading ? <Spinner color="indigo" /> : (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                <th className="text-left px-5 py-3">Store Name</th>
+                <th className="text-left px-4 py-3">Type</th>
+                <th className="text-left px-4 py-3">Color</th>
+                <th className="text-center px-4 py-3">Stock Items</th>
+                <th className="text-center px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {stores.length === 0 && (
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 text-sm">No stores found for this outlet.</td></tr>
+              )}
+              {stores.map(store => (
+                <tr key={store.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 dark:text-white text-sm">{store.name}</span>
+                      {store.is_main && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">DEFAULT</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", store.is_main ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300")}>
+                      {store.is_main ? "Main (Warehouse)" : "Child Store"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize", colorBadge(store.color))}>
+                      {store.color || "indigo"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{stockCounts[store.id] || 0}</span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {store.is_main ? (
+                      <span className="text-xs text-gray-400 italic">Protected</span>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => setEditStore(store)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                          <Edit3 size={15} />
+                        </button>
+                        <button onClick={() => handleDelete(store)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showCreate && (
+        <StoreFormModal
+          outlets={outlets}
+          initialOutletId={outletId}
+          onClose={() => setShowCreate(false)}
+          onSaved={(msg) => { setShowCreate(false); loadStores(outletId); setToast({ msg, type: "success" }); }}
+        />
+      )}
+
+      {editStore && (
+        <StoreFormModal
+          store={editStore}
+          outlets={outlets}
+          initialOutletId={outletId}
+          onClose={() => setEditStore(null)}
+          onSaved={(msg) => { setEditStore(null); loadStores(outletId); setToast({ msg, type: "success" }); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function StoreFormModal({ store, outlets, initialOutletId, onClose, onSaved }) {
+  const isEdit = !!store;
+  const [name, setName] = useState(store?.name || "");
+  const [outletId, setOutletId] = useState(store?.outlet_id || initialOutletId || outlets[0]?.id || "");
+  const [color, setColor] = useState(store?.color || "indigo");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    if (!name.trim()) { setError("Store name is required."); return; }
+    setSaving(true); setError("");
+    try {
+      if (isEdit) {
+        await api.updateStore(store.id, store.outlet_id, { name: name.trim(), color });
+        onSaved(`"${name.trim()}" updated.`);
+      } else {
+        await api.createStore({ name: name.trim(), outlet_id: outletId, color });
+        onSaved(`"${name.trim()}" created.`);
+      }
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-base font-bold text-gray-900 dark:text-white">{isEdit ? "Edit Store" : "Create New Store"}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          {!isEdit && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Outlet</label>
+              <select value={outletId} onChange={e => setOutletId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
+                {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Store Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Pastry Kitchen"
+              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Badge Color</label>
+            <div className="flex flex-wrap gap-2">
+              {COLOR_OPTIONS.map(c => (
+                <button key={c.value} onClick={() => setColor(c.value)}
+                  className={cn("px-3 py-1.5 rounded-full text-xs font-semibold transition-all", colorBadge(c.value),
+                    color === c.value ? "ring-2 ring-offset-1 ring-indigo-500" : "opacity-60 hover:opacity-100")}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 px-6 pb-6">
+          <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2.5 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50">
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Store"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1945,6 +2368,7 @@ export default function InventorySection({ view = "stock" }) {
   const can = (p) => isPrivileged || perms.includes(p);
 
   if (view === "main-store")     return can("update_stock")             ? <MainStoreView />     : <AccessDenied label="Main Store" />;
+  if (view === "stores")         return can("update_stock")             ? <StoresView />        : <AccessDenied label="Store Management" />;
   if (view === "stock-count")    return can("update_stock")             ? <StockCountView />    : <AccessDenied label="Stock Count" />;
   if (view === "update-stock")   return can("update_stock")             ? <UpdateStockView />   : <AccessDenied label="Update Stock" />;
   if (view === "transfer-stock") return can("transfer_stock")           ? <TransferStockView /> : <AccessDenied label="Transfer Stock" />;

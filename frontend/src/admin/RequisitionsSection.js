@@ -13,6 +13,22 @@ const STORE_COLORS = {
   kitchen: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   bar:     "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
 };
+const COLOR_BADGE = {
+  blue:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  orange: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  purple: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  green:  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  red:    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  teal:   "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  pink:   "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
+  indigo: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+};
+const storeLabel = (id, stores) => STORE_LABELS[id] || stores?.find(s => s.id === id)?.name || id;
+const storeColor = (id, stores) => {
+  if (STORE_COLORS[id]) return STORE_COLORS[id];
+  const s = stores?.find(st => st.id === id);
+  return s ? (COLOR_BADGE[s.color] || COLOR_BADGE.indigo) : COLOR_BADGE.indigo;
+};
 const STATUS_META = {
   pending:   { label: "Pending",   bg: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
   approved:  { label: "Approved",  bg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
@@ -44,7 +60,7 @@ function Spinner({ color = "blue" }) {
 
 // ── Fulfill Modal ─────────────────────────────────────────────────────────────
 
-function FulfillModal({ req, products, outlets, onClose, onFulfilled, setToast }) {
+function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, setToast }) {
   const [mainStock, setMainStock] = useState([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [qtys, setQtys] = useState({});
@@ -92,7 +108,7 @@ function FulfillModal({ req, products, outlets, onClose, onFulfilled, setToast }
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white">Transfer Stock</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              {STORE_LABELS.main} → <span className="font-semibold">{STORE_LABELS[req.from_store] || req.from_store}</span>
+              {STORE_LABELS.main} → <span className="font-semibold">{storeLabel(req.from_store, stores)}</span>
               {" · "}{outletName(req.outlet_id)}
             </p>
           </div>
@@ -171,7 +187,7 @@ function FulfillModal({ req, products, outlets, onClose, onFulfilled, setToast }
 
 // ── Requisition Card ──────────────────────────────────────────────────────────
 
-function ReqCard({ req, products, outlets, onApprove, onReject, onDelete, onFulfillOpen, isPrivileged }) {
+function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete, onFulfillOpen, isPrivileged }) {
   const [expanded, setExpanded] = useState(false);
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
@@ -185,8 +201,8 @@ function ReqCard({ req, products, outlets, onApprove, onReject, onDelete, onFulf
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900 dark:text-white text-sm">{outletName(req.outlet_id)}</p>
             <ArrowRight size={13} className="text-gray-400 flex-shrink-0" />
-            <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold", STORE_COLORS[req.from_store] || STORE_COLORS.kitchen)}>
-              {STORE_LABELS[req.from_store] || req.from_store}
+            <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold", storeColor(req.from_store, stores))}>
+              {storeLabel(req.from_store, stores)}
             </span>
             <span className="text-[11px] text-gray-400">requests from</span>
             <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold", STORE_COLORS.main)}>
@@ -278,9 +294,10 @@ function ReqCard({ req, products, outlets, onApprove, onReject, onDelete, onFulf
 
 // ── Create Requisition Modal ──────────────────────────────────────────────────
 
-function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated }) {
+function CreateRequisitionModal({ products, outlets, groups, stores, onClose, onCreated }) {
   const [outletId, setOutletId] = useState(outlets[0]?.id || "");
-  const [fromStore, setFromStore] = useState("kitchen");
+  const childStores = stores.filter(s => !s.is_main && s.outlet_id === outletId);
+  const [fromStore, setFromStore] = useState(childStores[0]?.id || "kitchen");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState([{ product_id: "", product_name: "", quantity_requested: 1 }]);
   const [saving, setSaving] = useState(false);
@@ -290,6 +307,7 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
   const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
   const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
 
+  // For default kitchen/bar stores filter by food/drinks; custom stores show all products
   const filteredProducts = fromStore === "kitchen"
     ? products.filter((p) => foodGroupIds.includes(p.category_id))
     : fromStore === "bar"
@@ -347,7 +365,12 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Outlet</label>
-              <select required value={outletId} onChange={(e) => setOutletId(e.target.value)}
+              <select required value={outletId} onChange={(e) => {
+                  const newId = e.target.value;
+                  setOutletId(newId);
+                  const cs = stores.filter(s => !s.is_main && s.outlet_id === newId);
+                  setFromStore(cs[0]?.id || "kitchen");
+                }}
                 className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
                 {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
@@ -356,8 +379,9 @@ function CreateRequisitionModal({ products, outlets, groups, onClose, onCreated 
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Requesting Store</label>
               <select required value={fromStore} onChange={(e) => setFromStore(e.target.value)}
                 className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-                <option value="kitchen">Kitchen Store</option>
-                <option value="bar">Bar Store</option>
+                {childStores.length > 0
+                  ? childStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                  : <option value="kitchen">Kitchen Store</option>}
               </select>
             </div>
           </div>
@@ -433,6 +457,7 @@ export default function RequisitionsSection() {
   const [products, setProducts] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -446,12 +471,14 @@ export default function RequisitionsSection() {
       api.getProducts(),
       api.getOutlets(),
       api.getGroups(),
+      api.getStores(),
     ])
-      .then(([r, p, o, g]) => {
+      .then(([r, p, o, g, s]) => {
         setRequisitions(r);
         setProducts(p.filter((pr) => pr.active !== false));
         setOutlets(o);
         setGroups(g);
+        setStores(s);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -555,7 +582,7 @@ export default function RequisitionsSection() {
         <div className="space-y-3">
           {displayed.map((req) => (
             <ReqCard
-              key={req.id} req={req} products={products} outlets={outlets}
+              key={req.id} req={req} products={products} outlets={outlets} stores={stores}
               isPrivileged={isPrivileged}
               onApprove={handleApprove}
               onReject={handleReject}
@@ -574,7 +601,7 @@ export default function RequisitionsSection() {
 
       {showCreate && (
         <CreateRequisitionModal
-          products={products} outlets={outlets} groups={groups}
+          products={products} outlets={outlets} groups={groups} stores={stores}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); setToast({ msg: "Requisition submitted.", type: "success" }); }}
         />
@@ -585,6 +612,7 @@ export default function RequisitionsSection() {
           req={fulfillReq}
           products={products}
           outlets={outlets}
+          stores={stores}
           setToast={setToast}
           onClose={() => setFulfillReq(null)}
           onFulfilled={handleFulfilled}

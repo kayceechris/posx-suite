@@ -1,4 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends
+import csv
+import io
+import re
+
+from fastapi import APIRouter, File, Form, HTTPException, Depends, UploadFile
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -55,6 +59,68 @@ async def update_stock(stock_data: StockUpdate, current_user: User = Depends(get
         await db.stock.insert_one(doc)
 
     return {"message": "Stock updated successfully"}
+
+
+@router.post("/stock/import-csv")
+async def import_stock_csv(
+    outlet_id: str = Form(...),
+    store: str = Form("main"),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    try:
+        contents = (await file.read()).decode("utf-8-sig")
+    except Exception:
+        raise HTTPException(400, "Could not read file. Ensure it is a valid UTF-8 CSV.")
+
+    reader = csv.DictReader(io.StringIO(contents))
+    results: dict = {"imported": 0, "skipped": 0, "errors": []}
+
+    for row in reader:
+        product_name = (row.get("product_name") or "").strip()
+        if not product_name:
+            continue
+        product = await db.products.find_one(
+            {"name": {"$regex": f"^{re.escape(product_name)}$", "$options": "i"}},
+            {"_id": 0, "id": 1},
+        )
+        if not product:
+            results["errors"].append(f'Product not found: "{product_name}"')
+            results["skipped"] += 1
+            continue
+        try:
+            qty = int(float(row.get("quantity") or 0))
+            min_qty = int(float(row.get("min_quantity") or 10))
+        except ValueError:
+            results["errors"].append(f'Invalid quantity for "{product_name}"')
+            results["skipped"] += 1
+            continue
+
+        set_doc: dict = {
+            "product_id": product["id"],
+            "outlet_id": outlet_id,
+            "store": store,
+            "quantity": qty,
+            "min_quantity": min_qty,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        batch = (row.get("batch_number") or "").strip()
+        expiry = (row.get("expiry_date") or "").strip()
+        if batch:
+            set_doc["batch_number"] = batch
+        if expiry:
+            set_doc["expiry_date"] = expiry
+
+        await db.stock.update_one(
+            {"product_id": product["id"], "outlet_id": outlet_id, "store": store},
+            {"$set": set_doc},
+            upsert=True,
+        )
+        results["imported"] += 1
+
+    return results
 
 
 @router.get("/stock/low")

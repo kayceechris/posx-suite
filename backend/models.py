@@ -193,6 +193,24 @@ class RequisitionCreate(BaseModel):
     notes: Optional[str] = None
 
 
+# ==================== STORE MODELS ====================
+
+class Store(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    outlet_id: str
+    is_main: bool = False
+    color: str = "indigo"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StoreCreate(BaseModel):
+    name: str
+    outlet_id: str
+    color: Optional[str] = "indigo"
+
+
 # ==================== CUSTOMER MODELS ====================
 
 class Customer(BaseModel):

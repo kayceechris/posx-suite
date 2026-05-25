@@ -211,6 +211,39 @@ export const api = {
   migrateStoreStock: () =>
     request("/api/migrate-store-stock", { method: "POST" }),
 
+  // CSV import to a store
+  importStockCsv: (outlet_id, store, file) => {
+    const token = localStorage.getItem("posx_token");
+    const form = new FormData();
+    form.append("outlet_id", outlet_id);
+    form.append("store", store);
+    form.append("file", file);
+    return fetch(`${BASE_URL}/api/stock/import-csv`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { const b = await res.json(); detail = b.detail || detail; } catch (_) {}
+        throw new Error(detail);
+      }
+      return res.json();
+    });
+  },
+
+  // Stores management
+  getStores: (outlet_id) => {
+    const qs = outlet_id ? `?outlet_id=${encodeURIComponent(outlet_id)}` : "";
+    return request(`/api/stores${qs}`);
+  },
+  createStore: (data) =>
+    request("/api/stores", { method: "POST", body: JSON.stringify(data) }),
+  updateStore: (id, outlet_id, data) =>
+    request(`/api/stores/${id}?outlet_id=${encodeURIComponent(outlet_id)}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteStore: (id, outlet_id) =>
+    request(`/api/stores/${id}?outlet_id=${encodeURIComponent(outlet_id)}`, { method: "DELETE" }),
+
   // Requisitions
   getRequisitions: (outlet_id, status) => {
     const params = new URLSearchParams();

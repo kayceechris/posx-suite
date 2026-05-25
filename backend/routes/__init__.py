@@ -30,6 +30,7 @@ from routes.recipes import router as recipes_router
 from routes.waste import router as waste_router
 from routes.reservations import router as reservations_router
 from routes.requisitions import router as requisitions_router
+from routes.stores import router as stores_router
 
 all_routers = [
     auth_router,
@@ -62,4 +63,5 @@ all_routers = [
     waste_router,
     reservations_router,
     requisitions_router,
+    stores_router,
 ]

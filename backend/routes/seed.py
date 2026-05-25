@@ -132,7 +132,7 @@ def _insert(doc):
 
 CLEARABLE = [
     "users", "outlets", "tables", "bar_tabs", "payment_types", "currencies",
-    "categories", "products", "stock", "customers", "suppliers", "expenses",
+    "categories", "products", "stock", "stores", "customers", "suppliers", "expenses",
     "orders", "settings",
 ]
 
@@ -178,6 +178,17 @@ async def seed_data(force: bool = Query(False)):
 
     for o in [outlet_main, outlet_bar]:
         await db.outlets.insert_one(_insert(o.model_dump()))
+
+    # ── Default Stores (per outlet) ──────────────────────────────────────────
+    # Main Store is the warehouse/receiving dock (always present, is_main=True)
+    # Kitchen and Bar are child stores that requisition from Main
+    _now = datetime.now(timezone.utc).isoformat()
+    for outlet in [outlet_main, outlet_bar]:
+        await db.stores.insert_many([
+            {"id": "main",    "name": "Main Store",    "outlet_id": outlet.id, "is_main": True,  "color": "blue",   "created_at": _now},
+            {"id": "kitchen", "name": "Kitchen Store", "outlet_id": outlet.id, "is_main": False, "color": "orange", "created_at": _now},
+            {"id": "bar",     "name": "Bar Store",     "outlet_id": outlet.id, "is_main": False, "color": "purple", "created_at": _now},
+        ])
 
     # Assign users to outlets
     for u in [cashier1, cashier2, waiter1, waiter2]:
