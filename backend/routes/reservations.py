@@ -11,14 +11,15 @@ router = APIRouter(prefix="/api")
 
 @router.get("/reservations/upcoming")
 async def get_upcoming_reservations(
+    days_ahead: int = 7,
     current_user: User = Depends(get_current_user)
 ):
-    """Today's confirmed/seated reservations — used by the table grid to show reserved status."""
+    """Confirmed/seated reservations from today onwards — used by the table grid."""
     today = date_type.today().isoformat()
     reservations = await db.reservations.find(
-        {"date": today, "status": {"$in": ["confirmed", "seated"]}},
+        {"date": {"$gte": today}, "status": {"$in": ["confirmed", "seated"]}},
         {"_id": 0}
-    ).sort("time", 1).to_list(500)
+    ).sort([("date", 1), ("time", 1)]).to_list(500)
     return reservations
 
 

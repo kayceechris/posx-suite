@@ -152,7 +152,12 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
         {status === "reserved" && reservation && (
           <div className="w-full mt-1 bg-purple-100 dark:bg-purple-900/40 rounded-xl px-2.5 py-2 space-y-0.5">
             <p className="text-[11px] font-black text-purple-800 dark:text-purple-200 truncate">{reservation.customer_name}</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {reservation.date !== new Date().toISOString().slice(0, 10) && (
+                <span className="flex items-center gap-0.5 text-[10px] text-purple-600 dark:text-purple-300 font-semibold">
+                  <CalendarDays size={9} /> {reservation.date}
+                </span>
+              )}
               <span className="flex items-center gap-0.5 text-[10px] text-purple-600 dark:text-purple-300 font-semibold">
                 <Clock size={9} /> {fmt12(reservation.time)}
               </span>
