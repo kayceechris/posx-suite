@@ -208,6 +208,9 @@ export const api = {
   getConsolidatedStock: () => request("/api/stock/consolidated"),
   getExpiringStock: (days = 30) => request(`/api/stock/expiring?days=${days}`),
 
+  migrateStoreStock: () =>
+    request("/api/migrate-store-stock", { method: "POST" }),
+
   // Requisitions
   getRequisitions: (outlet_id, status) => {
     const params = new URLSearchParams();

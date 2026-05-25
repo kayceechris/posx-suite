@@ -214,14 +214,14 @@ async def seed_data(force: bool = Query(False)):
         await db.currencies.insert_one(_insert(curr.model_dump()))
 
     # ── Categories & Products ────────────────────────────────────────────────
-    cat_starters = Category(name="Starters", color="#F97316")
-    cat_mains = Category(name="Main Course", color="#EF4444")
-    cat_burgers = Category(name="Burgers", color="#D97706")
-    cat_grill = Category(name="Grills", color="#B45309")
-    cat_pasta = Category(name="Pasta & Rice", color="#7C3AED")
-    cat_drinks = Category(name="Drinks", color="#3B82F6")
-    cat_cocktails = Category(name="Cocktails", color="#EC4899")
-    cat_desserts = Category(name="Desserts", color="#10B981")
+    cat_starters  = Category(name="Starters",     color="#F97316", main_category="food")
+    cat_mains     = Category(name="Main Course",  color="#EF4444", main_category="food")
+    cat_burgers   = Category(name="Burgers",      color="#D97706", main_category="food")
+    cat_grill     = Category(name="Grills",       color="#B45309", main_category="food")
+    cat_pasta     = Category(name="Pasta & Rice", color="#7C3AED", main_category="food")
+    cat_drinks    = Category(name="Drinks",       color="#3B82F6", main_category="drinks")
+    cat_cocktails = Category(name="Cocktails",    color="#EC4899", main_category="drinks")
+    cat_desserts  = Category(name="Desserts",     color="#10B981", main_category="food")
 
     cats = [cat_starters, cat_mains, cat_burgers, cat_grill, cat_pasta, cat_drinks, cat_cocktails, cat_desserts]
     for c in cats:
@@ -275,14 +275,18 @@ async def seed_data(force: bool = Query(False)):
         ("Fruit Salad",          cat_desserts, 2200, _U + "photo-1568158879083-c42860933ed7?w=400&h=300&fit=crop&auto=format"),
     ]
 
+    drink_cat_ids = {cat_drinks.id, cat_cocktails.id}
+
     products = []
     for name, cat, price, img in products_data:
         p = Product(name=name, category_id=cat.id, price=price, active=True, image=img)
         await db.products.insert_one(_insert(p.model_dump()))
         products.append(p)
-        # Stock in both outlets
+        # Food products stock in kitchen store; drink products stock in bar store.
+        # Main store starts empty — stock is added there manually then pushed via requisitions.
+        dest_store = "bar" if cat.id in drink_cat_ids else "kitchen"
         for outlet, qty in [(outlet_main, rng.randint(30, 150)), (outlet_bar, rng.randint(10, 60))]:
-            s = Stock(product_id=p.id, outlet_id=outlet.id, quantity=qty, min_quantity=10)
+            s = Stock(product_id=p.id, outlet_id=outlet.id, store=dest_store, quantity=qty, min_quantity=10)
             doc = s.model_dump()
             doc["updated_at"] = doc["updated_at"].isoformat()
             await db.stock.insert_one(doc)
@@ -469,6 +473,93 @@ async def seed_data(force: bool = Query(False)):
             "expenses": len(expense_templates),
             "orders": order_count,
         },
+    }
+
+
+@router.post("/migrate-store-stock")
+async def migrate_store_stock():
+    """
+    One-time migration for existing installs:
+    1. Tags categories with main_category (food/drinks) based on name.
+    2. Moves existing stock records to the correct store:
+       - Products in food groups  → kitchen store
+       - Products in drinks groups → bar store
+       - Unknown categories        → main store (unchanged)
+    Main store is left empty so it can be stocked manually.
+    """
+    # Step 1: tag categories
+    food_keywords   = ["starter", "main", "burger", "grill", "pasta", "rice", "dessert", "soup", "chicken", "beef", "fish", "snack", "food"]
+    drinks_keywords = ["drink", "cocktail", "beverage", "juice", "beer", "wine", "spirit", "soda", "water"]
+
+    cats = await db.categories.find({}, {"_id": 0}).to_list(1000)
+    cat_store_map: dict[str, str] = {}   # category_id → "kitchen" | "bar"
+    cats_updated = 0
+
+    for cat in cats:
+        if cat.get("main_category"):
+            mc = cat["main_category"]
+        else:
+            name_lower = cat.get("name", "").lower()
+            if any(kw in name_lower for kw in drinks_keywords):
+                mc = "drinks"
+            elif any(kw in name_lower for kw in food_keywords):
+                mc = "food"
+            else:
+                mc = None
+
+        if mc and not cat.get("main_category"):
+            await db.categories.update_one({"id": cat["id"]}, {"$set": {"main_category": mc}})
+            cats_updated += 1
+
+        if mc == "food":
+            cat_store_map[cat["id"]] = "kitchen"
+        elif mc == "drinks":
+            cat_store_map[cat["id"]] = "bar"
+        # else: no mapping → will stay "main"
+
+    # Step 2: update stock records based on product's category
+    products = await db.products.find({}, {"_id": 0, "id": 1, "category_id": 1}).to_list(1000)
+    product_store_map = {}
+    for p in products:
+        dest = cat_store_map.get(p.get("category_id") or "")
+        if dest:
+            product_store_map[p["id"]] = dest
+
+    stock_records = await db.stock.find({}, {"_id": 0}).to_list(5000)
+    moved_kitchen = moved_bar = skipped = 0
+
+    for s in stock_records:
+        current_store = s.get("store") or "main"
+        desired_store = product_store_map.get(s.get("product_id") or "")
+        if not desired_store or current_store == desired_store:
+            skipped += 1
+            continue
+
+        existing = await db.stock.find_one({
+            "product_id": s["product_id"],
+            "outlet_id": s["outlet_id"],
+            "store": desired_store,
+        })
+        if existing:
+            # Merge quantities
+            await db.stock.update_one(
+                {"product_id": s["product_id"], "outlet_id": s["outlet_id"], "store": desired_store},
+                {"$inc": {"quantity": int(s.get("quantity") or 0)}}
+            )
+            await db.stock.delete_one({"id": s["id"]})
+        else:
+            await db.stock.update_one({"id": s["id"]}, {"$set": {"store": desired_store}})
+
+        if desired_store == "kitchen":
+            moved_kitchen += 1
+        else:
+            moved_bar += 1
+
+    return {
+        "categories_tagged": cats_updated,
+        "stock_moved_to_kitchen": moved_kitchen,
+        "stock_moved_to_bar": moved_bar,
+        "stock_skipped": skipped,
     }
 
 

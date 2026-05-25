@@ -78,10 +78,14 @@ const STORE_COLORS = {
 };
 
 function StockLevelsView() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
   const [stock, setStock] = useState([]);
   const [products, setProducts] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState(null);
   const [updateModal, setUpdateModal] = useState(null);
   const [form, setForm] = useState({ product_id: "", outlet_id: "", store: "main", quantity: "", min_quantity: "10", batch_number: "", expiry_date: "" });
   const [saving, setSaving] = useState(false);
@@ -143,6 +147,21 @@ function StockLevelsView() {
 
   const lowCount = stock.filter(isLow).length;
   const expiringCount = stock.filter((s) => isExpiring(s) || isExpired(s)).length;
+  const unmappedCount = stock.filter((s) => (s.store || "main") === "main").length;
+
+  const handleMigrate = async () => {
+    if (!window.confirm("This will move food-product stock to Kitchen Store and drink-product stock to Bar Store, based on each product's group. Continue?")) return;
+    setMigrating(true);
+    try {
+      const result = await api.migrateStoreStock();
+      setMigrateResult(result);
+      load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   return (
     <div>
@@ -171,6 +190,29 @@ function StockLevelsView() {
           </button>
         </div>
       </div>
+
+      {isAdmin && unmappedCount > 0 && !migrateResult && (
+        <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl mb-4">
+          <AlertTriangle size={18} className="text-blue-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-blue-800 dark:text-blue-200 text-sm font-semibold">{unmappedCount} stock record{unmappedCount !== 1 ? "s" : ""} are in Main Store</p>
+            <p className="text-blue-600 dark:text-blue-400 text-xs mt-0.5">Run migration to automatically move food products → Kitchen Store and drink products → Bar Store based on group assignment.</p>
+          </div>
+          <button onClick={handleMigrate} disabled={migrating}
+            className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap">
+            {migrating ? "Migrating…" : "Fix Store Assignment"}
+          </button>
+        </div>
+      )}
+      {migrateResult && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl mb-4">
+          <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
+          <p className="text-green-700 dark:text-green-300 text-sm font-medium">
+            Migration done — {migrateResult.stock_moved_to_kitchen} to Kitchen, {migrateResult.stock_moved_to_bar} to Bar, {migrateResult.categories_tagged} categories tagged.
+          </p>
+          <button onClick={() => setMigrateResult(null)} className="ml-auto text-gray-400 hover:text-gray-600"><X size={15} /></button>
+        </div>
+      )}
 
       {lowCount > 0 && (
         <div className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl mb-3">
@@ -599,6 +641,7 @@ function UpdateStockView() {
   const { products, outlets, loading } = useBaseData();
   const [stock, setStock] = useState([]);
   const [outletId, setOutletId] = useState("");
+  const [storeId, setStoreId] = useState("main");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
@@ -617,7 +660,7 @@ function UpdateStockView() {
     setEditingId(null);
   }, [outletId]);
 
-  const stockFor = (pid) => stock.find((s) => s.product_id === pid);
+  const stockFor = (pid) => stock.find((s) => s.product_id === pid && (s.store || "main") === storeId);
 
   const openEdit = (p) => {
     const s = stockFor(p.id);
@@ -629,7 +672,7 @@ function UpdateStockView() {
     setSaving(true);
     try {
       await api.updateStock({
-        product_id: pid, outlet_id: outletId,
+        product_id: pid, outlet_id: outletId, store: storeId,
         quantity: parseInt(editForm.quantity), min_quantity: parseInt(editForm.min_quantity),
         batch_number: editForm.batch_number || null,
         expiry_date: editForm.expiry_date || null,
@@ -650,8 +693,8 @@ function UpdateStockView() {
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  // Reset page when search or outlet changes
-  useEffect(() => { setPage(1); setEditingId(null); }, [search, outletId]);
+  // Reset page when search or outlet or store changes
+  useEffect(() => { setPage(1); setEditingId(null); }, [search, outletId, storeId]);
 
   if (loading) return <Spinner />;
 
@@ -663,13 +706,27 @@ function UpdateStockView() {
         </div>
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white">Update Stock</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Adjust quantities, min levels, batch numbers and expiry dates per outlet</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Add or adjust stock quantities per outlet and store</p>
         </div>
       </div>
 
+      {storeId === "main" && (
+        <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl mb-5">
+          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+            <ArrowRight size={14} className="text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Main Store — Receiving Dock</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+              Add stock here when goods arrive from suppliers. Kitchen and Bar stores requisition from Main Store.
+            </p>
+          </div>
+        </div>
+      )}
+
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="flex gap-3 mb-5">
+      <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
@@ -678,6 +735,12 @@ function UpdateStockView() {
         <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
           className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white dark:bg-gray-800 dark:text-white">
           {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <select value={storeId} onChange={(e) => setStoreId(e.target.value)}
+          className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white dark:bg-gray-800 dark:text-white font-semibold">
+          <option value="main">Main Store</option>
+          <option value="kitchen">Kitchen Store</option>
+          <option value="bar">Bar Store</option>
         </select>
       </div>
 
