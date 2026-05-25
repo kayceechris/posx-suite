@@ -666,6 +666,7 @@ function StockCountView() {
 function UpdateStockView() {
   const { products, outlets, loading } = useBaseData();
   const [stores, setStores] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [stock, setStock] = useState([]);
   const [storeId, setStoreId] = useState("main");
   const [search, setSearch] = useState("");
@@ -680,6 +681,7 @@ function UpdateStockView() {
 
   useEffect(() => {
     api.getStores().then(setStores).catch(console.error);
+    api.getGroups().then(setGroups).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -716,7 +718,15 @@ function UpdateStockView() {
     }
   };
 
-  const filtered = products.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+  const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
+  const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
+  const storeProducts = storeId === "kitchen"
+    ? products.filter((p) => foodGroupIds.includes(p.category_id))
+    : storeId === "bar"
+    ? products.filter((p) => drinkGroupIds.includes(p.category_id))
+    : products;
+
+  const filtered = storeProducts.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
