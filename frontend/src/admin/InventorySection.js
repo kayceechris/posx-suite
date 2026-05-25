@@ -1659,131 +1659,190 @@ function ConsolidatedView() {
 
 // ─── Receive Stock Modal ──────────────────────────────────────────────────────
 
+const _EMPTY_RECEIVE_ITEM = { productId: "", received: "", minQty: "10", batchNumber: "", expiryDate: "" };
+
 function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onReceived }) {
   const [outletId, setOutletId] = useState(initialOutletId || outlets[0]?.id || "");
-  const [productId, setProductId] = useState("");
-  const [received, setReceived] = useState("");
-  const [minQty, setMinQty] = useState("10");
-  const [batchNumber, setBatchNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
+  const [search, setSearch] = useState("");
+  const [items, setItems] = useState([{ ..._EMPTY_RECEIVE_ITEM }]);
+  const [currentStock, setCurrentStock] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [currentQty, setCurrentQty] = useState(null);
-  const [loadingQty, setLoadingQty] = useState(false);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!productId || !outletId) { setCurrentQty(null); return; }
-    setLoadingQty(true);
-    api.getStock(outletId, "main")
-      .then((stock) => {
-        const s = stock.find((x) => x.product_id === productId);
-        setCurrentQty(s?.quantity ?? 0);
-        if (s?.min_quantity) setMinQty(String(s.min_quantity));
-      })
-      .catch(console.error)
-      .finally(() => setLoadingQty(false));
-  }, [productId, outletId]);
+    if (!outletId) return;
+    api.getStock(outletId, "main").then(setCurrentStock).catch(console.error);
+  }, [outletId]); // eslint-disable-line
+
+  const stockFor = (pid) => currentStock.find((x) => x.product_id === pid);
+  const currentQty = (pid) => stockFor(pid)?.quantity ?? 0;
 
   const filteredProducts = products.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const setField = (idx, key, val) =>
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
+
+  const handleProductChange = (idx, pid) => {
+    const s = currentStock.find((x) => x.product_id === pid);
+    setItems((prev) => prev.map((it, i) => i !== idx ? it : {
+      ...it,
+      productId: pid,
+      minQty: s?.min_quantity ? String(s.min_quantity) : "10",
+    }));
+  };
+
+  const addItem = () => setItems((prev) => [...prev, { ..._EMPTY_RECEIVE_ITEM }]);
+  const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!received || parseInt(received) <= 0) { setError("Enter a valid quantity to receive."); return; }
+    const valid = items.filter((it) => it.productId && parseInt(it.received) > 0);
+    if (!valid.length) { setError("Add at least one item with a valid quantity."); return; }
     setSaving(true); setError("");
     try {
-      const newQty = (currentQty ?? 0) + parseInt(received);
-      await api.updateStock({
-        product_id: productId, outlet_id: outletId, store: "main",
-        quantity: newQty,
-        min_quantity: parseInt(minQty) || 10,
-        batch_number: batchNumber || null,
-        expiry_date: expiryDate || null,
-      });
-      const pName = products.find((p) => p.id === productId)?.name || productId;
-      onReceived(`${pName} — ${parseInt(received)} units received into Main Store`);
+      await Promise.all(valid.map((it) =>
+        api.updateStock({
+          product_id: it.productId,
+          outlet_id: outletId,
+          store: "main",
+          quantity: currentQty(it.productId) + parseInt(it.received),
+          min_quantity: parseInt(it.minQty) || 10,
+          batch_number: it.batchNumber || null,
+          expiry_date: it.expiryDate || null,
+        })
+      ));
+      onReceived(`${valid.length} item${valid.length !== 1 ? "s" : ""} received into Main Store`);
     } catch (err) { setError(err.message); setSaving(false); }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white">Receive Stock</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Add incoming goods to Main Store</p>
+            <p className="text-xs text-gray-400 mt-0.5">Add incoming goods to Main Store — multiple items at once</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Outlet</label>
-              <select required value={outletId} onChange={(e) => setOutletId(e.target.value)}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          {/* Controls row */}
+          <div className="px-6 pt-4 pb-3 flex gap-3 flex-shrink-0">
+            <div className="w-48">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Outlet</label>
+              <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none">
                 {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Search Product</label>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type to filter…"
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Search Product</label>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter products…"
+                  className="w-full pl-8 pr-3 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none" />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Product</label>
-            <select required value={productId} onChange={(e) => setProductId(e.target.value)}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-              <option value="">Select product…</option>
-              {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            {productId && (
-              <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                {loadingQty ? "Loading…" : <span>Current Main Store qty: <span className="font-bold text-gray-800 dark:text-white">{currentQty ?? 0}</span></span>}
-              </p>
-            )}
+          {/* Items table — scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 min-h-0">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
+                <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left py-2 pr-2">Product</th>
+                  <th className="text-center py-2 px-2 w-24">Current</th>
+                  <th className="text-center py-2 px-2 w-24">+ Receive</th>
+                  <th className="text-center py-2 px-2 w-24">New Total</th>
+                  <th className="text-center py-2 px-2 w-20">Min Qty</th>
+                  <th className="text-left py-2 px-2 w-28">Batch #</th>
+                  <th className="text-left py-2 px-2 w-32">Expiry</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                {items.map((item, idx) => {
+                  const cur = item.productId ? currentQty(item.productId) : null;
+                  const add = parseInt(item.received) || 0;
+                  const newTotal = cur !== null ? cur + add : null;
+                  return (
+                    <tr key={idx} className="group">
+                      <td className="py-2 pr-2">
+                        <select value={item.productId} onChange={(e) => handleProductChange(idx, e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                          <option value="">Select product…</option>
+                          {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                          {cur !== null ? cur : <span className="text-gray-300">—</span>}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="number" min="1" value={item.received}
+                          onChange={(e) => setField(idx, "received", e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm text-center focus:outline-none focus:border-blue-500" />
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        {newTotal !== null && add > 0
+                          ? <span className="text-sm font-bold text-green-600 dark:text-green-400">{newTotal}</span>
+                          : <span className="text-gray-300 text-sm">—</span>}
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="number" min="0" value={item.minQty}
+                          onChange={(e) => setField(idx, "minQty", e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm text-center focus:outline-none focus:border-blue-500" />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="text" value={item.batchNumber}
+                          onChange={(e) => setField(idx, "batchNumber", e.target.value)}
+                          placeholder="Optional"
+                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="date" value={item.expiryDate}
+                          onChange={(e) => setField(idx, "expiryDate", e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500" />
+                      </td>
+                      <td className="py-2 pl-1">
+                        {items.length > 1 && (
+                          <button type="button" onClick={() => removeItem(idx)}
+                            className="text-gray-300 hover:text-red-500 transition-colors p-1">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Quantity Received</label>
-              <input required type="number" min="1" value={received} onChange={(e) => setReceived(e.target.value)}
-                placeholder="e.g. 50"
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
-              {productId && received && (
-                <p className="text-xs mt-1 text-green-600 dark:text-green-400 font-semibold">
-                  New total: {(currentQty ?? 0) + (parseInt(received) || 0)}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Min Qty Alert</label>
-              <input type="number" min="0" value={minQty} onChange={(e) => setMinQty(e.target.value)}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Batch Number</label>
-              <input type="text" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="Optional"
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Expiry Date</label>
-              <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 space-y-3">
+            <button type="button" onClick={addItem}
+              className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 transition-colors">
+              <Plus size={15} /> Add Another Item
+            </button>
+            {error && <p className="text-red-500 text-xs">{error}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {saving ? "Receiving…" : `Receive ${items.filter(it => it.productId && parseInt(it.received) > 0).length || ""} Item${items.filter(it => it.productId && parseInt(it.received) > 0).length === 1 ? "" : "s"} into Main Store`}
+              </button>
             </div>
           </div>
-
-          {error && <p className="text-red-500 text-xs">{error}</p>}
-          <button type="submit" disabled={saving}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving ? "Receiving…" : "Receive into Main Store"}
-          </button>
         </form>
       </div>
     </div>
@@ -1792,8 +1851,7 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
 
 // ─── Import CSV Modal ─────────────────────────────────────────────────────────
 
-function ImportCsvModal({ outlets, initialOutletId, onClose, onImported }) {
-  const [outletId, setOutletId] = useState(initialOutletId || (outlets[0]?.id || ""));
+function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);
   const [result, setResult] = useState(null);
@@ -1864,13 +1922,11 @@ function ImportCsvModal({ outlets, initialOutletId, onClose, onImported }) {
             </button>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Outlet</label>
-            <select value={outletId} onChange={e => setOutletId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 dark:text-white focus:outline-none">
-              {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-          </div>
+          {outletName && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Importing to: <span className="font-semibold text-gray-700 dark:text-gray-200">{outletName}</span> · Main Store
+            </p>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">CSV File</label>
@@ -1956,11 +2012,9 @@ function MainStoreView() {
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
 
-  const loadStock = (oid) => {
-    const id = oid || outletId;
-    if (!id) return;
+  const loadStock = () => {
     setLoading(true);
-    api.getStock(id, "main")
+    api.getStock(null, "main")
       .then(setStock)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -1971,12 +2025,11 @@ function MainStoreView() {
       .then(([p, o]) => {
         setProducts(p.filter((pr) => pr.active !== false));
         setOutlets(o);
-        if (o.length > 0) { setOutletId(o[0].id); loadStock(o[0].id); }
+        if (o.length > 0) setOutletId(o[0].id);
+        loadStock();
       })
       .catch(console.error);
   }, []); // eslint-disable-line
-
-  useEffect(() => { if (outletId) loadStock(outletId); }, [outletId]); // eslint-disable-line
 
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
   const totalUnits = stock.reduce((s, x) => s + (parseInt(x.quantity) || 0), 0);
@@ -1996,7 +2049,7 @@ function MainStoreView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => loadStock(outletId)}
+          <button onClick={loadStock}
             className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
             <RefreshCw size={15} /> Refresh
           </button>
@@ -2026,16 +2079,12 @@ function MainStoreView() {
         ))}
       </div>
 
-      <div className="flex gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex gap-3 mb-4">
+        <div className="relative flex-1 max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
         </div>
-        <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white">
-          {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
       </div>
 
       {loading ? <Spinner color="blue" /> : stock.length === 0 ? (
@@ -2111,7 +2160,7 @@ function MainStoreView() {
           onClose={() => setShowReceive(false)}
           onReceived={(msg) => {
             setShowReceive(false);
-            loadStock(outletId);
+            loadStock();
             setToast({ msg, type: "success" });
           }}
         />
@@ -2119,10 +2168,10 @@ function MainStoreView() {
 
       {showImport && (
         <ImportCsvModal
-          outlets={outlets}
-          initialOutletId={outletId}
+          outletId={outletId}
+          outletName={outlets.find(o => o.id === outletId)?.name}
           onClose={() => setShowImport(false)}
-          onImported={() => loadStock(outletId)}
+          onImported={loadStock}
         />
       )}
     </div>
