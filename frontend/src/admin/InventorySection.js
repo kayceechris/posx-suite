@@ -189,15 +189,15 @@ function StockLevelsView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl font-black text-gray-900 dark:text-white">Stock Levels</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
             {stock.length} entries · <span className="text-orange-500 font-semibold">{lowCount} low</span>
             {expiringCount > 0 && <> · <span className="text-red-500 font-semibold">{expiringCount} expiring</span></>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportBtn
             onCSV={() => downloadCSV("stock_levels",
               ["Product", "Store", "Qty", "Min", "Batch", "Expiry", "Status"],
@@ -209,8 +209,8 @@ function StockLevelsView() {
               rows: stock.map((item) => [productName(item.product_id), STORE_LABELS[item.store || "main"] || item.store || "Main Store", item.quantity, item.min_quantity || 10, item.batch_number || "—", item.expiry_date || "—", isExpired(item) ? "Expired" : isExpiring(item) ? "Expiring" : isLow(item) ? "Low" : "OK"]),
             })}
           />
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <RefreshCw size={15} /> Refresh
+          <button onClick={load} className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -505,17 +505,17 @@ function StockCountView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
             <ClipboardCheck size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Stock Count</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Enter physical counts to reconcile with system quantities</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Enter physical counts to reconcile with system quantities</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportBtn
             onCSV={() => downloadCSV("stock_count",
               ["Product", "System Qty", "Counted", "Variance"],
@@ -530,10 +530,10 @@ function StockCountView() {
           />
           <button
             onClick={() => setScanMode((v) => !v)}
-            className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors",
+            className={cn("flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors",
               scanMode ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200")}
           >
-            <Barcode size={16} /> {scanMode ? "Scan Mode ON" : "Scan Mode"}
+            <Barcode size={16} /> <span className="hidden sm:inline">{scanMode ? "Scan Mode ON" : "Scan Mode"}</span>
           </button>
           {filledCount > 0 && (
             <button onClick={handleSave} disabled={saving}
@@ -565,8 +565,8 @@ function StockCountView() {
         </div>
       )}
 
-      <div className="flex gap-3 mb-5">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex gap-3 mb-5 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search products…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800 dark:text-white" />
@@ -770,7 +770,7 @@ function UpdateStockView() {
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
         <table className="w-full min-w-[680px]">
           <thead>
             <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
@@ -1058,17 +1058,17 @@ function ReorderView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center flex-shrink-0">
             <TrendingDown size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Reorder Alerts</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{lowStock.length} item{lowStock.length !== 1 ? "s" : ""} at or below minimum stock level</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">{lowStock.length} item{lowStock.length !== 1 ? "s" : ""} at or below minimum stock level</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportBtn
             onCSV={() => downloadCSV("reorder_alerts",
               ["Product", "Store", "Current", "Min", "Suggested Order"],
@@ -1080,8 +1080,8 @@ function ReorderView() {
               rows: lowStock.map((item) => [productName(item.product_id), storeName(item.store), item.quantity, item.min_quantity || 10, deficit(item)]),
             })}
           />
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <RefreshCw size={15} /> Refresh
+          <button onClick={load} className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -1225,17 +1225,17 @@ function WasteView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-red-500 rounded-2xl flex items-center justify-center flex-shrink-0">
             <PackageX size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Waste Recording</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Log spoilage, damage, and other stock losses</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Log spoilage, damage, and other stock losses</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportBtn
             onCSV={() => downloadCSV("waste_log",
               ["Product", "Qty", "Reason", "Notes", "Date"],
@@ -1248,8 +1248,8 @@ function WasteView() {
             })}
           />
           <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
-            <Plus size={16} /> Record Waste
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
+            <Plus size={16} /> <span className="hidden sm:inline">Record</span> Waste
           </button>
         </div>
       </div>
@@ -1533,17 +1533,17 @@ function ConsolidatedView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-violet-600 rounded-2xl flex items-center justify-center flex-shrink-0">
             <LayoutGrid size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Consolidated Stock</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">All products across all outlets side by side</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">All products across all outlets side by side</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {data && (
             <ExportBtn
               onCSV={() => {
@@ -1558,8 +1558,8 @@ function ConsolidatedView() {
               }}
             />
           )}
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <RefreshCw size={15} /> Refresh
+          <button onClick={load} className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -1703,8 +1703,8 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div>
@@ -1727,16 +1727,16 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
 
           {/* Items table — scrollable */}
           <div className="flex-1 overflow-y-auto overflow-x-auto px-6 min-h-0">
-            <table className="w-full min-w-[680px] text-sm">
+            <table className="w-full min-w-[700px] text-sm">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left py-2 pr-2 min-w-[200px]">Product</th>
-                  <th className="text-center py-2 px-2 w-20">Current</th>
-                  <th className="text-center py-2 px-2 w-20">+ Receive</th>
-                  <th className="text-center py-2 px-2 w-20">New Total</th>
-                  <th className="text-center py-2 px-2 w-20">Min Qty</th>
-                  <th className="text-left py-2 px-2 w-28">Batch #</th>
-                  <th className="text-left py-2 px-2 w-32">Expiry</th>
+                  <th className="text-left py-2 pr-3 min-w-[220px]">Product</th>
+                  <th className="text-center py-2 px-3 w-24">Current</th>
+                  <th className="text-center py-2 px-3 w-28">+ Receive</th>
+                  <th className="text-center py-2 px-3 w-24">New Total</th>
+                  <th className="text-center py-2 px-3 w-24">Min Qty</th>
+                  <th className="text-left py-2 px-3 w-32">Batch #</th>
+                  <th className="text-left py-2 px-3 w-36">Expiry</th>
                   <th className="w-8" />
                 </tr>
               </thead>
@@ -2014,27 +2014,27 @@ function MainStoreView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
             <ShoppingBag size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Main Store</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Central warehouse — receive goods here, then dispatch to Kitchen &amp; Bar via requisitions</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Central warehouse — receive goods here, then dispatch to Kitchen &amp; Bar via requisitions</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={loadStock}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <RefreshCw size={15} /> Refresh
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
           <button onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <Upload size={15} /> Import CSV
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <Upload size={15} /> <span className="hidden sm:inline">Import CSV</span>
           </button>
           <button onClick={() => setShowReceive(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Receive Stock
           </button>
         </div>
@@ -2048,15 +2048,15 @@ function MainStoreView() {
           { label: "Total Units", value: totalUnits.toLocaleString(), color: "text-gray-900 dark:text-white", bg: "bg-gray-50 dark:bg-gray-800" },
           { label: "Low Stock", value: lowCount, color: lowCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: lowCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
         ].map((c) => (
-          <div key={c.label} className={cn("rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-4 text-center", c.bg)}>
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{c.label}</p>
-            <p className={cn("text-2xl font-black leading-tight truncate", c.color)}>{c.value}</p>
+          <div key={c.label} className={cn("rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center", c.bg)}>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{c.label}</p>
+            <p className={cn("text-xl sm:text-2xl font-black leading-tight truncate", c.color)}>{c.value}</p>
           </div>
         ))}
       </div>
 
       <div className="flex gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
@@ -2212,18 +2212,18 @@ function StoresView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
             <Store size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Store Management</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Global stores shared across all outlets. Main Store is built-in and protected.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Global stores shared across all outlets. Main Store is built-in and protected.</p>
           </div>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors flex-shrink-0">
           <Plus size={16} /> New Store
         </button>
       </div>
@@ -2238,8 +2238,8 @@ function StoresView() {
       )}
 
       {loading && !initializing ? <Spinner color="indigo" /> : !loading && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
                 <th className="text-left px-5 py-3">Store Name</th>

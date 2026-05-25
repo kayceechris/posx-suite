@@ -225,26 +225,28 @@ function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 italic">"{req.notes}"</p>
           )}
 
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="text-[11px] font-bold text-gray-400 uppercase">
-                <th className="text-left py-1.5">Product</th>
-                <th className="text-center py-1.5">Requested</th>
-                {req.status === "fulfilled" && <th className="text-center py-1.5 text-green-600">Transferred</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
-              {req.items.map((item) => (
-                <tr key={item.product_id}>
-                  <td className="py-2 font-medium text-gray-800 dark:text-gray-200">{productName(item.product_id)}</td>
-                  <td className="py-2 text-center font-mono font-bold text-gray-700 dark:text-gray-200">{item.quantity_requested}</td>
-                  {req.status === "fulfilled" && (
-                    <td className="py-2 text-center font-mono font-bold text-green-600 dark:text-green-400">{item.quantity_fulfilled}</td>
-                  )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm mb-4 min-w-[280px]">
+              <thead>
+                <tr className="text-[11px] font-bold text-gray-400 uppercase">
+                  <th className="text-left py-1.5">Product</th>
+                  <th className="text-center py-1.5">Requested</th>
+                  {req.status === "fulfilled" && <th className="text-center py-1.5 text-green-600">Transferred</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                {req.items.map((item) => (
+                  <tr key={item.product_id}>
+                    <td className="py-2 font-medium text-gray-800 dark:text-gray-200">{productName(item.product_id)}</td>
+                    <td className="py-2 text-center font-mono font-bold text-gray-700 dark:text-gray-200">{item.quantity_requested}</td>
+                    {req.status === "fulfilled" && (
+                      <td className="py-2 text-center font-mono font-bold text-green-600 dark:text-green-400">{item.quantity_fulfilled}</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {isPrivileged && (
             <div className="flex gap-2 flex-wrap items-center">
@@ -508,26 +510,26 @@ export default function RequisitionsSection() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
             <ClipboardList size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Requisitions</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">
               Kitchen &amp; Bar request stock from Main Store
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={load}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-            <RefreshCw size={15} /> Refresh
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
+            <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
-            <Plus size={16} /> New Requisition
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
+            <Plus size={16} /> <span className="hidden sm:inline">New</span> Requisition
           </button>
         </div>
       </div>
