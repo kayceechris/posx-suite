@@ -8,10 +8,11 @@ import { cn } from "../lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const STATUS_META = {
-  confirmed:  { label: "Confirmed",  color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",    dot: "bg-blue-500"   },
-  seated:     { label: "Seated",     color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", dot: "bg-green-500"  },
-  cancelled:  { label: "Cancelled",  color: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",        dot: "bg-gray-400"   },
-  no_show:    { label: "No-show",    color: "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",         dot: "bg-red-500"    },
+  confirmed:  { label: "Confirmed",  color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",        dot: "bg-blue-500"    },
+  seated:     { label: "Seated",     color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",    dot: "bg-green-500"   },
+  completed:  { label: "Completed",  color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", dot: "bg-emerald-500" },
+  cancelled:  { label: "Cancelled",  color: "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",            dot: "bg-gray-400"    },
+  no_show:    { label: "No-show",    color: "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",             dot: "bg-red-500"     },
 };
 
 function fmt12(time24) {
@@ -265,6 +266,7 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
       "bg-white dark:bg-gray-800 border-2 rounded-2xl p-4 transition-all",
       res.status === "confirmed" ? "border-purple-200 dark:border-purple-700/50" :
       res.status === "seated"    ? "border-green-200 dark:border-green-700/50" :
+      res.status === "completed" ? "border-emerald-200 dark:border-emerald-700/50 opacity-80" :
       "border-gray-200 dark:border-gray-700 opacity-70"
     )}>
       <div className="flex items-start justify-between gap-3">
@@ -311,6 +313,12 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
             <button onClick={() => onStatusChange(res.id, "seated")} title="Mark as Seated"
               className="w-8 h-8 flex items-center justify-center rounded-xl border border-green-200 dark:border-green-700 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
               <UserCheck size={13} />
+            </button>
+          )}
+          {res.status === "seated" && (
+            <button onClick={() => onStatusChange(res.id, "completed")} title="Mark as Completed"
+              className="w-8 h-8 flex items-center justify-center rounded-xl border border-emerald-200 dark:border-emerald-700 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+              <CheckCircle2 size={13} />
             </button>
           )}
           {isActive && (
@@ -421,6 +429,7 @@ export default function ReservationsSection() {
     { id: "all",       label: "All",       count: reservations.length },
     { id: "confirmed", label: "Confirmed", count: counts.confirmed || 0 },
     { id: "seated",    label: "Seated",    count: counts.seated || 0 },
+    { id: "completed", label: "Completed", count: counts.completed || 0 },
     { id: "cancelled", label: "Cancelled", count: counts.cancelled || 0 },
     { id: "no_show",   label: "No-show",   count: counts.no_show || 0 },
   ];
@@ -444,12 +453,13 @@ export default function ReservationsSection() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
         {[
-          { label: "Confirmed", value: counts.confirmed || 0, color: "text-blue-600 dark:text-blue-400",  bg: "bg-blue-50 dark:bg-blue-900/20" },
-          { label: "Seated",    value: counts.seated || 0,    color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
-          { label: "No-show",   value: counts.no_show || 0,   color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-900/20" },
-          { label: "Guests",    value: totalGuests,            color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20" },
+          { label: "Confirmed",  value: counts.confirmed || 0,  color: "text-blue-600 dark:text-blue-400",     bg: "bg-blue-50 dark:bg-blue-900/20" },
+          { label: "Seated",     value: counts.seated || 0,     color: "text-green-600 dark:text-green-400",   bg: "bg-green-50 dark:bg-green-900/20" },
+          { label: "Completed",  value: counts.completed || 0,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+          { label: "No-show",    value: counts.no_show || 0,    color: "text-red-600 dark:text-red-400",       bg: "bg-red-50 dark:bg-red-900/20" },
+          { label: "Guests",     value: totalGuests,             color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20" },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className={cn("rounded-2xl p-4", bg)}>
             <p className={cn("text-2xl font-black", color)}>{value}</p>
