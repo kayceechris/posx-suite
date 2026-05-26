@@ -533,7 +533,7 @@ async def migrate_store_stock():
         if dest:
             product_store_map[p["id"]] = dest
 
-    stock_records = await db.stock.find({}, {"_id": 0}).to_list(5000)
+    stock_records = await db.stock.find({}).to_list(5000)
     moved_kitchen = moved_bar = skipped = 0
 
     for s in stock_records:
@@ -549,25 +549,45 @@ async def migrate_store_stock():
             "store": desired_store,
         })
         if existing:
-            # Merge quantities
+            # Merge quantities into the existing destination record, then delete the source
             await db.stock.update_one(
-                {"product_id": s["product_id"], "outlet_id": s["outlet_id"], "store": desired_store},
+                {"_id": existing["_id"]},
                 {"$inc": {"quantity": int(s.get("quantity") or 0)}}
             )
-            await db.stock.delete_one({"id": s["id"]})
+            await db.stock.delete_one({"_id": s["_id"]})
         else:
-            await db.stock.update_one({"id": s["id"]}, {"$set": {"store": desired_store}})
+            await db.stock.update_one({"_id": s["_id"]}, {"$set": {"store": desired_store}})
 
         if desired_store == "kitchen":
             moved_kitchen += 1
         else:
             moved_bar += 1
 
+    # Step 3: deduplicate — merge any remaining records with the same product+outlet+store
+    duplicates_merged = 0
+    pipeline = [
+        {"$group": {
+            "_id": {"product_id": "$product_id", "outlet_id": "$outlet_id", "store": "$store"},
+            "ids": {"$push": "$_id"},
+            "quantities": {"$push": "$quantity"},
+            "count": {"$sum": 1},
+        }},
+        {"$match": {"count": {"$gt": 1}}},
+    ]
+    async for group in db.stock.aggregate(pipeline):
+        keep_id = group["ids"][0]
+        total_qty = sum(int(q or 0) for q in group["quantities"])
+        await db.stock.update_one({"_id": keep_id}, {"$set": {"quantity": total_qty}})
+        for dup_id in group["ids"][1:]:
+            await db.stock.delete_one({"_id": dup_id})
+            duplicates_merged += 1
+
     return {
         "categories_tagged": cats_updated,
         "stock_moved_to_kitchen": moved_kitchen,
         "stock_moved_to_bar": moved_bar,
         "stock_skipped": skipped,
+        "duplicates_merged": duplicates_merged,
     }
 
 
