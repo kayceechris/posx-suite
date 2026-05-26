@@ -190,54 +190,52 @@ export default function OrdersSection() {
         <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center">
           <ClipboardList size={20} className="text-white" />
         </div>
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white">Order Management</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Order Management</h1>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-blue-50 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Today's Orders</p>
-            <p className="text-4xl font-black text-blue-600">{todayOrders.length}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-3 sm:p-5 flex items-center justify-between">
+          <div className="min-w-0 mr-3">
+            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Today's Orders</p>
+            <p className="text-2xl sm:text-4xl font-black text-blue-600 dark:text-blue-400">{todayOrders.length}</p>
           </div>
-          <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
-            <Calendar size={26} className="text-blue-500" />
-          </div>
-        </div>
-        <div className="bg-green-50 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Today's Revenue</p>
-            <p className="text-4xl font-black text-green-600">{formatCurrency(todayRevenue)}</p>
-          </div>
-          <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
-            <ShoppingBag size={26} className="text-green-500" />
+          <div className="w-11 h-11 sm:w-14 sm:h-14 bg-blue-100 dark:bg-blue-800/40 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <Calendar size={22} className="text-blue-500 dark:text-blue-400" />
           </div>
         </div>
-        <div className="bg-orange-50 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Total Revenue</p>
-            <p className="text-4xl font-black text-orange-500">{formatCurrency(totalRevenue)}</p>
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3 sm:p-5 flex items-center justify-between">
+          <div className="min-w-0 mr-3">
+            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Today's Revenue</p>
+            <p className="text-2xl sm:text-4xl font-black text-green-600 dark:text-green-400 truncate">{formatCurrency(todayRevenue)}</p>
           </div>
-          <div className="w-14 h-14 bg-orange-100 rounded-2xl flex items-center justify-center">
-            <ShoppingBag size={26} className="text-orange-400" />
+          <div className="w-11 h-11 sm:w-14 sm:h-14 bg-green-100 dark:bg-green-800/40 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <ShoppingBag size={22} className="text-green-500 dark:text-green-400" />
+          </div>
+        </div>
+        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-3 sm:p-5 flex items-center justify-between">
+          <div className="min-w-0 mr-3">
+            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Revenue</p>
+            <p className="text-2xl sm:text-4xl font-black text-orange-500 dark:text-orange-400 truncate">{formatCurrency(totalRevenue)}</p>
+          </div>
+          <div className="w-11 h-11 sm:w-14 sm:h-14 bg-orange-100 dark:bg-orange-800/40 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <ShoppingBag size={22} className="text-orange-400 dark:text-orange-400" />
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-3">
         <div className="flex flex-col gap-0.5">
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Outlet</label>
           <div className="relative">
             <select value={outletFilter} onChange={(e) => { setOutletFilter(e.target.value); setTerminalFilter(""); setPage(1); }}
-              className="appearance-none pl-3 pr-8 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 min-w-[160px]">
+              className="w-full appearance-none pl-3 pr-7 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]">
               <option value="">All Outlets</option>
               {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
         </div>
@@ -245,14 +243,12 @@ export default function OrdersSection() {
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Terminal</label>
           <div className="relative">
             <select value={terminalFilter} onChange={(e) => { setTerminalFilter(e.target.value); setPage(1); }}
-              className="appearance-none pl-3 pr-8 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 min-w-[160px]">
+              className="w-full appearance-none pl-3 pr-7 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]">
               <option value="">All Terminals</option>
               {availableTerminals.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
         </div>
@@ -260,29 +256,21 @@ export default function OrdersSection() {
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Order #</label>
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={orderSearch}
-              onChange={(e) => { setOrderSearch(e.target.value); setPage(1); }}
+            <input type="text" value={orderSearch} onChange={(e) => { setOrderSearch(e.target.value); setPage(1); }}
               placeholder="Search order #"
-              className="pl-8 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 min-w-[150px]"
-            />
+              className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]" />
           </div>
         </div>
         <div className="flex flex-col gap-0.5">
           <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Waiter / Cashier</label>
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={waiterSearch}
-              onChange={(e) => { setWaiterSearch(e.target.value); setPage(1); }}
+            <input type="text" value={waiterSearch} onChange={(e) => { setWaiterSearch(e.target.value); setPage(1); }}
               placeholder="Search by name"
-              className="pl-8 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 min-w-[150px]"
-            />
+              className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]" />
           </div>
         </div>
-        <div className="ml-auto text-sm text-gray-400 font-medium self-end pb-0.5">
+        <div className="col-span-2 sm:col-span-1 sm:ml-auto text-sm text-gray-400 font-medium self-end pb-0.5 text-right">
           {filtered.length} order{filtered.length !== 1 ? "s" : ""}{totalPages > 1 ? ` · page ${safePage}/${totalPages}` : ""}
         </div>
       </div>
@@ -295,40 +283,40 @@ export default function OrdersSection() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[700px]">
               <thead>
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left px-5 py-3">Order #</th>
-                  <th className="text-left px-5 py-3">Date &amp; Time</th>
-                  <th className="text-left px-5 py-3">Customer</th>
-                  <th className="text-left px-5 py-3">Cashier / Waiter</th>
-                  <th className="text-left px-5 py-3">Outlet</th>
-                  <th className="text-left px-5 py-3">Terminal</th>
-                  <th className="text-center px-5 py-3">Items</th>
-                  <th className="text-right px-5 py-3">Total</th>
-                  <th className="text-center px-5 py-3">Payment</th>
-                  <th className="text-center px-5 py-3">Actions</th>
+                  <th className="text-left px-4 py-3">Order #</th>
+                  <th className="text-left px-4 py-3">Date &amp; Time</th>
+                  <th className="text-left px-4 py-3">Customer</th>
+                  <th className="text-left px-4 py-3">Cashier / Waiter</th>
+                  <th className="text-left px-4 py-3">Outlet</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell">Terminal</th>
+                  <th className="text-center px-4 py-3">Items</th>
+                  <th className="text-right px-4 py-3">Total</th>
+                  <th className="text-center px-4 py-3">Payment</th>
+                  <th className="text-center px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {paginated.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
-                    <td className="px-5 py-3 font-bold text-gray-900 dark:text-white text-sm">{o.order_number}</td>
-                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
+                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white text-sm">{o.order_number}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
                       {new Date(o.created_at).toLocaleString()}
                     </td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in Customer"}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in Customer"}</td>
                     <td className="px-5 py-3">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{o.created_by_name || "—"}</p>
                       {o.created_by_role && (
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">{o.created_by_role}</p>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-300 text-sm">{outletName(o.outlet_id)}</td>
-                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400 text-sm">{o.terminal_id ? terminalName(o.terminal_id) : "—"}</td>
-                    <td className="px-5 py-3 text-center text-gray-600 dark:text-gray-300 text-sm">{o.items?.length || 0}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-green-600 text-sm">{formatCurrency(o.total)}</td>
-                    <td className="px-5 py-3 text-center">
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{outletName(o.outlet_id)}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm hidden lg:table-cell">{o.terminal_id ? terminalName(o.terminal_id) : "—"}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-300 text-sm">{o.items?.length || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-green-600 dark:text-green-400 text-sm">{formatCurrency(o.total)}</td>
+                    <td className="px-4 py-3 text-center">
                       {o.payment_method && o.payment_method !== "pending" ? (
                         <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold uppercase",
                           PAYMENT_BADGE[o.payment_method] || "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300")}>
@@ -340,7 +328,7 @@ export default function OrdersSection() {
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-center">
+                    <td className="px-4 py-3 text-center">
                       <button onClick={() => setViewOrder(o)}
                         className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                         <Eye size={16} />
@@ -359,8 +347,8 @@ export default function OrdersSection() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <p className="text-sm text-gray-400">
+        <div className="flex items-center justify-between mt-4 px-1 gap-2 flex-wrap">
+          <p className="text-xs sm:text-sm text-gray-400">
             Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} orders
           </p>
           <div className="flex items-center gap-1">

@@ -462,7 +462,7 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6">
           <div className="max-w-7xl mx-auto">
             {activeSection === "dashboard" && (
               <DashboardContent analytics={analytics} loading={analyticsLoading} userName={user?.name} />
@@ -533,7 +533,7 @@ function DashboardContent({ analytics, loading, userName }) {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white">Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Welcome back, {userName || "Admin"}</p>
       </div>
 

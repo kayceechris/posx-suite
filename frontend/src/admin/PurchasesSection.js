@@ -403,7 +403,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
             <Icon size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white">{title}</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{title}</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{pos.length} order{pos.length !== 1 ? "s" : ""}</p>
           </div>
         </div>

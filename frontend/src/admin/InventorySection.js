@@ -174,7 +174,7 @@ function StockLevelsView() {
     <div>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Stock Levels</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Stock Levels</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
             {stock.length} entries · <span className="text-orange-500 font-semibold">{lowCount} low</span>
             {expiringCount > 0 && <> · <span className="text-red-500 font-semibold">{expiringCount} expiring</span></>}
@@ -316,12 +316,12 @@ function StockLevelsView() {
 
       {updateModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
               <h3 className="font-bold text-gray-900 dark:text-white">Update Stock</h3>
               <button onClick={() => setUpdateModal(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               <form onSubmit={handleUpdate} className="space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 text-sm">
                   <p className="font-semibold text-gray-900 dark:text-white">{productName(form.product_id)}</p>
@@ -471,7 +471,7 @@ function StockCountView() {
             <ClipboardCheck size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Stock Count</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Stock Count</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Enter physical counts to reconcile with system quantities</p>
           </div>
         </div>
