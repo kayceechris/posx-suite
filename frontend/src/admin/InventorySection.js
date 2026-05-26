@@ -109,10 +109,6 @@ function StockLevelsView() {
   const [products, setProducts] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [migrating, setMigrating] = useState(false);
-  const [migrateResult, setMigrateResult] = useState(null);
-  const [migrateError, setMigrateError] = useState(null);
-  const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
   const [updateModal, setUpdateModal] = useState(null);
   const [form, setForm] = useState({ product_id: "", outlet_id: "", store: "main", quantity: "", min_quantity: "10", batch_number: "", expiry_date: "" });
   const [saving, setSaving] = useState(false);
@@ -173,22 +169,6 @@ function StockLevelsView() {
 
   const lowCount = stock.filter(isLow).length;
   const expiringCount = stock.filter((s) => isExpiring(s) || isExpired(s)).length;
-  const unmappedCount = stock.filter((s) => (s.store || "main") === "main").length;
-
-  const handleMigrate = async () => {
-    setShowMigrateConfirm(false);
-    setMigrating(true);
-    setMigrateError(null);
-    try {
-      const result = await api.migrateStoreStock();
-      setMigrateResult(result);
-      load();
-    } catch (err) {
-      setMigrateError(err.message || "Migration failed. Please try again.");
-    } finally {
-      setMigrating(false);
-    }
-  };
 
   return (
     <div>
@@ -217,57 +197,6 @@ function StockLevelsView() {
           </button>
         </div>
       </div>
-
-      {isAdmin && unmappedCount > 0 && !migrateResult && !showMigrateConfirm && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl mb-4">
-          <AlertTriangle size={18} className="text-blue-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-blue-800 dark:text-blue-200 text-sm font-semibold">{unmappedCount} stock record{unmappedCount !== 1 ? "s" : ""} are in Main Store</p>
-            <p className="text-blue-600 dark:text-blue-400 text-xs mt-0.5">Run migration to automatically move food products → Kitchen Store and drink products → Bar Store based on group assignment.</p>
-          </div>
-          <button onClick={() => setShowMigrateConfirm(true)} disabled={migrating}
-            className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap">
-            Fix Store Assignment
-          </button>
-        </div>
-      )}
-      {isAdmin && showMigrateConfirm && !migrateResult && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl mb-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-amber-800 dark:text-amber-200 text-sm font-semibold">Confirm Store Migration</p>
-              <p className="text-amber-700 dark:text-amber-300 text-xs mt-1">This will move food-product stock to Kitchen Store and drink-product stock to Bar Store based on each product's category group. Duplicate records will be merged automatically.</p>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-3 justify-end">
-            <button onClick={() => setShowMigrateConfirm(false)} disabled={migrating}
-              className="px-4 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors">
-              Cancel
-            </button>
-            <button onClick={handleMigrate} disabled={migrating}
-              className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors">
-              {migrating ? "Migrating…" : "Confirm Migration"}
-            </button>
-          </div>
-        </div>
-      )}
-      {migrateError && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl mb-4">
-          <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
-          <p className="text-red-700 dark:text-red-300 text-sm font-medium flex-1">{migrateError}</p>
-          <button onClick={() => setMigrateError(null)} className="ml-auto text-gray-400 hover:text-gray-600"><X size={15} /></button>
-        </div>
-      )}
-      {migrateResult && (
-        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl mb-4">
-          <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
-          <p className="text-green-700 dark:text-green-300 text-sm font-medium flex-1">
-            Migration done — {migrateResult.stock_moved_to_kitchen} to Kitchen, {migrateResult.stock_moved_to_bar} to Bar{migrateResult.duplicates_merged > 0 ? `, ${migrateResult.duplicates_merged} duplicates merged` : ""}{migrateResult.categories_tagged > 0 ? `, ${migrateResult.categories_tagged} categories tagged` : ""}.
-          </p>
-          <button onClick={() => setMigrateResult(null)} className="ml-auto text-gray-400 hover:text-gray-600"><X size={15} /></button>
-        </div>
-      )}
 
       {lowCount > 0 && (
         <div className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl mb-3">

@@ -208,9 +208,6 @@ export const api = {
   getConsolidatedStock: () => request("/api/stock/consolidated"),
   getExpiringStock: (days = 30) => request(`/api/stock/expiring?days=${days}`),
 
-  migrateStoreStock: () =>
-    request("/api/migrate-store-stock", { method: "POST" }),
-
   // CSV import to a store
   importStockCsv: (outlet_id, store, file) => {
     const token = localStorage.getItem("posx_token");
