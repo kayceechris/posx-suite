@@ -359,22 +359,22 @@ export default function AdminPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <button onClick={() => setSidebarOpen((v) => !v)} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
+          <button onClick={() => setSidebarOpen((v) => !v)} className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
             <Menu size={22} />
           </button>
           <div className="flex items-center gap-3">
-            {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0) && (
-              <button
-                onClick={() => { setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: notifSummary.pending_requisitions > 0 ? "requisitions" : "reorder" })); }}
-                title="View alerts"
-                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                <Bell size={17} />
+            <button
+              onClick={() => { setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: notifSummary.pending_requisitions > 0 ? "requisitions" : "reorder" })); }}
+              title="View alerts"
+              className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <Bell size={17} />
+              {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0) && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
                   {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock, 99)}
                 </span>
-              </button>
-            )}
+              )}
+            </button>
             <button
               onClick={toggleTheme}
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
