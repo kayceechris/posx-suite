@@ -290,10 +290,10 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
           )}
           title={collapsed ? (user?.name || "Staff") : undefined}
         >
-          <div className="w-7 h-7 bg-blue-700/40 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-300 text-xs font-bold uppercase">
-              {(user?.name || "S")[0]}
-            </span>
+          <div className="w-7 h-7 bg-blue-700/40 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+            {user?.photo
+              ? <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
+              : <span className="text-blue-300 text-xs font-bold uppercase">{(user?.name || "S")[0]}</span>}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">

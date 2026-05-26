@@ -45,6 +45,7 @@ async def login(credentials: UserLogin):
                 "role": user_doc["role"],
                 "outlet_id": user_doc.get("outlet_id"),
                 "permissions": user_doc.get("permissions", []),
+                "photo": user_doc.get("photo"),
             }
         }
 

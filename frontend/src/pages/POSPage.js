@@ -545,6 +545,13 @@ export default function POSPage() {
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-gray-50 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 focus:outline-none focus:border-blue-400 transition-all"
               />
             </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0" title={user?.name}>
+                {user?.photo
+                  ? <img src={user.photo} alt={user?.name} className="w-full h-full object-cover" />
+                  : <span>{(user?.name || "U")[0].toUpperCase()}</span>}
+              </div>
+            </div>
             <button
               onClick={() => setShowTerminalModal(true)}
               className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-2xl text-sm text-gray-600 dark:text-gray-300 hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all bg-gray-50 dark:bg-gray-700 flex-shrink-0"
