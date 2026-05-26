@@ -192,6 +192,59 @@ async def send_low_stock_email(low_items: list):
     })
 
 
+async def send_new_purchase_order_email(po: dict):
+    if not _enabled():
+        return
+    items_html = "".join(
+        f"<tr style='border-bottom:1px solid #f1f5f9;'>"
+        f"<td style='padding:8px 12px;font-size:14px;color:#374151;'>{i.get('description', '—')}</td>"
+        f"<td style='padding:8px 12px;font-size:14px;color:#374151;text-align:center;'>{i.get('quantity', 0)} {i.get('unit', 'pcs')}</td>"
+        f"<td style='padding:8px 12px;font-size:14px;color:#374151;text-align:right;'>&#8358;{i.get('total', 0):,.0f}</td>"
+        f"</tr>"
+        for i in po.get("items", [])
+    )
+    total = po.get("total", 0)
+    body = f"""
+      <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">New Purchase Order</h2>
+      <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">A purchase order has been submitted and is awaiting approval.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:20px;">
+        <tr>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">PO Number</p>
+            <p style="margin:0;font-size:14px;font-weight:600;color:#111827;">{po.get('po_number', '—')}</p>
+          </td>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Supplier</p>
+            <p style="margin:0;font-size:14px;font-weight:600;color:#111827;">{po.get('supplier_name', '—')}</p>
+          </td>
+          <td style="padding:12px 16px;">
+            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Total</p>
+            <p style="margin:0;font-size:16px;font-weight:700;color:#111827;">&#8358;{total:,.0f}</p>
+          </td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+        <tr style="background:#f1f5f9;">
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;">Item</th>
+          <th style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;">Qty</th>
+          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;">Amount</th>
+        </tr>
+        {items_html}
+        <tr style="background:#f0fdf4;">
+          <td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#374151;">Total</td>
+          <td style="padding:10px 12px;font-size:15px;font-weight:700;color:#059669;text-align:right;">&#8358;{total:,.0f}</td>
+        </tr>
+      </table>
+      <p style="margin:0;font-size:13px;color:#6b7280;">Log in to POSx Suite to approve or reject this purchase order.</p>
+    """
+    await _send({
+        "from": FROM_EMAIL,
+        "to": _recipients(),
+        "subject": f"New PO {po.get('po_number', '—')} — {po.get('supplier_name', '')} · ₦{total:,.0f} | POSx Suite",
+        "html": _base_html("New Purchase Order", body),
+    })
+
+
 async def send_daily_digest_email(db):
     if not _enabled():
         return

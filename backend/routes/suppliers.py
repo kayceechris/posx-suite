@@ -1,8 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
+import uuid
+from datetime import datetime, timezone
 
-from database import db
-from models import User, Supplier, SupplierCreate, PurchaseOrder, PurchaseOrderCreate
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+
 from auth import get_current_user
+from database import db
+from lib.email_service import send_new_purchase_order_email
+from models import User, Supplier, SupplierCreate, PurchaseOrder, PurchaseOrderCreate
 
 router = APIRouter(prefix="/api")
 
@@ -66,19 +70,22 @@ async def get_purchase_orders(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/purchase-orders")
-async def create_purchase_order(po_data: PurchaseOrderCreate, current_user: User = Depends(get_current_user)):
+async def create_purchase_order(po_data: PurchaseOrderCreate, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     if not _can_manage_purchases(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
     count = await db.purchase_orders.count_documents({})
     po_dict = po_data.model_dump()
-    # Preserve the status from the request body; PurchaseOrder defaults to "draft"
-    # so we must extract it here and pass it explicitly.
     status = po_dict.pop("status", None) or "pending"
+    po_dict["type"] = "external"  # always external — internal transfers use requisitions
     po = PurchaseOrder(**po_dict, status=status, po_number=f"PO{count + 1:06d}", created_by=current_user.id)
     doc = po.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.purchase_orders.insert_one(doc)
     doc.pop("_id", None)
+    # Resolve supplier name for the email
+    supplier = await db.suppliers.find_one({"id": po.supplier_id}, {"_id": 0, "name": 1})
+    email_doc = {**doc, "supplier_name": supplier["name"] if supplier else "—", "created_by_name": current_user.name}
+    background_tasks.add_task(send_new_purchase_order_email, email_doc)
     return doc
 
 
@@ -94,13 +101,26 @@ async def update_purchase_order(po_id: str, po_data: dict, current_user: User = 
     if update_fields.get("status") == "received":
         po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
         if po:
+            outlet_id = po.get("outlet_id") or ""
             for item in po.get("items", []):
-                if item.get("product_id"):
-                    await db.stock.update_one(
-                        {"product_id": item["product_id"]},
-                        {"$inc": {"quantity": item["quantity"]}},
-                        upsert=True
-                    )
+                if item.get("product_id") and item.get("quantity"):
+                    qty = int(item["quantity"])
+                    stock_filter = {"product_id": item["product_id"], "store": "main"}
+                    if outlet_id:
+                        stock_filter["outlet_id"] = outlet_id
+                    existing = await db.stock.find_one(stock_filter, {"_id": 0})
+                    if existing:
+                        await db.stock.update_one(stock_filter, {"$inc": {"quantity": qty}})
+                    else:
+                        await db.stock.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "product_id": item["product_id"],
+                            "outlet_id": outlet_id,
+                            "store": "main",
+                            "quantity": qty,
+                            "min_quantity": 10,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        })
 
     updated = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
     return updated

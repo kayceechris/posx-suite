@@ -52,8 +52,8 @@ const UNITS = ["pcs", "carton", "kg", "g", "litre", "dozen", "box", "pack", "bag
 
 const EMPTY_ITEM = { product_id: "", description: "", quantity: 1, unit: "pcs", unit_cost: "", total: 0 };
 
-function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreated }) {
-  const [form, setForm] = useState({ supplier_id: "", type: "external", notes: "" });
+function NewPOModal({ suppliers, products, units, outlets, initialItems, onClose, onCreated }) {
+  const [form, setForm] = useState({ supplier_id: "", outlet_id: "", notes: "" });
   const [items, setItems] = useState(initialItems?.length ? initialItems : [{ ...EMPTY_ITEM }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -81,12 +81,14 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
 
   const handleSubmit = async () => {
     if (!form.supplier_id) { setError("Please select a supplier"); return; }
+    if (!form.outlet_id) { setError("Please select which outlet receives this stock"); return; }
     if (items.some((it) => !it.description.trim())) { setError("All items need a description"); return; }
     setSaving(true); setError("");
     try {
       await api.createPurchaseOrder({
         supplier_id: form.supplier_id,
-        type: form.type,
+        outlet_id: form.outlet_id,
+        type: "external",
         notes: form.notes,
         status: "pending",
         items: items.map((it) => ({
@@ -138,15 +140,16 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Type</label>
+              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Receiving Outlet</label>
               <div className="relative">
-                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                <select value={form.outlet_id} onChange={(e) => setForm((f) => ({ ...f, outlet_id: e.target.value }))}
                   className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-400 appearance-none">
-                  <option value="external">External (Supplier)</option>
-                  <option value="internal">Internal Transfer</option>
+                  <option value="">Select outlet</option>
+                  {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
+              <p className="text-[10px] text-gray-400 mt-1">Stock added to this outlet's Main Store on receipt</p>
             </div>
           </div>
 
@@ -236,7 +239,7 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
   );
 }
 
-function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
+function PODetailModal({ po, suppliers, outlets, canApprove, onClose, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(po.status);
   const supplierName = suppliers.find((s) => s.id === po.supplier_id)?.name || "—";
@@ -266,7 +269,11 @@ function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={status} />
-            <TypeBadge type={po.type} />
+            {po.outlet_id && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                {outlets?.find(o => o.id === po.outlet_id)?.name || "Outlet"} · Main Store
+              </span>
+            )}
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
@@ -342,6 +349,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
+  const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [newPOInitialItems, setNewPOInitialItems] = useState(null);
@@ -350,12 +358,13 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getPurchaseOrders(), api.getSuppliers(), api.getProducts(), api.getUnits()])
-      .then(([all, s, pr, u]) => {
+    Promise.all([api.getPurchaseOrders(), api.getSuppliers(), api.getProducts(), api.getUnits(), api.getOutlets()])
+      .then(([all, s, pr, u, o]) => {
         setPOs(statusFilter ? all.filter((p) => statusFilter.includes(p.status)) : all);
         setSuppliers(s);
         setProducts(pr.filter((pr) => pr.active !== false));
         setUnits(u);
+        setOutlets(o);
       })
       .catch((err) => {
         setToast({ msg: `Failed to load: ${err.message || "Network error"}`, type: "error" });
@@ -471,10 +480,10 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="font-black text-gray-900 dark:text-white text-sm sm:text-base">{po.po_number}</span>
                   <StatusBadge status={po.status} />
-                  <TypeBadge type={po.type} />
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                   Supplier: <span className="font-medium text-gray-700 dark:text-gray-300">{supplierName(po.supplier_id)}</span>
+                  {po.outlet_id && <span className="ml-2 text-xs text-gray-400">→ {outlets.find(o => o.id === po.outlet_id)?.name || ""} Main Store</span>}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">{po.items?.length || 0} item{po.items?.length !== 1 ? "s" : ""} · {formatCurrency(po.total)}</p>
               </div>
@@ -513,6 +522,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
           suppliers={suppliers}
           products={products}
           units={units}
+          outlets={outlets}
           initialItems={newPOInitialItems}
           onClose={() => { setShowNew(false); setNewPOInitialItems(null); }}
           onCreated={() => {
@@ -528,6 +538,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
         <PODetailModal
           po={detail}
           suppliers={suppliers}
+          outlets={outlets}
           canApprove={canApprove}
           onClose={() => setDetail(null)}
           onUpdated={() => { setDetail(null); load(); }}

@@ -527,6 +527,7 @@ class PurchaseOrder(BaseModel):
     po_number: str = ""
     supplier_id: str
     type: str = "external"
+    outlet_id: Optional[str] = None
     items: List[PurchaseOrderItem] = []
     subtotal: float = 0.0
     tax: float = 0.0
@@ -540,6 +541,7 @@ class PurchaseOrder(BaseModel):
 class PurchaseOrderCreate(BaseModel):
     supplier_id: str
     type: str = "external"
+    outlet_id: Optional[str] = None
     status: str = "pending"
     items: List[PurchaseOrderItem]
     subtotal: float = 0.0
