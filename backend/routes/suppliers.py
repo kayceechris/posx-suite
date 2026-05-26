@@ -101,13 +101,10 @@ async def update_purchase_order(po_id: str, po_data: dict, current_user: User = 
     if update_fields.get("status") == "received":
         po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
         if po:
-            outlet_id = po.get("outlet_id") or ""
             for item in po.get("items", []):
                 if item.get("product_id") and item.get("quantity"):
                     qty = int(item["quantity"])
                     stock_filter = {"product_id": item["product_id"], "store": "main"}
-                    if outlet_id:
-                        stock_filter["outlet_id"] = outlet_id
                     existing = await db.stock.find_one(stock_filter, {"_id": 0})
                     if existing:
                         await db.stock.update_one(stock_filter, {"$inc": {"quantity": qty}})
@@ -115,7 +112,7 @@ async def update_purchase_order(po_id: str, po_data: dict, current_user: User = 
                         await db.stock.insert_one({
                             "id": str(uuid.uuid4()),
                             "product_id": item["product_id"],
-                            "outlet_id": outlet_id,
+                            "outlet_id": "",
                             "store": "main",
                             "quantity": qty,
                             "min_quantity": 10,
