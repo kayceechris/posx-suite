@@ -370,7 +370,7 @@ export default function AdminPage() {
           <button onClick={() => setSidebarOpen((v) => !v)} className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
             <Menu size={22} />
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 ml-auto">
             <div ref={bellRef} className="relative">
               <button
                 onClick={() => setBellOpen((v) => !v)}
