@@ -49,6 +49,28 @@ async def create_requisition(data: RequisitionCreate, background_tasks: Backgrou
     return req
 
 
+@router.put("/requisitions/{req_id}")
+async def update_requisition(req_id: str, data: dict, current_user: User = Depends(get_current_user)):
+    """Edit items / notes on a pending requisition before it is approved."""
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    req = await db.requisitions.find_one({"id": req_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+    if req["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Only pending requisitions can be edited")
+    update = {}
+    if "items" in data:
+        update["items"] = data["items"]
+    if "notes" in data:
+        update["notes"] = data["notes"]
+    if not update:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    await db.requisitions.update_one({"id": req_id}, {"$set": update})
+    updated = await db.requisitions.find_one({"id": req_id}, {"_id": 0})
+    return updated
+
+
 @router.put("/requisitions/{req_id}/approve")
 async def approve_requisition(req_id: str, current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager"]:

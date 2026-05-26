@@ -1136,6 +1136,7 @@ function WasteView() {
   const { products, outlets, loading: baseLoading } = useBaseData();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState([]);
+  const [units, setUnits] = useState([]);
   const [outletId, setOutletId] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -1143,6 +1144,15 @@ function WasteView() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
+
+  useEffect(() => { api.getUnits().then(setUnits).catch(console.error); }, []);
+
+  const productUnit = (pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    if (!p?.unit_id) return "";
+    const u = units.find((u) => u.id === p.unit_id);
+    return u?.abbreviation || u?.name || "";
+  };
 
   const load = (oid) => {
     const id = oid || outletId;
@@ -1268,7 +1278,9 @@ function WasteView() {
               {filtered.map((e) => (
                 <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(e.product_id)}</td>
-                  <td className="px-3 py-3 text-center font-bold text-red-500">{e.quantity}</td>
+                  <td className="px-3 py-3 text-center font-bold text-red-500">
+                    {e.quantity}{productUnit(e.product_id) && <span className="ml-1 text-[11px] font-semibold text-gray-400">{productUnit(e.product_id)}</span>}
+                  </td>
                   <td className="px-3 py-3">
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">{e.reason}</span>
                   </td>
@@ -1306,8 +1318,13 @@ function WasteView() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Quantity Lost</label>
-                  <input required type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-red-400" />
+                  <div className="flex items-center gap-2">
+                    <input required type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-red-400" />
+                    {form.product_id && productUnit(form.product_id) && (
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">{productUnit(form.product_id)}</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Reason</label>

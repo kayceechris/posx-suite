@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Plus, RefreshCw,
-  Trash2, X, ChevronDown, ChevronUp, ArrowRight, Package,
+  Trash2, X, ChevronDown, ChevronUp, ArrowRight, Package, Pencil,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -187,7 +187,7 @@ function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, se
 
 // ── Requisition Card ──────────────────────────────────────────────────────────
 
-function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete, onFulfillOpen, isPrivileged }) {
+function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete, onFulfillOpen, onEdit, isPrivileged }) {
   const [expanded, setExpanded] = useState(false);
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
@@ -255,6 +255,10 @@ function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete
                   <button onClick={() => onApprove(req.id)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
                     Approve
+                  </button>
+                  <button onClick={() => onEdit(req)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <Pencil size={13} /> Edit
                   </button>
                   <button onClick={() => onReject(req.id)}
                     className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 rounded-xl text-sm font-semibold hover:bg-red-200 transition-colors">
@@ -435,6 +439,142 @@ function CreateRequisitionModal({ products, outlets, groups, stores, onClose, on
   );
 }
 
+// ── Edit Requisition Modal ────────────────────────────────────────────────────
+
+function EditRequisitionModal({ req, products, groups, stores, onClose, onSaved }) {
+  const childStores = stores.filter(s => !s.is_main);
+  const fromStore = req.from_store;
+
+  const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
+  const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
+  const filteredProducts = fromStore === "kitchen"
+    ? products.filter((p) => foodGroupIds.includes(p.category_id))
+    : fromStore === "bar"
+    ? products.filter((p) => drinkGroupIds.includes(p.category_id))
+    : products;
+
+  const [items, setItems] = useState(req.items.map((it) => ({ ...it })));
+  const [notes, setNotes] = useState(req.notes || "");
+  const [mainStock, setMainStock] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.getStock(req.outlet_id, "main").then(setMainStock).catch(console.error);
+  }, [req.outlet_id]);
+
+  const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? null;
+
+  const setItem = (idx, key, val) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: val } : it));
+  const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
+  const addItem = () => setItems((prev) => [...prev, { product_id: "", product_name: "", quantity_requested: 1 }]);
+
+  const handleProductChange = (idx, pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    setItem(idx, "product_id", pid);
+    setItem(idx, "product_name", p?.name || "");
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    const validItems = items.filter((it) => it.product_id && it.quantity_requested > 0);
+    if (!validItems.length) { setError("Add at least one product."); return; }
+    setSaving(true); setError("");
+    try {
+      await api.updateRequisition(req.id, { items: validItems, notes: notes || null });
+      onSaved();
+    } catch (err) { setError(err.message); setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Edit Requisition</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Requesting store: <span className="font-semibold text-gray-600 dark:text-gray-300">{storeLabel(fromStore, stores)}</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSave} className="p-6 space-y-4">
+          <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+            <AlertTriangle size={14} className="text-blue-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+              Adjust quantities if Main Store cannot fulfill the full amount. Changes apply before approval.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Items</label>
+              <button type="button" onClick={addItem}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                <Plus size={13} /> Add Item
+              </button>
+            </div>
+            <div className="space-y-2">
+              {items.map((item, idx) => {
+                const avail = item.product_id ? mainQty(item.product_id) : null;
+                const isShort = avail !== null && item.quantity_requested > avail;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex gap-2 items-center">
+                      <select required value={item.product_id} onChange={(e) => handleProductChange(idx, e.target.value)}
+                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
+                        <option value="">Select product…</option>
+                        {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      <input type="number" min="1" required value={item.quantity_requested}
+                        onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
+                        className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
+                          isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
+                      {items.length > 1 && (
+                        <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                    {item.product_id && (
+                      <p className={cn("text-[11px] pl-1 font-semibold",
+                        avail === null ? "text-gray-400" : isShort ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400")}>
+                        {avail === null ? "Loading availability…" : isShort
+                          ? `⚠ Only ${avail} available in Main Store`
+                          : `✓ ${avail} available in Main Store`}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">Notes (optional)</label>
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 resize-none" />
+          </div>
+
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Section ──────────────────────────────────────────────────────────────
 
 export default function RequisitionsSection() {
@@ -450,6 +590,7 @@ export default function RequisitionsSection() {
   const [tab, setTab] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [fulfillReq, setFulfillReq] = useState(null);
+  const [editReq, setEditReq] = useState(null);
   const [toast, setToast] = useState(null);
 
   const load = () => {
@@ -594,6 +735,7 @@ export default function RequisitionsSection() {
               onReject={handleReject}
               onDelete={handleDelete}
               onFulfillOpen={(r) => setFulfillReq(r)}
+              onEdit={(r) => setEditReq(r)}
             />
           ))}
           {displayed.length === 0 && (
@@ -622,6 +764,17 @@ export default function RequisitionsSection() {
           setToast={setToast}
           onClose={() => setFulfillReq(null)}
           onFulfilled={handleFulfilled}
+        />
+      )}
+
+      {editReq && (
+        <EditRequisitionModal
+          req={editReq}
+          products={products}
+          groups={groups}
+          stores={stores}
+          onClose={() => setEditReq(null)}
+          onSaved={() => { setEditReq(null); load(); setToast({ msg: "Requisition updated.", type: "success" }); }}
         />
       )}
     </div>

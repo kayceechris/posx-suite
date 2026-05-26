@@ -249,6 +249,8 @@ export const api = {
   },
   createRequisition: (data) =>
     request("/api/requisitions", { method: "POST", body: JSON.stringify(data) }),
+  updateRequisition: (id, data) =>
+    request(`/api/requisitions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   approveRequisition: (id) =>
     request(`/api/requisitions/${id}/approve`, { method: "PUT" }),
   rejectRequisition: (id) =>
