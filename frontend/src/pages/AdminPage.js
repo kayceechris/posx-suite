@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Building2, Package, Warehouse, ShoppingBag, UserCircle,
@@ -193,6 +193,8 @@ export default function AdminPage() {
   const [expandedSection, setExpandedSection] = useState(null);
   const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", stores: "main-store", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard" });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [notifSummary, setNotifSummary] = useState({ pending_requisitions: 0, low_stock: 0, todays_orders: 0, pending_purchases: 0 });
@@ -220,9 +222,15 @@ export default function AdminPage() {
       setSubViews((s) => ({ ...s, purchases: sub }));
       if (prefill) setPreFillPO(prefill);
     };
+    const handleClickOutside = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
     window.addEventListener("nav-purchases", handleNavPurchases);
     return () => {
       clearInterval(notifTimer);
+      document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("nav-purchases", handleNavPurchases);
     };
   }, []);
@@ -363,18 +371,79 @@ export default function AdminPage() {
             <Menu size={22} />
           </button>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: notifSummary.pending_requisitions > 0 ? "requisitions" : "reorder" })); }}
-              title="View alerts"
-              className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              <Bell size={17} />
-              {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0) && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-                  {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock, 99)}
-                </span>
+            <div ref={bellRef} className="relative">
+              <button
+                onClick={() => setBellOpen((v) => !v)}
+                title="View alerts"
+                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Bell size={17} />
+                {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0 || notifSummary.pending_purchases > 0) && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                    {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock + notifSummary.pending_purchases, 99)}
+                  </span>
+                )}
+              </button>
+
+              {bellOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Alerts</p>
+                  </div>
+                  {notifSummary.pending_requisitions === 0 && notifSummary.low_stock === 0 && notifSummary.pending_purchases === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-gray-400">No active alerts</p>
+                  ) : (
+                    <div className="py-1">
+                      {notifSummary.pending_requisitions > 0 && (
+                        <button
+                          onClick={() => { setBellOpen(false); setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: "requisitions" })); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <ClipboardList size={15} className="text-amber-600 dark:text-amber-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Pending Requisitions</p>
+                            <p className="text-xs text-gray-400">{notifSummary.pending_requisitions} awaiting approval</p>
+                          </div>
+                          <span className="min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.pending_requisitions > 99 ? "99+" : notifSummary.pending_requisitions}</span>
+                        </button>
+                      )}
+                      {notifSummary.low_stock > 0 && (
+                        <button
+                          onClick={() => { setBellOpen(false); setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: "reorder" })); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-red-100 dark:bg-red-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Warehouse size={15} className="text-red-600 dark:text-red-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Low Stock</p>
+                            <p className="text-xs text-gray-400">{notifSummary.low_stock} item{notifSummary.low_stock !== 1 ? "s" : ""} running low</p>
+                          </div>
+                          <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.low_stock > 99 ? "99+" : notifSummary.low_stock}</span>
+                        </button>
+                      )}
+                      {notifSummary.pending_purchases > 0 && (
+                        <button
+                          onClick={() => { setBellOpen(false); setActiveSection("purchases"); setExpandedSection("purchases"); setSubViews((s) => ({ ...s, purchases: "pending" })); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <ShoppingBag size={15} className="text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Pending Purchases</p>
+                            <p className="text-xs text-gray-400">{notifSummary.pending_purchases} order{notifSummary.pending_purchases !== 1 ? "s" : ""} pending</p>
+                          </div>
+                          <span className="min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.pending_purchases > 99 ? "99+" : notifSummary.pending_purchases}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
+            </div>
             <button
               onClick={toggleTheme}
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
