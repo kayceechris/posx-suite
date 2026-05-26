@@ -452,8 +452,10 @@ export default function AdminPage() {
               {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </button>
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                {user?.name?.[0]?.toUpperCase() || "A"}
+              <div className="w-9 h-9 bg-blue-600 rounded-full overflow-hidden flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {user?.photo
+                  ? <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
+                  : user?.name?.[0]?.toUpperCase() || "A"}
               </div>
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{user?.name || "Admin"}</span>
             </div>

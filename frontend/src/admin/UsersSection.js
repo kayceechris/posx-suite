@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Trash2, ToggleLeft, ToggleRight, X, Shield, ChevronDown, ChevronRight, Users, Pencil } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Plus, Trash2, ToggleLeft, ToggleRight, X, Shield, ChevronDown, ChevronRight, Users, Pencil, Camera } from "lucide-react";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
@@ -212,7 +212,7 @@ const roleBadge = (role) => (
 
 // ─── User List ───────────────────────────────────────────────────────────────
 
-const EMPTY_USER = { name: "", pincode: "", role: "cashier", outlet_id: "", permissions: [] };
+const EMPTY_USER = { name: "", pincode: "", role: "cashier", outlet_id: "", permissions: [], photo: "" };
 
 function UserList() {
   const [users, setUsers] = useState([]);
@@ -224,6 +224,8 @@ function UserList() {
   const [form, setForm] = useState(EMPTY_USER);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
 
   const load = () => {
     setLoading(true);
@@ -242,8 +244,23 @@ function UserList() {
   };
 
   const openEdit = (u) => {
-    setForm({ name: u.name, pincode: "", role: u.role, outlet_id: u.outlet_id || "", permissions: u.permissions || [] });
+    setForm({ name: u.name, pincode: "", role: u.role, outlet_id: u.outlet_id || "", permissions: u.permissions || [], photo: u.photo || "" });
     setFormError(""); setEditUser(u); setShowAdd(true);
+  };
+
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const result = await api.uploadImage(file);
+      setForm((prev) => ({ ...prev, photo: result.fullUrl || result.url }));
+    } catch (err) {
+      setFormError("Photo upload failed: " + err.message);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -251,7 +268,7 @@ function UserList() {
     if (!editUser && form.pincode.length < 4) { setFormError("PIN must be at least 4 digits."); return; }
     setSaving(true); setFormError("");
     try {
-      const payload = { ...form, outlet_id: form.outlet_id || null };
+      const payload = { ...form, outlet_id: form.outlet_id || null, photo: form.photo || null };
       if (editUser) {
         if (!payload.pincode) delete payload.pincode;
         await api.updateUser(editUser.id, payload);
@@ -311,18 +328,27 @@ function UserList() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {users.map((u) => (
             <div key={u.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-700 p-5 shadow-sm">
-              <div className="flex items-start justify-between mb-2">
-                <p className="font-bold text-gray-900 dark:text-white text-base">{u.name}</p>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                  <button onClick={() => openEdit(u)} className="text-blue-500 hover:text-blue-700 transition-colors">
-                    <Pencil size={15} />
-                  </button>
-                  <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 transition-colors">
-                    <Trash2 size={15} />
-                  </button>
+              <div className="flex items-start gap-3 mb-2">
+                <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-blue-600 flex items-center justify-center text-white font-bold text-base">
+                  {u.photo
+                    ? <img src={u.photo} alt={u.name} className="w-full h-full object-cover" />
+                    : u.name?.[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <p className="font-bold text-gray-900 dark:text-white text-base truncate">{u.name}</p>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <button onClick={() => openEdit(u)} className="text-blue-500 hover:text-blue-700 transition-colors">
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 transition-colors">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  {roleBadge(u.role)}
                 </div>
               </div>
-              {roleBadge(u.role)}
               <div className="mt-3 space-y-1 text-sm">
                 {outletName(u.outlet_id) && (
                   <p className="text-gray-600 dark:text-gray-300"><span className="font-semibold">Outlet:</span> {outletName(u.outlet_id)}</p>
@@ -359,6 +385,29 @@ function UserList() {
 
             {/* Scrollable body */}
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+
+              {/* PHOTO */}
+              <div className="flex flex-col items-center gap-2 pb-2">
+                <div
+                  className="relative w-24 h-24 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center cursor-pointer group"
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  {form.photo
+                    ? <img src={form.photo} alt="Profile" className="w-full h-full object-cover" />
+                    : <span className="text-white font-bold text-3xl">{form.name?.[0]?.toUpperCase() || "?"}</span>}
+                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {uploadingPhoto
+                      ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <><Camera size={18} className="text-white" /><span className="text-white text-[10px] mt-1 font-semibold">Change</span></>}
+                  </div>
+                </div>
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                <p className="text-xs text-gray-400">Click photo to upload</p>
+                {form.photo && (
+                  <button type="button" onClick={() => setForm((p) => ({ ...p, photo: "" }))} className="text-xs text-red-400 hover:text-red-600">Remove photo</button>
+                )}
+              </div>
+
               {/* NAME */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Name</label>

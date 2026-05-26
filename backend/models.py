@@ -15,6 +15,7 @@ class User(BaseModel):
     role_id: Optional[str] = None
     outlet_id: Optional[str] = None
     permissions: Optional[List[str]] = None
+    photo: Optional[str] = None
     active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -25,6 +26,7 @@ class UserCreate(BaseModel):
     role: str
     outlet_id: Optional[str] = None
     permissions: Optional[List[str]] = None
+    photo: Optional[str] = None
 
 
 class UserLogin(BaseModel):
