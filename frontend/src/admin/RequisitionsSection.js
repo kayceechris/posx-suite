@@ -536,6 +536,24 @@ export default function RequisitionsSection() {
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
+      {isPrivileged && counts.pending > 0 && tab !== "pending" && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl mb-4">
+          <AlertTriangle size={18} className="text-amber-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-800 dark:text-amber-200 text-sm font-semibold">
+              {counts.pending} pending requisition{counts.pending !== 1 ? "s" : ""} awaiting approval
+            </p>
+            <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">
+              Kitchen or Bar has requested stock from Main Store.
+            </p>
+          </div>
+          <button onClick={() => setTab("pending")}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors whitespace-nowrap">
+            <ArrowRight size={13} /> Review
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Pending",   key: "pending",   color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },

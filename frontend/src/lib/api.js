@@ -622,4 +622,8 @@ export const api = {
     request(`/api/accounts/currencies/${code}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteExchangeRate: (code) =>
     request(`/api/accounts/currencies/${code}`, { method: "DELETE" }),
+
+  // Notifications
+  getNotificationsSummary: () => request("/api/notifications/summary"),
+  triggerDailyDigest: () => request("/api/notifications/daily-digest", { method: "POST" }),
 };

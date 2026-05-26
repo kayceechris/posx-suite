@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from typing import List, Optional
 from datetime import date, timedelta
 
 from database import db
 from models import User, Order, OrderCreate, SplitBill, SplitBillCreate
 from auth import get_current_user
+from lib.email_service import send_new_order_email
 
 router = APIRouter(prefix="/api")
 
@@ -31,7 +32,7 @@ async def _deduct_stock_for_order(items: list, outlet_id: str):
 
 
 @router.post("/orders", response_model=Order)
-async def create_order(order_data: OrderCreate, current_user: User = Depends(get_current_user)):
+async def create_order(order_data: OrderCreate, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     count = await db.orders.count_documents({})
     order_number = f"ORD{count + 1:06d}"
 
@@ -70,6 +71,8 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(get
     doc = order.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.orders.insert_one(doc)
+    if order.status == "completed":
+        background_tasks.add_task(send_new_order_email, doc)
     return order
 
 

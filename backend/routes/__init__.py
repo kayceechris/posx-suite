@@ -31,6 +31,7 @@ from routes.waste import router as waste_router
 from routes.reservations import router as reservations_router
 from routes.requisitions import router as requisitions_router
 from routes.stores import router as stores_router
+from routes.notifications import router as notifications_router
 
 all_routers = [
     auth_router,
@@ -64,4 +65,5 @@ all_routers = [
     reservations_router,
     requisitions_router,
     stores_router,
+    notifications_router,
 ]

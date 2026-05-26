@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from typing import List, Optional
 from datetime import datetime, timezone
 
 from database import db
 from models import User, Requisition, RequisitionCreate
 from auth import get_current_user
+from lib.email_service import send_new_requisition_email
 
 router = APIRouter(prefix="/api")
 
@@ -33,7 +34,7 @@ async def get_requisition(req_id: str, current_user: User = Depends(get_current_
 
 
 @router.post("/requisitions", response_model=Requisition)
-async def create_requisition(data: RequisitionCreate, current_user: User = Depends(get_current_user)):
+async def create_requisition(data: RequisitionCreate, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     req = Requisition(
         **data.model_dump(),
         created_by=current_user.id,
@@ -44,6 +45,7 @@ async def create_requisition(data: RequisitionCreate, current_user: User = Depen
     if doc.get("fulfilled_at"):
         doc["fulfilled_at"] = doc["fulfilled_at"].isoformat()
     await db.requisitions.insert_one(doc)
+    background_tasks.add_task(send_new_requisition_email, doc)
     return req
 
 
