@@ -323,7 +323,7 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
   const childStores = stores.filter(s => !s.is_main);
   const [fromStore, setFromStore] = useState(childStores[0]?.id || "kitchen");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState([{ product_id: "", product_name: "", quantity_requested: 1 }]);
+  const [items, setItems] = useState([{ product_id: "", product_name: "", quantity_requested: 1, unit_id: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mainStock, setMainStock] = useState([]);
@@ -355,12 +355,16 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
 
   const setItem = (idx, key, val) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
-  const addItem = () => setItems((prev) => [...prev, { product_id: "", product_name: "", quantity_requested: 1 }]);
+  const addItem = () => setItems((prev) => [...prev, { product_id: "", product_name: "", quantity_requested: 1, unit_id: "" }]);
 
   const handleProductChange = (idx, pid) => {
     const p = products.find((pr) => pr.id === pid);
-    setItem(idx, "product_id", pid);
-    setItem(idx, "product_name", p?.name || "");
+    setItems((prev) => prev.map((it, i) => i === idx ? {
+      ...it,
+      product_id: pid,
+      product_name: p?.name || "",
+      unit_id: p?.unit_id || "",
+    } : it));
   };
 
   const handleSubmit = async (e) => {
@@ -427,11 +431,16 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
                         onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
-                      {item.product_id && (
-                        <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-200 rounded-lg whitespace-nowrap flex-shrink-0 min-w-[2.5rem] text-center border border-gray-200 dark:border-gray-500">
-                          {productUnit(item.product_id) || "unit"}
-                        </span>
-                      )}
+                      <select
+                        value={item.unit_id || ""}
+                        onChange={(e) => setItem(idx, "unit_id", e.target.value)}
+                        className="w-24 px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xs focus:outline-none focus:border-blue-500 flex-shrink-0"
+                      >
+                        <option value="">Unit</option>
+                        {(units || []).map((u) => (
+                          <option key={u.id} value={u.id}>{u.abbreviation || u.name}</option>
+                        ))}
+                      </select>
                       {items.length > 1 && (
                         <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
                           <Trash2 size={15} />
@@ -483,7 +492,10 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
     ? products.filter((p) => drinkGroupIds.includes(p.category_id))
     : products;
 
-  const [items, setItems] = useState(req.items.map((it) => ({ ...it })));
+  const [items, setItems] = useState(req.items.map((it) => ({
+    ...it,
+    unit_id: it.unit_id || products.find((p) => p.id === it.product_id)?.unit_id || "",
+  })));
   const [notes, setNotes] = useState(req.notes || "");
   const [mainStock, setMainStock] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -504,12 +516,16 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
 
   const setItem = (idx, key, val) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   const removeItem = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
-  const addItem = () => setItems((prev) => [...prev, { product_id: "", product_name: "", quantity_requested: 1 }]);
+  const addItem = () => setItems((prev) => [...prev, { product_id: "", product_name: "", quantity_requested: 1, unit_id: "" }]);
 
   const handleProductChange = (idx, pid) => {
     const p = products.find((pr) => pr.id === pid);
-    setItem(idx, "product_id", pid);
-    setItem(idx, "product_name", p?.name || "");
+    setItems((prev) => prev.map((it, i) => i === idx ? {
+      ...it,
+      product_id: pid,
+      product_name: p?.name || "",
+      unit_id: p?.unit_id || "",
+    } : it));
   };
 
   const handleSave = async (e) => {
@@ -568,11 +584,16 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
                         onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
-                      {item.product_id && (
-                        <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-200 rounded-lg whitespace-nowrap flex-shrink-0 min-w-[2.5rem] text-center border border-gray-200 dark:border-gray-500">
-                          {productUnit(item.product_id) || "unit"}
-                        </span>
-                      )}
+                      <select
+                        value={item.unit_id || ""}
+                        onChange={(e) => setItem(idx, "unit_id", e.target.value)}
+                        className="w-24 px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xs focus:outline-none focus:border-blue-500 flex-shrink-0"
+                      >
+                        <option value="">Unit</option>
+                        {(units || []).map((u) => (
+                          <option key={u.id} value={u.id}>{u.abbreviation || u.name}</option>
+                        ))}
+                      </select>
                       {items.length > 1 && (
                         <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
                           <Trash2 size={15} />
