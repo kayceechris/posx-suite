@@ -60,7 +60,7 @@ function Spinner({ color = "blue" }) {
 
 // ── Fulfill Modal ─────────────────────────────────────────────────────────────
 
-function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, setToast }) {
+function FulfillModal({ req, products, outlets, stores, units, onClose, onFulfilled, setToast }) {
   const [mainStock, setMainStock] = useState([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [qtys, setQtys] = useState({});
@@ -69,6 +69,12 @@ function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, se
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
   const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? 0;
+  const productUnit = (pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    if (!p?.unit_id) return "";
+    const u = units.find((u) => u.id === p.unit_id);
+    return u?.abbreviation || u?.name || "";
+  };
 
   useEffect(() => {
     setLoadingStock(true);
@@ -142,7 +148,10 @@ function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, se
                     const isShort = avail < item.quantity_requested;
                     return (
                       <tr key={item.product_id}>
-                        <td className="py-2.5 pr-2 font-medium text-gray-800 dark:text-gray-200 text-xs leading-tight">{productName(item.product_id)}</td>
+                        <td className="py-2.5 pr-2 font-medium text-gray-800 dark:text-gray-200 text-xs leading-tight">
+                          {productName(item.product_id)}
+                          {productUnit(item.product_id) && <span className="ml-1 text-[10px] text-gray-400 font-semibold">{productUnit(item.product_id)}</span>}
+                        </td>
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-gray-600 dark:text-gray-300 text-sm">{item.quantity_requested}</td>
                         <td className="py-2.5 px-2 text-center">
                           <span className={cn("font-mono font-black text-sm", isShort ? "text-red-500" : "text-green-600 dark:text-green-400")}>
@@ -187,10 +196,16 @@ function FulfillModal({ req, products, outlets, stores, onClose, onFulfilled, se
 
 // ── Requisition Card ──────────────────────────────────────────────────────────
 
-function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete, onFulfillOpen, onEdit, isPrivileged }) {
+function ReqCard({ req, products, outlets, stores, units, onApprove, onReject, onDelete, onFulfillOpen, onEdit, isPrivileged }) {
   const [expanded, setExpanded] = useState(false);
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || id;
   const productName = (id) => products.find((p) => p.id === id)?.name || id;
+  const productUnit = (pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    if (!p?.unit_id) return "";
+    const u = (units || []).find((u) => u.id === p.unit_id);
+    return u?.abbreviation || u?.name || "";
+  };
   const meta = STATUS_META[req.status] || STATUS_META.pending;
   const totalRequested = req.items.reduce((s, i) => s + i.quantity_requested, 0);
 
@@ -237,7 +252,10 @@ function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
                 {req.items.map((item) => (
                   <tr key={item.product_id}>
-                    <td className="py-2 font-medium text-gray-800 dark:text-gray-200">{productName(item.product_id)}</td>
+                    <td className="py-2 font-medium text-gray-800 dark:text-gray-200">
+                      {productName(item.product_id)}
+                      {productUnit(item.product_id) && <span className="ml-1 text-[10px] text-gray-400 font-semibold">{productUnit(item.product_id)}</span>}
+                    </td>
                     <td className="py-2 text-center font-mono font-bold text-gray-700 dark:text-gray-200">{item.quantity_requested}</td>
                     {req.status === "fulfilled" && (
                       <td className="py-2 text-center font-mono font-bold text-green-600 dark:text-green-400">{item.quantity_fulfilled}</td>
@@ -300,7 +318,7 @@ function ReqCard({ req, products, outlets, stores, onApprove, onReject, onDelete
 
 // ── Create Requisition Modal ──────────────────────────────────────────────────
 
-function CreateRequisitionModal({ products, outlets, groups, stores, onClose, onCreated }) {
+function CreateRequisitionModal({ products, outlets, groups, stores, units, onClose, onCreated }) {
   const outletId = outlets[0]?.id || "";
   const childStores = stores.filter(s => !s.is_main);
   const [fromStore, setFromStore] = useState(childStores[0]?.id || "kitchen");
@@ -309,6 +327,13 @@ function CreateRequisitionModal({ products, outlets, groups, stores, onClose, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mainStock, setMainStock] = useState([]);
+
+  const productUnit = (pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    if (!p?.unit_id) return "";
+    const u = (units || []).find((u) => u.id === p.unit_id);
+    return u?.abbreviation || u?.name || "";
+  };
 
   const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
   const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
@@ -402,6 +427,9 @@ function CreateRequisitionModal({ products, outlets, groups, stores, onClose, on
                         onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
+                      {item.product_id && productUnit(item.product_id) && (
+                        <span className="text-xs font-semibold text-gray-400 whitespace-nowrap flex-shrink-0">{productUnit(item.product_id)}</span>
+                      )}
                       {items.length > 1 && (
                         <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
                           <Trash2 size={15} />
@@ -441,7 +469,7 @@ function CreateRequisitionModal({ products, outlets, groups, stores, onClose, on
 
 // ── Edit Requisition Modal ────────────────────────────────────────────────────
 
-function EditRequisitionModal({ req, products, groups, stores, onClose, onSaved }) {
+function EditRequisitionModal({ req, products, groups, stores, units, onClose, onSaved }) {
   const childStores = stores.filter(s => !s.is_main);
   const fromStore = req.from_store;
 
@@ -458,6 +486,13 @@ function EditRequisitionModal({ req, products, groups, stores, onClose, onSaved 
   const [mainStock, setMainStock] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const productUnit = (pid) => {
+    const p = products.find((pr) => pr.id === pid);
+    if (!p?.unit_id) return "";
+    const u = (units || []).find((u) => u.id === p.unit_id);
+    return u?.abbreviation || u?.name || "";
+  };
 
   useEffect(() => {
     api.getStock(req.outlet_id, "main").then(setMainStock).catch(console.error);
@@ -531,6 +566,9 @@ function EditRequisitionModal({ req, products, groups, stores, onClose, onSaved 
                         onChange={(e) => setItem(idx, "quantity_requested", parseInt(e.target.value) || 1)}
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
+                      {item.product_id && productUnit(item.product_id) && (
+                        <span className="text-xs font-semibold text-gray-400 whitespace-nowrap flex-shrink-0">{productUnit(item.product_id)}</span>
+                      )}
                       {items.length > 1 && (
                         <button type="button" onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
                           <Trash2 size={15} />
@@ -586,6 +624,7 @@ export default function RequisitionsSection() {
   const [outlets, setOutlets] = useState([]);
   const [groups, setGroups] = useState([]);
   const [stores, setStores] = useState([]);
+  const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -601,13 +640,15 @@ export default function RequisitionsSection() {
       api.getOutlets(),
       api.getGroups(),
       api.getStores(),
+      api.getUnits(),
     ])
-      .then(([r, p, o, g, s]) => {
+      .then(([r, p, o, g, s, u]) => {
         setRequisitions(r);
         setProducts(p.filter((pr) => pr.active !== false));
         setOutlets(o);
         setGroups(g);
         setStores(s);
+        setUnits(u);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -729,7 +770,7 @@ export default function RequisitionsSection() {
         <div className="space-y-3">
           {displayed.map((req) => (
             <ReqCard
-              key={req.id} req={req} products={products} outlets={outlets} stores={stores}
+              key={req.id} req={req} products={products} outlets={outlets} stores={stores} units={units}
               isPrivileged={isPrivileged}
               onApprove={handleApprove}
               onReject={handleReject}
@@ -749,7 +790,7 @@ export default function RequisitionsSection() {
 
       {showCreate && (
         <CreateRequisitionModal
-          products={products} outlets={outlets} groups={groups} stores={stores}
+          products={products} outlets={outlets} groups={groups} stores={stores} units={units}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); setToast({ msg: "Requisition submitted.", type: "success" }); }}
         />
@@ -761,6 +802,7 @@ export default function RequisitionsSection() {
           products={products}
           outlets={outlets}
           stores={stores}
+          units={units}
           setToast={setToast}
           onClose={() => setFulfillReq(null)}
           onFulfilled={handleFulfilled}
@@ -773,6 +815,7 @@ export default function RequisitionsSection() {
           products={products}
           groups={groups}
           stores={stores}
+          units={units}
           onClose={() => setEditReq(null)}
           onSaved={() => { setEditReq(null); load(); setToast({ msg: "Requisition updated.", type: "success" }); }}
         />
