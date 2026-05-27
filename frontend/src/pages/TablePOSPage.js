@@ -235,6 +235,7 @@ export default function TablePOSPage() {
   const [customerName, setCustomerName] = useState("");
 
   const [cart, setCart] = useState([]);
+  const [originalItems, setOriginalItems] = useState([]); // items from the loaded held/sent order
   const [showPay, setShowPay] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -276,13 +277,15 @@ export default function TablePOSPage() {
             try {
               const existingOrder = await api.getOrder(entityData.current_order_id);
               if (existingOrder?.items?.length) {
-                setCart(existingOrder.items.map((item) => ({
+                const loaded = existingOrder.items.map((item) => ({
                   product_id: item.product_id,
                   product_name: item.product_name || item.name,
                   quantity: item.quantity || item.qty || 1,
                   price: item.price,
                   total: item.total,
-                })));
+                }));
+                setCart(loaded);
+                setOriginalItems(loaded); // snapshot for delta calculation
               }
               if (existingOrder?.customer_name) setCustomerName(existingOrder.customer_name);
             } catch {
@@ -420,31 +423,66 @@ export default function TablePOSPage() {
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
+  // Items that are new or have increased quantity compared to what was loaded from the held order
+  const computeKitchenItems = () => {
+    if (!originalItems.length) return cart;
+    const result = [];
+    for (const item of cart) {
+      const orig = originalItems.find((o) => o.product_id === item.product_id);
+      if (!orig) {
+        result.push(item);
+      } else if (item.quantity > orig.quantity) {
+        const delta = item.quantity - orig.quantity;
+        result.push({ ...item, quantity: delta, total: delta * item.price });
+      }
+    }
+    return result;
+  };
+
   const handleSendToKitchen = async () => {
     if (cart.length === 0) { showToast("Add at least one item", "error"); return; }
+    const existingOrderId = entity?.current_order_id;
+    const kitchenItems = computeKitchenItems();
+
+    if (existingOrderId && kitchenItems.length === 0) {
+      showToast("No new items to send — cart unchanged since last send.", "error");
+      return;
+    }
+
     if (!isOnline) {
       setSubmitting(true);
       try {
-        await queueOrder("send_kitchen", buildOrderPayload("sent_to_kitchen", "pending"), `Kitchen — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        if (existingOrderId) {
+          await queueOrder("update_order", { order_id: existingOrderId, data: { status: "sent_to_kitchen", items: cart, subtotal, total } }, `Kitchen add-on — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        } else {
+          await queueOrder("send_kitchen", buildOrderPayload("sent_to_kitchen", "pending"), `Kitchen — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        }
         showToast("Saved offline — will sync when connected");
         setCart([]); setCustomerName(""); navigate("/tables");
       } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
       return;
     }
+
     setSubmitting(true);
     try {
-      await api.createOrder(buildOrderPayload("sent_to_kitchen", "pending"));
+      if (existingOrderId) {
+        // Update the existing held/sent order — don't create a duplicate
+        await api.updateOrder(existingOrderId, { status: "sent_to_kitchen", items: cart, subtotal, total });
+      } else {
+        await api.createOrder(buildOrderPayload("sent_to_kitchen", "pending"));
+      }
       showToast("Order sent to kitchen!");
-      // Print kitchen/bar tickets for each configured station
+      // Print kitchen tickets for only the new/additional items
       try {
         const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
         const kitchenPrinters = saved.filter((x) => x.type === "kitchen");
+        const itemsToPrint = existingOrderId ? kitchenItems : cart;
         for (const kp of kitchenPrinters) {
           const printerConfig = kp.mode === "usb" ? { printer: kp } : { ip: kp.ip_address, port: kp.port || 9100 };
           printService.printKitchenTicket({
             tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
             orderNo: "",
-            items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity })),
+            items: itemsToPrint.map((i) => ({ name: i.product_name, quantity: i.quantity })),
             station: kp.name || "KITCHEN",
           }, printerConfig).catch(console.warn);
         }
