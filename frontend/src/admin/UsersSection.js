@@ -257,6 +257,7 @@ function UserList() {
   const [users, setUsers] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [userTypes, setUserTypes] = useState([]);
+  const [userTypesErr, setUserTypesErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -269,8 +270,11 @@ function UserList() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getUsers(), api.getOutlets(), api.getUserTypes().catch(() => [])])
-      .then(([u, o, ut]) => { setUsers(u); setOutlets(o); setUserTypes(ut); })
+    Promise.all([
+      api.getUsers(),
+      api.getOutlets(),
+      api.getUserTypes().catch((e) => { setUserTypesErr(e.message); return []; }),
+    ]).then(([u, o, ut]) => { setUsers(u); setOutlets(o); setUserTypes(ut); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -279,14 +283,18 @@ function UserList() {
 
   const outletName = (id) => outlets.find((o) => o.id === id)?.name || null;
 
+  const fetchUserTypes = () => {
+    setUserTypesErr("");
+    api.getUserTypes().then(setUserTypes).catch((e) => setUserTypesErr(e.message));
+  };
+
   const openAdd = () => {
     setForm(EMPTY_USER); setFormError(""); setEditUser(null); setShowAdd(true);
-    // Re-fetch user types in case the initial load failed (e.g. backend was redeploying)
-    if (userTypes.length === 0) api.getUserTypes().then(setUserTypes).catch(() => {});
+    fetchUserTypes();
   };
 
   const openEdit = (u) => {
-    if (userTypes.length === 0) api.getUserTypes().then(setUserTypes).catch(() => {});
+    fetchUserTypes();
     setForm({ name: u.name, pincode: "", role: u.role, outlet_id: u.outlet_id || "", permissions: u.permissions || [], photo: u.photo || "" });
     setFormError(""); setEditUser(u); setShowAdd(true);
   };
@@ -500,6 +508,12 @@ function UserList() {
                       </optgroup>
                     )}
                   </select>
+                  {userTypesErr && (
+                    <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">
+                      Custom roles unavailable: {userTypesErr}
+                      <button type="button" onClick={fetchUserTypes} className="underline text-blue-500 ml-1">Retry</button>
+                    </p>
+                  )}
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
                 </div>
               </div>

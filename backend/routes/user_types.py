@@ -23,9 +23,15 @@ class UserTypeCreate(BaseModel):
     permissions: List[str] = []
 
 
+def _require_admin(current_user: User):
+    if current_user.role.lower() != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
 @router.get("/user-types")
 async def get_user_types(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # Allow admin or manager to read user types (managers may assign roles when creating users)
+    if current_user.role.lower() not in ("admin", "manager"):
         raise HTTPException(status_code=403, detail="Not authorized")
     types = await db.user_types.find({}, {"_id": 0}).to_list(1000)
     return types
@@ -33,8 +39,7 @@ async def get_user_types(current_user: User = Depends(get_current_user)):
 
 @router.post("/user-types")
 async def create_user_type(data: UserTypeCreate, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _require_admin(current_user)
     ut = UserType(**data.model_dump())
     doc = ut.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -45,8 +50,7 @@ async def create_user_type(data: UserTypeCreate, current_user: User = Depends(ge
 
 @router.put("/user-types/{type_id}")
 async def update_user_type(type_id: str, data: UserTypeCreate, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _require_admin(current_user)
     result = await db.user_types.update_one(
         {"id": type_id},
         {"$set": {"name": data.name, "permissions": data.permissions}}
@@ -59,8 +63,7 @@ async def update_user_type(type_id: str, data: UserTypeCreate, current_user: Use
 
 @router.delete("/user-types/{type_id}")
 async def delete_user_type(type_id: str, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _require_admin(current_user)
     result = await db.user_types.delete_one({"id": type_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User type not found")
