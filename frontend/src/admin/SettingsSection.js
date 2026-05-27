@@ -96,7 +96,7 @@ function CompanySettings() {
       if (logoFile) {
         try {
           const result = await api.uploadImage(logoFile);
-          payload.logo_url = result.url;
+          payload.logo_url = result.fullUrl || result.url;
         } catch (uploadErr) {
           setError("Logo upload failed: " + uploadErr.message);
           return;
@@ -161,7 +161,11 @@ function CompanySettings() {
               </div>
               {logoPreview && (
                 <div className="mt-2">
-                  <img src={logoPreview} alt="Logo" className="h-20 object-contain border-2 border-gray-300 dark:border-gray-700 rounded-xl p-2" />
+                  <img
+                    src={logoPreview.startsWith("blob:") || logoPreview.startsWith("data:") ? logoPreview : api.getImageUrl(logoPreview)}
+                    alt="Logo"
+                    className="h-20 object-contain border-2 border-gray-300 dark:border-gray-700 rounded-xl p-2"
+                  />
                 </div>
               )}
             </div>
@@ -575,7 +579,7 @@ function QRBlock({ small }) {
 
 function ReceiptPreview({ rs, settings, tab }) {
   const logoPx = LOGO_PX[rs.logo_size] || 60;
-  const logoUrl = settings?.logo_url || null;
+  const logoUrl = settings?.logo_url ? api.getImageUrl(settings.logo_url) : null;
   const props   = { rs, logoPx, logoUrl, tab };
   switch (rs.layout) {
     case "compact":   return <PreviewCompact   {...props} />;
@@ -632,7 +636,7 @@ function ReceiptBillSettings() {
     const bizName  = settings?.business_name || DEMO.storeName;
     const address  = settings?.address       || DEMO.address;
     const phone    = settings?.phone         || DEMO.phone;
-    const logoUrl  = settings?.logo_url      || null;
+    const logoUrl  = settings?.logo_url ? api.getImageUrl(settings.logo_url) : null;
     const sym      = localStorage.getItem("pos_currency_symbol") || "$";
     const f      = (n) => { const v = Number(n); return `${sym}${v.toLocaleString("en", { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`; };
     const fTotal = (n) => `${sym}${Number(n).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
