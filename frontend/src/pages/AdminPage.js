@@ -105,7 +105,7 @@ const SECTION_PERMISSION = {
   outlets: "view_outlets",
   products: "view_products",
   inventory: "view_inventory",
-  stores: "update_stock",
+  stores: "view_stores",
   purchases: "view_purchases",
   customers: "view_customers",
   orders: "view_orders",
@@ -121,19 +121,30 @@ const SUB_ITEM_PERMISSION = {
   "inventory.stock":            "view_inventory",
   "inventory.stock-count":      "manage_stock_count",
   "inventory.update-stock":     "update_stock",
-  "inventory.requisitions":     "view_inventory",
+  "inventory.requisitions":     "manage_requisitions",
   "inventory.reorder":          "view_reorder_alerts",
   "inventory.waste":            "record_waste",
   "inventory.valuation":        "view_stock_valuation",
   "inventory.consolidated":     "view_consolidated_stock",
   // ── Store Management ────────────────────────────────────────────────────────
-  "stores.main-store":          "update_stock",
-  "stores.create-store":        "update_stock",
+  "stores.main-store":          "view_stores",
+  "stores.create-store":        "create_store",
   // ── Products ────────────────────────────────────────────────────────────────
   "products.create-product":    "create_product",
+  "products.groups":            "manage_groups",
+  "products.brands":            "manage_brands",
+  "products.units":             "manage_units",
+  "products.recipes":           "manage_recipes",
+  "products.print-labels":      "print_labels",
   "products.import":            "import_products",
+  "products.image-library":     "manage_image_library",
   // ── Purchases ───────────────────────────────────────────────────────────────
   "purchases.approved":         "approve_purchase",
+  // ── Floor ───────────────────────────────────────────────────────────────────
+  "floor.bar-tabs":             "view_bar_tabs",
+  "floor.reservations":         "view_reservations",
+  // ── Outlets ─────────────────────────────────────────────────────────────────
+  "outlets.terminals":          "manage_terminals",
   // ── Reports ─────────────────────────────────────────────────────────────────
   "reports.sales":              "view_sales_report",
   "reports.cost":               "view_financial_report",
