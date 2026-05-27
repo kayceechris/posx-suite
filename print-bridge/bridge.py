@@ -406,31 +406,27 @@ def main():
     local_ip = _local_ip()
     _ensure_firewall_rule()
 
-    ssl_ctx  = _ensure_https(local_ip)
-    proto    = "https" if ssl_ctx else "http"
-
     server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
-    if ssl_ctx:
-        server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
 
-    print("=" * 60)
-    print("  POSx Suite Local Print Bridge v1.5")
-    print("=" * 60)
-    print(f"  Protocol      : {'HTTPS (secure)' if ssl_ctx else 'HTTP (plain)'}")
-    print(f"  Your local IP : {proto}://{local_ip}:{PORT}")
+    print("=" * 65)
+    print("  POSx Suite Local Print Bridge v1.6")
+    print("=" * 65)
+    print(f"  Protocol      : HTTP")
+    print(f"  Your local IP : http://{local_ip}:{PORT}")
     print(f"  -> Use this URL in the POSx app Bridge URL field")
-    if ssl_ctx:
-        print()
-        print("  FIRST-TIME TABLET SETUP:")
-        print(f"  1. Open {proto}://{local_ip}:{PORT}/health in the tablet browser")
-        print("  2. Tap 'Advanced' -> 'Proceed' to trust the cert")
-        print("  3. Then paste the URL above into the app and Test Bridge")
     print()
-    print(f"  Localhost URL : {proto}://localhost:{PORT}")
+    print("  FIRST-TIME TABLET / PHONE SETUP (Android Chrome):")
+    print(f"  1. Open Chrome and go to:")
+    print(f"     chrome://flags/#unsafely-treat-insecure-origin-as-secure")
+    print(f"  2. In the text box add:  http://{local_ip}:{PORT}")
+    print(f"  3. Set dropdown to 'Enabled', tap Relaunch")
+    print(f"  4. Paste http://{local_ip}:{PORT} into the app and Test Bridge")
+    print()
+    print(f"  Localhost URL : http://localhost:{PORT}")
     print(f"  -> Use this if the app runs on this same PC")
     print()
     print("  Press Ctrl+C to stop")
-    print("=" * 60)
+    print("=" * 65)
 
     try:
         server.serve_forever()
