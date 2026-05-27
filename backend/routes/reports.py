@@ -330,3 +330,90 @@ async def get_shift_report(start_date: Optional[str] = None, end_date: Optional[
         "total_orders": sum(s["orders"] for s in result),
         "busiest_shift": max(result, key=lambda x: x["orders"])["shift"] if any(s["orders"] for s in result) else None,
     }
+
+
+@router.get("/reports/floors")
+async def get_floor_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    query = {"status": "completed"}
+    dr = _date_range_query(start_date, end_date)
+    if dr:
+        query["created_at"] = dr
+
+    orders  = await db.orders.find(query, {"_id": 0}).to_list(10000)
+    tables  = await db.tables.find({}, {"_id": 0, "id": 1, "floor_id": 1}).to_list(1000)
+    floors  = await db.floors.find({}, {"_id": 0, "id": 1, "name": 1, "outlet_id": 1}).to_list(200)
+    outlets = await db.outlets.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
+
+    table_floor  = {t["id"]: t.get("floor_id") for t in tables}
+    floor_meta   = {f["id"]: f for f in floors}
+    outlet_names = {o["id"]: o["name"] for o in outlets}
+
+    # bucket_key → accumulator
+    buckets: dict = {}
+
+    for order in orders:
+        tid      = order.get("table_id")
+        floor_id = table_floor.get(tid) if tid else None
+        key      = floor_id  # None = unassigned / walk-in
+
+        if key not in buckets:
+            buckets[key] = {"revenue": 0.0, "orders": 0, "items_sold": 0, "product_sales": {}, "staff": {}}
+
+        b = buckets[key]
+        b["revenue"]    += order.get("total", 0)
+        b["orders"]     += 1
+        b["items_sold"] += sum(i.get("quantity", 0) for i in order.get("items", []))
+
+        for item in order.get("items", []):
+            pid = item.get("product_id", "")
+            if pid not in b["product_sales"]:
+                b["product_sales"][pid] = {"name": item.get("product_name", ""), "quantity": 0, "revenue": 0.0}
+            b["product_sales"][pid]["quantity"] += item.get("quantity", 0)
+            b["product_sales"][pid]["revenue"]  += item.get("total", 0)
+
+        uid = order.get("created_by", "")
+        if uid not in b["staff"]:
+            b["staff"][uid] = {"name": order.get("created_by_name", uid), "orders": 0, "revenue": 0.0}
+        b["staff"][uid]["orders"]  += 1
+        b["staff"][uid]["revenue"] += order.get("total", 0)
+
+    total_revenue = sum(b["revenue"] for b in buckets.values())
+    total_orders  = sum(b["orders"]  for b in buckets.values())
+
+    result_floors = []
+    for floor_id, b in buckets.items():
+        meta        = floor_meta.get(floor_id, {}) if floor_id else {}
+        outlet_id   = meta.get("outlet_id", "")
+        top_items   = sorted(b["product_sales"].values(), key=lambda x: x["revenue"], reverse=True)[:5]
+        top_staff   = sorted(b["staff"].values(),         key=lambda x: x["revenue"], reverse=True)[:5]
+
+        result_floors.append({
+            "floor_id":        floor_id,
+            "floor_name":      meta.get("name", "Unassigned / Walk-in") if floor_id else "Unassigned / Walk-in",
+            "outlet_name":     outlet_names.get(outlet_id, "") if outlet_id else "",
+            "revenue":         round(b["revenue"], 2),
+            "orders":          b["orders"],
+            "avg_order_value": round(b["revenue"] / b["orders"], 2) if b["orders"] else 0,
+            "items_sold":      b["items_sold"],
+            "revenue_pct":     round(b["revenue"] / total_revenue * 100, 1) if total_revenue else 0,
+            "top_items":       top_items,
+            "top_staff":       top_staff,
+        })
+
+    # Named floors sorted by revenue desc, unassigned always last
+    result_floors.sort(key=lambda x: (x["floor_id"] is None, -x["revenue"]))
+
+    return {
+        "total_revenue":    round(total_revenue, 2),
+        "total_orders":     total_orders,
+        "avg_order_value":  round(total_revenue / total_orders, 2) if total_orders else 0,
+        "top_floor":        result_floors[0]["floor_name"] if result_floors and result_floors[0]["floor_id"] else None,
+        "floors":           result_floors,
+    }

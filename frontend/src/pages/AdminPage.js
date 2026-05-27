@@ -46,6 +46,7 @@ const EXPANDABLE = {
     { id: "daily-summary", label: "Daily Summary" },
     { id: "shifts",        label: "Shift Report" },
     { id: "tax",           label: "Tax Report" },
+    { id: "floors",        label: "Floor Report" },
   ],
   inventory: [
     { id: "stock", label: "Stock Levels" },
@@ -156,6 +157,7 @@ const SUB_ITEM_PERMISSION = {
   "reports.daily-summary":      "view_daily_summary",
   "reports.shifts":             "view_staff_report",
   "reports.tax":                "view_financial_report",
+  "reports.floors":             "view_sales_report",
   // ── Users ───────────────────────────────────────────────────────────────────
   "users.types":                "manage_user_types",
   // ── Accounts ────────────────────────────────────────────────────────────────

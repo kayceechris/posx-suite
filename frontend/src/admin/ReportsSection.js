@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Calendar, ChevronDown, ChevronRight, X, BarChart2, Tag, Layers, Percent, ClipboardList, Clock, Receipt } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, X, BarChart2, Tag, Layers, Percent, ClipboardList, Clock, Receipt, LayoutGrid } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import ExportBtn from "../components/ExportBtn";
@@ -16,6 +16,7 @@ const VIEW_LABELS = {
   "daily-summary": "Daily Summary",
   shifts:        "Shift Report",
   tax:           "Tax Report",
+  floors:        "Floor Report",
 };
 
 function today() { return new Date().toISOString().split("T")[0]; }
@@ -1187,6 +1188,217 @@ function TaxReportTab() {
   );
 }
 
+// ─── Floor Report ─────────────────────────────────────────────────────────────
+
+const FLOOR_COLORS = [
+  "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500",
+  "bg-pink-500", "bg-teal-500", "bg-amber-500", "bg-indigo-500",
+];
+const FLOOR_TEXT = [
+  "text-blue-600 dark:text-blue-400", "text-green-600 dark:text-green-400",
+  "text-purple-600 dark:text-purple-400", "text-orange-500 dark:text-orange-400",
+  "text-pink-600 dark:text-pink-400", "text-teal-600 dark:text-teal-400",
+  "text-amber-600 dark:text-amber-400", "text-indigo-600 dark:text-indigo-400",
+];
+const FLOOR_BG = [
+  "bg-blue-50 dark:bg-blue-900/20", "bg-green-50 dark:bg-green-900/20",
+  "bg-purple-50 dark:bg-purple-900/20", "bg-orange-50 dark:bg-orange-900/20",
+  "bg-pink-50 dark:bg-pink-900/20", "bg-teal-50 dark:bg-teal-900/20",
+  "bg-amber-50 dark:bg-amber-900/20", "bg-indigo-50 dark:bg-indigo-900/20",
+];
+
+function FloorReportTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState({ start: monthStart(), end: today() });
+  const [expanded, setExpanded] = useState(null); // floor_id of open drill-down
+
+  const load = useCallback((s, e) => {
+    setLoading(true);
+    api.getFloorReport({ start_date: s, end_date: e })
+      .then(setData).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(dates.start, dates.end); }, []);
+
+  const floors = data?.floors || [];
+  const maxRevenue = floors.length ? Math.max(...floors.map((f) => f.revenue), 1) : 1;
+
+  return (
+    <div>
+      <DateFilter onApply={(s, e) => { setDates({ start: s, end: e }); load(s, e); }} />
+      {loading ? <Spinner /> : data && (
+        <>
+          {/* Summary stat cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatCard label="Total Revenue" value={formatCurrency(data.total_revenue)} color="text-green-600 dark:text-green-400" bg="bg-green-50 dark:bg-green-900/20" />
+            <StatCard label="Total Orders" value={data.total_orders} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-900/20" />
+            <StatCard label="Avg Order Value" value={formatCurrency(data.avg_order_value)} color="text-orange-500 dark:text-orange-400" bg="bg-orange-50 dark:bg-orange-900/20" />
+            <StatCard label="Top Floor" value={data.top_floor || "—"} color="text-purple-600 dark:text-purple-400" bg="bg-purple-50 dark:bg-purple-900/20" />
+          </div>
+
+          {/* Export */}
+          <div className="flex justify-end mb-3">
+            <ExportBtn
+              onCSV={() => downloadCSV(`floor_report_${dates.start}_${dates.end}`,
+                ["Floor", "Outlet", "Revenue", "Orders", "Avg Order", "Items Sold", "% Share"],
+                floors.map((f) => [f.floor_name, f.outlet_name, f.revenue, f.orders, f.avg_order_value, f.items_sold, `${f.revenue_pct}%`])
+              )}
+              onPrint={() => printReport({
+                title: "Floor Report",
+                subtitle: `${dates.start} to ${dates.end}`,
+                summaryRows: [
+                  ["Total Revenue", formatCurrency(data.total_revenue)],
+                  ["Total Orders", String(data.total_orders)],
+                  ["Avg Order Value", formatCurrency(data.avg_order_value)],
+                ],
+                headers: ["Floor", "Outlet", "Revenue", "Orders", "Avg Order", "Share"],
+                rows: floors.map((f) => [f.floor_name, f.outlet_name, formatCurrency(f.revenue), f.orders, formatCurrency(f.avg_order_value), `${f.revenue_pct}%`]),
+              })}
+            />
+          </div>
+
+          {floors.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 text-sm">
+              <LayoutGrid size={32} className="mx-auto mb-3 opacity-30" />
+              No floor data for this period. Orders must be linked to tables that belong to a floor.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {floors.map((floor, idx) => {
+                const colorBar  = FLOOR_COLORS[idx % FLOOR_COLORS.length];
+                const colorText = FLOOR_TEXT[idx % FLOOR_TEXT.length];
+                const colorBg   = FLOOR_BG[idx % FLOOR_BG.length];
+                const isOpen    = expanded === (floor.floor_id ?? "__unassigned__");
+                const pct       = maxRevenue > 0 ? Math.max((floor.revenue / maxRevenue) * 100, 2) : 2;
+                const isUnassigned = !floor.floor_id;
+
+                return (
+                  <div key={floor.floor_id ?? "__unassigned__"}
+                    className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+
+                    {/* Floor row — click to expand */}
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : (floor.floor_id ?? "__unassigned__"))}
+                      className="w-full text-left px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+
+                      <div className="flex items-center gap-3 mb-3">
+                        {/* Color dot + name */}
+                        <div className={cn("w-3 h-3 rounded-full flex-shrink-0", isUnassigned ? "bg-gray-400" : colorBar)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={cn("font-bold text-sm", isUnassigned ? "text-gray-500 dark:text-gray-400 italic" : "text-gray-900 dark:text-white")}>
+                              {floor.floor_name}
+                            </span>
+                            {floor.outlet_name && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full">
+                                {floor.outlet_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Quick stats */}
+                        <div className="flex items-center gap-4 flex-shrink-0 text-right">
+                          <div className="hidden sm:block">
+                            <p className="text-[11px] text-gray-400 leading-tight">Orders</p>
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{floor.orders}</p>
+                          </div>
+                          <div className="hidden sm:block">
+                            <p className="text-[11px] text-gray-400 leading-tight">Avg</p>
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatCurrency(floor.avg_order_value)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-gray-400 leading-tight">Revenue</p>
+                            <p className={cn("text-sm font-black", isUnassigned ? "text-gray-500" : colorText)}>{formatCurrency(floor.revenue)}</p>
+                          </div>
+                          <div className="w-12 text-right">
+                            <span className={cn("text-xs font-bold px-1.5 py-0.5 rounded-lg", isUnassigned ? "bg-gray-100 dark:bg-gray-700 text-gray-500" : colorBg, isUnassigned ? "" : colorText)}>
+                              {floor.revenue_pct}%
+                            </span>
+                          </div>
+                          <ChevronRight size={16} className={cn("text-gray-400 transition-transform flex-shrink-0", isOpen && "rotate-90")} />
+                        </div>
+                      </div>
+
+                      {/* Revenue bar */}
+                      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                        <div className={cn("h-2 rounded-full transition-all", isUnassigned ? "bg-gray-400" : colorBar)}
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                    </button>
+
+                    {/* Drill-down section */}
+                    {isOpen && (
+                      <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-4 grid sm:grid-cols-2 gap-5">
+
+                        {/* Top items */}
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Top Items</h4>
+                          {floor.top_items.length === 0 ? (
+                            <p className="text-xs text-gray-400">No item data</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {floor.top_items.map((item, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <span className="w-5 h-5 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-full text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center justify-center">{i + 1}</span>
+                                  <span className="flex-1 text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{item.name}</span>
+                                  <span className="text-xs text-gray-400 flex-shrink-0">{item.quantity}×</span>
+                                  <span className={cn("text-xs font-bold flex-shrink-0 tabular-nums", isUnassigned ? "text-gray-500" : colorText)}>{formatCurrency(item.revenue)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Top staff */}
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Staff Performance</h4>
+                          {floor.top_staff.length === 0 ? (
+                            <p className="text-xs text-gray-400">No staff data</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {floor.top_staff.map((s, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <div className="w-5 h-5 flex-shrink-0 rounded-full bg-violet-100 dark:bg-violet-900/40 text-[10px] font-bold text-violet-600 dark:text-violet-300 flex items-center justify-center">
+                                    {(s.name || "?").charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="flex-1 text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{s.name || "Unknown"}</span>
+                                  <span className="text-xs text-gray-400 flex-shrink-0">{s.orders} orders</span>
+                                  <span className={cn("text-xs font-bold flex-shrink-0 tabular-nums", isUnassigned ? "text-gray-500" : colorText)}>{formatCurrency(s.revenue)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Mobile: orders/avg stats */}
+                        <div className="sm:hidden flex gap-4 pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <div>
+                            <p className="text-[11px] text-gray-400">Orders</p>
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{floor.orders}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-gray-400">Avg Order</p>
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatCurrency(floor.avg_order_value)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-gray-400">Items Sold</p>
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{floor.items_sold}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function ReportsSection({ view = "sales" }) {
@@ -1212,6 +1424,7 @@ export default function ReportsSection({ view = "sales" }) {
       {view === "daily-summary" && <DailySummaryTab />}
       {view === "shifts"        && <ShiftReportTab />}
       {view === "tax"           && <TaxReportTab />}
+      {view === "floors"        && <FloorReportTab />}
     </div>
   );
 }

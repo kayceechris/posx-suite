@@ -400,6 +400,12 @@ export const api = {
     if (filters.end_date) params.append("end_date", filters.end_date);
     return request(`/api/reports/shifts?${params.toString()}`);
   },
+  getFloorReport: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append("start_date", filters.start_date);
+    if (filters.end_date) params.append("end_date", filters.end_date);
+    return request(`/api/reports/floors?${params.toString()}`);
+  },
 
   // Payment types
   getPaymentTypes: () => request("/api/payment-types"),
