@@ -52,12 +52,13 @@ export default function PrintBridgeSettings({ onClose }) {
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1.5">
         <p className="font-bold">How to set up:</p>
         <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC</p>
-        <p>2. Copy the URL shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">http://192.168.1.10:8765</code>)</p>
+        <p>2. Copy the URL shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://192.168.1.10:8765</code>)</p>
         <p>3. Paste it below, click <strong>Save Settings</strong>, then <strong>Test Bridge</strong></p>
         <p>4. Add printers in Terminal Settings → Printers tab</p>
         <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-          <p><strong>Same PC as bridge?</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">http://localhost:8765</code></p>
+          <p><strong>Same PC as bridge?</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">https://localhost:8765</code></p>
           <p><strong>Tablet / phone?</strong> Use the IP address shown in the bridge window</p>
+          <p className="mt-1.5 font-bold text-orange-700 dark:text-orange-400">⚠ First time on a tablet: open the bridge URL in the browser and tap "Advanced → Proceed" to trust the certificate, then come back and Test Bridge.</p>
         </div>
       </div>
 
@@ -68,7 +69,7 @@ export default function PrintBridgeSettings({ onClose }) {
             className={INPUT}
             value={bridgeUrl}
             onChange={(e) => { setBridgeUrl(e.target.value); setStatus(null); }}
-            placeholder="http://192.168.1.10:8765"
+            placeholder="https://192.168.1.10:8765"
           />
         </div>
         <div>

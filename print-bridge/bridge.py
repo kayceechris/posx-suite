@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-POSx Suite Local Print Bridge v1.3
+POSx Suite Local Print Bridge v1.5
 - Run this on any Windows PC on the same Wi-Fi as your printers.
-- Serves plain HTTP — Chrome's Private Network Access headers handle security.
-- No pip packages needed — uses Python standard library only.
+- Serves HTTPS with a self-signed cert (requires `cryptography` package).
+- Falls back to plain HTTP if cryptography is not installed.
 
 Setup:
-  1. Double-click start.bat (or run: python bridge.py)
-  2. Note the IP shown and enter it in the POSx app Bridge URL field.
-  3. Add printers in Terminal Settings -> Printers tab.
+  1. Double-click start.bat (installs dependencies automatically)
+  2. Note the URL shown (https://...) and enter it in the POSx app Bridge URL field.
+  3. On each tablet/phone: visit that URL in the browser once and accept the
+     security warning ("Advanced" -> "Proceed") to trust the cert.
+  4. Add printers in Terminal Settings -> Printers tab.
 """
+import datetime
+import ipaddress
 import json
+import os
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -25,6 +31,73 @@ except ImportError:
 
 PORT         = 8765
 SECRET_TOKEN = "posx-bridge-2025"   # must match bridge token in POSx app
+
+_BRIDGE_DIR  = os.path.dirname(os.path.abspath(__file__))
+_CERT_FILE   = os.path.join(_BRIDGE_DIR, "bridge.crt")
+_KEY_FILE    = os.path.join(_BRIDGE_DIR, "bridge.key")
+
+
+# ── HTTPS self-signed cert ─────────────────────────────────────────────────────
+
+def _generate_cert(local_ip: str) -> bool:
+    """Generate a self-signed TLS cert valid for local_ip and localhost."""
+    try:
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "POSx Print Bridge")])
+        san_ips = [ipaddress.IPv4Address("127.0.0.1")]
+        try:
+            san_ips.append(ipaddress.IPv4Address(local_ip))
+        except Exception:
+            pass
+
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
+            .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=3650))
+            .add_extension(
+                x509.SubjectAlternativeName([x509.IPAddress(ip) for ip in san_ips]),
+                critical=False,
+            )
+            .sign(key, hashes.SHA256())
+        )
+
+        with open(_KEY_FILE, "wb") as f:
+            f.write(key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.TraditionalOpenSSL,
+                serialization.NoEncryption(),
+            ))
+        with open(_CERT_FILE, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        print("  [SSL] Self-signed cert generated.")
+        return True
+    except Exception as e:
+        print(f"  [!] SSL cert generation failed: {e}")
+        return False
+
+
+def _ensure_https(local_ip: str):
+    """Return an ssl.SSLContext if HTTPS can be set up, else None."""
+    if not (os.path.exists(_CERT_FILE) and os.path.exists(_KEY_FILE)):
+        if not _generate_cert(local_ip):
+            return None
+    try:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(_CERT_FILE, _KEY_FILE)
+        return ctx
+    except Exception as e:
+        print(f"  [!] SSL setup failed: {e}")
+        return None
 
 
 # ── Windows raw print via spooler ──────────────────────────────────────────────
@@ -333,20 +406,31 @@ def main():
     local_ip = _local_ip()
     _ensure_firewall_rule()
 
-    server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
+    ssl_ctx  = _ensure_https(local_ip)
+    proto    = "https" if ssl_ctx else "http"
 
-    print("=" * 55)
-    print("  POSx Suite Local Print Bridge v1.3")
-    print("=" * 55)
-    print(f"  Protocol      : HTTP")
-    print(f"  Your local IP : http://{local_ip}:{PORT}")
+    server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
+    if ssl_ctx:
+        server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
+
+    print("=" * 60)
+    print("  POSx Suite Local Print Bridge v1.5")
+    print("=" * 60)
+    print(f"  Protocol      : {'HTTPS (secure)' if ssl_ctx else 'HTTP (plain)'}")
+    print(f"  Your local IP : {proto}://{local_ip}:{PORT}")
     print(f"  -> Use this URL in the POSx app Bridge URL field")
+    if ssl_ctx:
+        print()
+        print("  FIRST-TIME TABLET SETUP:")
+        print(f"  1. Open {proto}://{local_ip}:{PORT}/health in the tablet browser")
+        print("  2. Tap 'Advanced' -> 'Proceed' to trust the cert")
+        print("  3. Then paste the URL above into the app and Test Bridge")
     print()
-    print(f"  Localhost URL : http://localhost:{PORT}")
+    print(f"  Localhost URL : {proto}://localhost:{PORT}")
     print(f"  -> Use this if the app runs on this same PC")
     print()
     print("  Press Ctrl+C to stop")
-    print("=" * 55)
+    print("=" * 60)
 
     try:
         server.serve_forever()
