@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock } from "lucide-react";
+import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -216,6 +216,7 @@ export default function TablesPage() {
   const [barTabs, setBarTabs] = useState([]);
   const [floors, setFloors] = useState([]);
   const [activeFloorId, setActiveFloorId] = useState(null);
+  const [defaultFloorId, setDefaultFloorId] = useState(null);
   const [reservationMap, setReservationMap] = useState({}); // table_id → reservation
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -260,19 +261,29 @@ export default function TablesPage() {
     }
   }, []);
 
-  // Auto-select first floor whenever the floor list or outlet changes
   const outletFloors = floors.filter((f) => !selectedOutlet || f.outlet_id === selectedOutlet);
+
+  const defaultStorageKey = `pos_default_floor_${selectedOutlet || "all"}`;
+
+  // Auto-select floor: prefer saved default, then current active if still valid, then first
   useEffect(() => {
-    if (outletFloors.length > 0) {
-      setActiveFloorId((prev) => {
-        const stillValid = outletFloors.some((f) => f.id === prev);
-        return stillValid ? prev : outletFloors[0].id;
-      });
-    } else {
-      setActiveFloorId(null);
-    }
+    if (outletFloors.length === 0) { setActiveFloorId(null); return; }
+    const saved = localStorage.getItem(defaultStorageKey);
+    setDefaultFloorId(saved || null);
+    setActiveFloorId((prev) => {
+      if (saved && outletFloors.some((f) => f.id === saved)) return saved;
+      if (prev && outletFloors.some((f) => f.id === prev)) return prev;
+      return outletFloors[0].id;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floors, selectedOutlet]);
+
+  const handleSetDefault = (floorId) => {
+    localStorage.setItem(defaultStorageKey, floorId);
+    setDefaultFloorId(floorId);
+    setActiveFloorId(floorId);
+    showToast(`${outletFloors.find((f) => f.id === floorId)?.name} set as default floor`);
+  };
 
   useEffect(() => {
     load();
@@ -398,17 +409,32 @@ export default function TablesPage() {
             <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
               {outletFloors.map((floor) => {
                 const count = allTables.filter((t) => t.floor_id === floor.id).length;
+                const isActive = activeFloorId === floor.id;
+                const isDefault = defaultFloorId === floor.id;
                 return (
-                  <button key={floor.id}
-                    onClick={() => setActiveFloorId(floor.id)}
-                    className={cn(
-                      "px-4 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border-2",
-                      activeFloorId === floor.id
-                        ? "bg-white dark:bg-gray-700 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300"
-                    )}>
-                    {floor.name} ({count})
-                  </button>
+                  <div key={floor.id} className="relative flex items-center flex-shrink-0">
+                    <button
+                      onClick={() => setActiveFloorId(floor.id)}
+                      className={cn(
+                        "pl-4 pr-8 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border-2",
+                        isActive
+                          ? "bg-white dark:bg-gray-700 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300"
+                      )}>
+                      {floor.name} ({count})
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSetDefault(floor.id); }}
+                      title={isDefault ? "Default floor" : "Set as default floor"}
+                      className={cn(
+                        "absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors",
+                        isDefault
+                          ? "text-blue-500 dark:text-blue-400"
+                          : "text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400"
+                      )}>
+                      <Pin size={11} fill={isDefault ? "currentColor" : "none"} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
