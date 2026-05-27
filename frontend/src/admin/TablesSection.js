@@ -18,12 +18,12 @@ function TableCard({ t, floorName, outletName, onEdit, onDelete }) {
       <p className="text-xs font-semibold opacity-75 truncate max-w-full">{outletName(t.outlet_id)}</p>
       {floorName && <p className="text-[10px] opacity-50 mt-0.5 truncate max-w-full">{floorName}</p>}
       <p className="text-xs opacity-60 mt-0.5">{t.seats || 4} seats</p>
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
-        <button onClick={() => onEdit(t)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 rounded-lg p-0.5 shadow-sm">
-          <Pencil size={12} />
+      <div className="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onEdit(t)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
+          <Pencil size={13} />
         </button>
-        <button onClick={() => onDelete(t)} className="text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 rounded-lg p-0.5 shadow-sm">
-          <Trash2 size={12} />
+        <button onClick={() => onDelete(t)} className="text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
+          <Trash2 size={13} />
         </button>
       </div>
     </div>
@@ -268,7 +268,7 @@ export default function TablesSection() {
             <LayoutGrid size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Table Management</h1>
+            <h1 className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white">Table Management</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
               {outletFloors.length} floor{outletFloors.length !== 1 ? "s" : ""}
               {" · "}{outletTables.length} table{outletTables.length !== 1 ? "s" : ""}
@@ -276,8 +276,8 @@ export default function TablesSection() {
           </div>
         </div>
         <button onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors">
-          <Plus size={16} /> Add Table
+          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors">
+          <Plus size={16} /> <span className="hidden sm:inline">Add Table</span>
         </button>
       </div>
 
@@ -367,15 +367,15 @@ export default function TablesSection() {
         {/* Add floor */}
         <div className="flex items-center ml-1 pb-0.5">
           {showFloorInput ? (
-            <form onSubmit={handleAddFloor} className="flex items-center gap-1.5 flex-wrap">
+            <form onSubmit={handleAddFloor} className="flex flex-wrap items-center gap-1.5 max-w-full">
               <input ref={floorInputRef} value={newFloorName} onChange={(e) => setNewFloorName(e.target.value)}
                 placeholder="Floor name…"
-                className="w-36 px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none" />
+                className="w-32 sm:w-36 px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none" />
               {multiOutlet && (
                 <select
                   value={newFloorOutletId || activeOutletId || ""}
                   onChange={(e) => setNewFloorOutletId(e.target.value)}
-                  className="px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none">
+                  className="max-w-[120px] px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none">
                   {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
               )}

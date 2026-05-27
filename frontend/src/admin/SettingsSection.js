@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, Trash2, Check, X, Pencil, ToggleLeft, ToggleRight, Printer, AlertCircle, Settings, Receipt, CreditCard, Banknote, Smartphone, Building2, DollarSign } from "lucide-react";
+import { Plus, Trash2, Check, X, Pencil, ToggleLeft, ToggleRight, Printer, AlertCircle, Settings, Receipt, CreditCard, Banknote, Smartphone, Building2, DollarSign, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { useBusiness } from "../context/BusinessContext";
 import PrintBridgeSettings from "../components/PrintBridgeSettings";
@@ -1596,6 +1596,140 @@ function LabelPrinterSettings() {
   );
 }
 
+// --- Danger Zone / Data Management ---
+
+const DATA_GROUPS = [
+  { key: "orders",       label: "Orders & Sales",    desc: "All completed, pending, and voided orders" },
+  { key: "bar_tabs",     label: "Bar Tabs",           desc: "All open and closed bar tabs" },
+  { key: "reservations", label: "Reservations",       desc: "All table reservations" },
+  { key: "customers",    label: "Customers",          desc: "All customer profiles" },
+  { key: "tables",       label: "Tables",             desc: "All table layouts (floors are kept)" },
+  { key: "floors",       label: "Floors",             desc: "All floor sections (delete tables first)" },
+];
+
+function DangerZoneSettings() {
+  const [selected, setSelected] = useState([]);
+  const [confirmText, setConfirmText] = useState("");
+  const [step, setStep] = useState(1); // 1 = select, 2 = confirm
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  const toggle = (key) =>
+    setSelected((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+
+  const handleProceed = () => {
+    if (selected.length === 0) return;
+    setStep(2); setConfirmText(""); setError("");
+  };
+
+  const handleClear = async () => {
+    if (confirmText !== "DELETE") { setError('Type "DELETE" exactly to confirm.'); return; }
+    setSaving(true); setError("");
+    try {
+      const res = await api.clearData(selected);
+      setResult(res.cleared);
+      setStep(1); setSelected([]); setConfirmText("");
+    } catch (err) {
+      setError(err.message || "Failed to clear data");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
+          <ShieldAlert size={20} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-gray-900 dark:text-white">Data Management</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Permanently delete data. This cannot be undone.</p>
+        </div>
+      </div>
+
+      {result && (
+        <div className="mb-5 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-2xl text-sm text-green-700 dark:text-green-300">
+          <p className="font-bold mb-1">Cleared successfully:</p>
+          <ul className="space-y-0.5">
+            {Object.entries(result).map(([col, count]) => (
+              <li key={col}>• {DATA_GROUPS.find((g) => g.key === col)?.label || col}: <strong>{count}</strong> record{count !== 1 ? "s" : ""} deleted</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {step === 1 ? (
+        <>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Select which data to permanently remove:</p>
+          <div className="space-y-2 mb-6">
+            {DATA_GROUPS.map(({ key, label, desc }) => (
+              <button
+                key={key}
+                onClick={() => toggle(key)}
+                className={`w-full flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition-all ${
+                  selected.includes(key)
+                    ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                    : "border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                  selected.includes(key) ? "bg-red-500 border-red-500" : "border-gray-300 dark:border-gray-600"
+                }`}>
+                  {selected.includes(key) && <Check size={12} className="text-white" strokeWidth={3} />}
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold ${selected.includes(key) ? "text-red-700 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}`}>{label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleProceed}
+            disabled={selected.length === 0}
+            className="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Clear {selected.length > 0 ? `${selected.length} selected` : "Selected Data"}
+          </button>
+        </>
+      ) : (
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700 rounded-2xl p-5">
+          <p className="font-bold text-red-700 dark:text-red-400 mb-2">You are about to delete:</p>
+          <ul className="mb-4 space-y-1">
+            {selected.map((key) => (
+              <li key={key} className="text-sm text-red-600 dark:text-red-400">
+                • {DATA_GROUPS.find((g) => g.key === key)?.label}
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+            Type <strong className="font-mono">DELETE</strong> to confirm:
+          </p>
+          <input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder='Type "DELETE"'
+            className="w-full px-3 py-2.5 border-2 border-red-400 dark:border-red-600 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm font-mono mb-3 focus:outline-none focus:border-red-600"
+          />
+          {error && <p className="text-red-600 text-xs mb-3">{error}</p>}
+          <div className="flex gap-3">
+            <button onClick={() => { setStep(1); setError(""); }}
+              className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleClear} disabled={saving || confirmText !== "DELETE"}
+              className="flex-[2] py-2.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 disabled:opacity-40 transition-colors">
+              {saving ? "Deleting…" : "Permanently Delete"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Main export ---
 
 const VIEWS = {
@@ -1607,6 +1741,7 @@ const VIEWS = {
   "printer-groups": PrinterGroupsSettings,
   "label-printer": LabelPrinterSettings,
   "print-bridge": PrintBridgeSettings,
+  "danger": DangerZoneSettings,
 };
 
 export default function SettingsSection({ view = "company", onViewChange }) {

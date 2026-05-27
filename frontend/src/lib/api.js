@@ -641,4 +641,8 @@ export const api = {
   // Notifications
   getNotificationsSummary: () => request("/api/notifications/summary"),
   triggerDailyDigest: () => request("/api/notifications/daily-digest", { method: "POST" }),
+
+  // Admin utilities
+  clearData: (collections) =>
+    request("/api/admin/clear-data", { method: "POST", body: JSON.stringify({ collections }) }),
 };

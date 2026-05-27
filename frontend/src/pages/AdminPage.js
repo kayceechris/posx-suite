@@ -77,6 +77,7 @@ const EXPANDABLE = {
     { id: "currencies", label: "Currencies" }, { id: "payment-types", label: "Payment Types" },
     { id: "tax", label: "Tax" }, { id: "printer-groups", label: "Printer Groups" },
     { id: "label-printer", label: "Label Printer" }, { id: "print-bridge", label: "Print Bridge" },
+    { id: "danger", label: "Data Management" },
   ],
   accounts: [
     { id: "dashboard",           label: "Dashboard" },

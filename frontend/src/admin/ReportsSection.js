@@ -1280,7 +1280,7 @@ function FloorReportTab() {
                     {/* Floor row — click to expand */}
                     <button
                       onClick={() => setExpanded(isOpen ? null : (floor.floor_id ?? "__unassigned__"))}
-                      className="w-full text-left px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      className="w-full text-left px-3 sm:px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
 
                       <div className="flex items-center gap-3 mb-3">
                         {/* Color dot + name */}
@@ -1329,7 +1329,7 @@ function FloorReportTab() {
 
                     {/* Drill-down section */}
                     {isOpen && (
-                      <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-4 grid sm:grid-cols-2 gap-5">
+                      <div className="border-t border-gray-100 dark:border-gray-700 px-3 sm:px-5 py-4 grid sm:grid-cols-2 gap-5">
 
                         {/* Top items */}
                         <div>
