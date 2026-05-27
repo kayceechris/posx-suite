@@ -256,6 +256,7 @@ const EMPTY_USER = { name: "", pincode: "", role: "cashier", outlet_id: "", perm
 function UserList() {
   const [users, setUsers] = useState([]);
   const [outlets, setOutlets] = useState([]);
+  const [userTypes, setUserTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -268,8 +269,8 @@ function UserList() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getUsers(), api.getOutlets()])
-      .then(([u, o]) => { setUsers(u); setOutlets(o); })
+    Promise.all([api.getUsers(), api.getOutlets(), api.getUserTypes().catch(() => [])])
+      .then(([u, o, ut]) => { setUsers(u); setOutlets(o); setUserTypes(ut); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -483,9 +484,18 @@ function UserList() {
                     onChange={(e) => setForm({ ...form, role: e.target.value })}
                     className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900 appearance-none"
                   >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-                    ))}
+                    <optgroup label="Base Roles">
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                      ))}
+                    </optgroup>
+                    {userTypes.length > 0 && (
+                      <optgroup label="Custom Roles">
+                        {userTypes.map((ut) => (
+                          <option key={ut.id} value={ut.name.toLowerCase()}>{ut.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">▾</span>
                 </div>

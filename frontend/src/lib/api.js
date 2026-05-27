@@ -137,6 +137,7 @@ export const api = {
 
   // Users
   getUsers: () => request("/api/users"),
+  getUserTypes: () => request("/api/user-types"),
   createUser: (data) =>
     request("/api/users", { method: "POST", body: JSON.stringify(data) }),
   updateUser: (id, data) =>
