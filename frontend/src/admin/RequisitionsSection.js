@@ -428,8 +428,8 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
                       {item.product_id && (
-                        <span className="text-xs font-semibold text-gray-400 whitespace-nowrap flex-shrink-0 min-w-[2rem] text-center">
-                          {productUnit(item.product_id) || "—"}
+                        <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-200 rounded-lg whitespace-nowrap flex-shrink-0 min-w-[2.5rem] text-center border border-gray-200 dark:border-gray-500">
+                          {productUnit(item.product_id) || "unit"}
                         </span>
                       )}
                       {items.length > 1 && (
@@ -569,8 +569,8 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
                         className={cn("w-20 px-3 py-2 border-2 rounded-xl text-sm text-center focus:outline-none bg-white dark:bg-gray-700 dark:text-white",
                           isShort ? "border-yellow-400 focus:border-yellow-500" : "border-gray-200 dark:border-gray-700 focus:border-blue-500")} />
                       {item.product_id && (
-                        <span className="text-xs font-semibold text-gray-400 whitespace-nowrap flex-shrink-0 min-w-[2rem] text-center">
-                          {productUnit(item.product_id) || "—"}
+                        <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-200 rounded-lg whitespace-nowrap flex-shrink-0 min-w-[2.5rem] text-center border border-gray-200 dark:border-gray-500">
+                          {productUnit(item.product_id) || "unit"}
                         </span>
                       )}
                       {items.length > 1 && (
