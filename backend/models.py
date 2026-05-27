@@ -169,6 +169,7 @@ class RequisitionItem(BaseModel):
     product_name: str
     quantity_requested: int
     quantity_fulfilled: int = 0
+    unit_id: Optional[str] = None
 
 
 class Requisition(BaseModel):
@@ -290,6 +291,7 @@ class Table(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     number: str
     outlet_id: str
+    floor_id: Optional[str] = None
     status: str = "available"
     waiter_id: Optional[str] = None
     waiter_name: Optional[str] = None
@@ -301,11 +303,28 @@ class Table(BaseModel):
 class TableCreate(BaseModel):
     number: str
     outlet_id: str
+    floor_id: Optional[str] = None
     seats: int = 4
 
 
 class TableTransferRequest(BaseModel):
     new_waiter_id: str
+
+
+# ==================== FLOOR MODELS ====================
+
+class Floor(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    outlet_id: str
+    sort_order: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FloorCreate(BaseModel):
+    name: str
+    outlet_id: str
+    sort_order: int = 0
 
 
 # ==================== BAR TAB MODELS ====================

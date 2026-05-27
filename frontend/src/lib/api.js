@@ -455,6 +455,16 @@ export const api = {
   releaseTable: (id) =>
     request(`/api/tables/${id}/release`, { method: "POST" }),
 
+  // Floors
+  getFloors: (outlet_id) =>
+    request(`/api/floors${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
+  createFloor: (data) =>
+    request("/api/floors", { method: "POST", body: JSON.stringify(data) }),
+  updateFloor: (id, data) =>
+    request(`/api/floors/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteFloor: (id) =>
+    request(`/api/floors/${id}`, { method: "DELETE" }),
+
   // Bar Tabs (positions)
   getBarTabs: (outlet_id) =>
     request(`/api/bar-tabs${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),

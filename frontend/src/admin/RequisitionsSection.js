@@ -327,6 +327,7 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mainStock, setMainStock] = useState([]);
+  const [stockLoaded, setStockLoaded] = useState(false);
 
   const productUnit = (pid) => {
     const p = products.find((pr) => pr.id === pid);
@@ -338,18 +339,21 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
   const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
   const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
 
-  // For default kitchen/bar stores filter by food/drinks; custom stores show all products
-  const filteredProducts = fromStore === "kitchen"
-    ? products.filter((p) => foodGroupIds.includes(p.category_id))
-    : fromStore === "bar"
-    ? products.filter((p) => drinkGroupIds.includes(p.category_id))
-    : products;
-
-  // Load main store stock when outlet changes
+  // Load main store stock — product list is derived from what main store actually tracks
   useEffect(() => {
     if (!outletId) return;
-    api.getStock(outletId, "main").then(setMainStock).catch(console.error);
+    api.getStock(outletId, "main")
+      .then(stock => { setMainStock(stock); setStockLoaded(true); })
+      .catch(() => setStockLoaded(true));
   }, [outletId]);
+
+  // Only show products that main store actually has a stock record for
+  const stockedIds = new Set(mainStock.map(s => s.product_id));
+  const filteredProducts = !stockLoaded ? [] : fromStore === "kitchen"
+    ? products.filter((p) => foodGroupIds.includes(p.category_id) && stockedIds.has(p.id))
+    : fromStore === "bar"
+    ? products.filter((p) => drinkGroupIds.includes(p.category_id) && stockedIds.has(p.id))
+    : products.filter((p) => stockedIds.has(p.id));
 
   const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? null;
 
@@ -423,8 +427,9 @@ function CreateRequisitionModal({ products, outlets, groups, stores, units, onCl
                   <div key={idx} className="space-y-1">
                     <div className="flex gap-2 items-center">
                       <select required value={item.product_id} onChange={(e) => handleProductChange(idx, e.target.value)}
-                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-                        <option value="">Select product…</option>
+                        disabled={!stockLoaded}
+                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60">
+                        <option value="">{!stockLoaded ? "Loading inventory…" : filteredProducts.length === 0 ? "No stocked products" : "Select product…"}</option>
                         {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                       <input type="number" min="1" required value={item.quantity_requested}
@@ -486,20 +491,23 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
 
   const foodGroupIds = groups.filter((g) => g.main_category === "food").map((g) => g.id);
   const drinkGroupIds = groups.filter((g) => g.main_category === "drinks").map((g) => g.id);
-  const filteredProducts = fromStore === "kitchen"
-    ? products.filter((p) => foodGroupIds.includes(p.category_id))
-    : fromStore === "bar"
-    ? products.filter((p) => drinkGroupIds.includes(p.category_id))
-    : products;
-
   const [items, setItems] = useState(req.items.map((it) => ({
     ...it,
     unit_id: it.unit_id || products.find((p) => p.id === it.product_id)?.unit_id || "",
   })));
   const [notes, setNotes] = useState(req.notes || "");
   const [mainStock, setMainStock] = useState([]);
+  const [stockLoaded, setStockLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const existingProductIds = new Set(req.items.map((it) => it.product_id).filter(Boolean));
+  const stockedIds = new Set(mainStock.map((s) => s.product_id));
+  const filteredProducts = fromStore === "kitchen"
+    ? products.filter((p) => (foodGroupIds.includes(p.category_id) && stockedIds.has(p.id)) || existingProductIds.has(p.id))
+    : fromStore === "bar"
+    ? products.filter((p) => (drinkGroupIds.includes(p.category_id) && stockedIds.has(p.id)) || existingProductIds.has(p.id))
+    : products.filter((p) => stockedIds.has(p.id) || existingProductIds.has(p.id));
 
   const productUnit = (pid) => {
     const p = products.find((pr) => pr.id === pid);
@@ -509,7 +517,9 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
   };
 
   useEffect(() => {
-    api.getStock(req.outlet_id, "main").then(setMainStock).catch(console.error);
+    api.getStock(req.outlet_id, "main")
+      .then((stock) => { setMainStock(stock); setStockLoaded(true); })
+      .catch(() => setStockLoaded(true));
   }, [req.outlet_id]);
 
   const mainQty = (pid) => mainStock.find((s) => s.product_id === pid)?.quantity ?? null;
@@ -576,8 +586,9 @@ function EditRequisitionModal({ req, products, groups, stores, units, onClose, o
                   <div key={idx} className="space-y-1">
                     <div className="flex gap-2 items-center">
                       <select required value={item.product_id} onChange={(e) => handleProductChange(idx, e.target.value)}
-                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
-                        <option value="">Select product…</option>
+                        disabled={!stockLoaded}
+                        className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60">
+                        <option value="">{!stockLoaded ? "Loading inventory…" : filteredProducts.length === 0 ? "No stocked products" : "Select product…"}</option>
                         {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                       <input type="number" min="1" required value={item.quantity_requested}

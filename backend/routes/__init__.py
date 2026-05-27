@@ -32,6 +32,7 @@ from routes.reservations import router as reservations_router
 from routes.requisitions import router as requisitions_router
 from routes.stores import router as stores_router
 from routes.notifications import router as notifications_router
+from routes.floors import router as floors_router
 
 all_routers = [
     auth_router,
@@ -66,4 +67,5 @@ all_routers = [
     requisitions_router,
     stores_router,
     notifications_router,
+    floors_router,
 ]
