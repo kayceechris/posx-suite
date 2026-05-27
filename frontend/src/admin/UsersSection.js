@@ -281,9 +281,12 @@ function UserList() {
 
   const openAdd = () => {
     setForm(EMPTY_USER); setFormError(""); setEditUser(null); setShowAdd(true);
+    // Re-fetch user types in case the initial load failed (e.g. backend was redeploying)
+    if (userTypes.length === 0) api.getUserTypes().then(setUserTypes).catch(() => {});
   };
 
   const openEdit = (u) => {
+    if (userTypes.length === 0) api.getUserTypes().then(setUserTypes).catch(() => {});
     setForm({ name: u.name, pincode: "", role: u.role, outlet_id: u.outlet_id || "", permissions: u.permissions || [], photo: u.photo || "" });
     setFormError(""); setEditUser(u); setShowAdd(true);
   };
