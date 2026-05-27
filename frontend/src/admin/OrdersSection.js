@@ -283,40 +283,40 @@ export default function OrdersSection() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
+            <table className="w-full min-w-0">
               <thead>
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left px-4 py-3">Order #</th>
-                  <th className="text-left px-4 py-3">Date &amp; Time</th>
-                  <th className="text-left px-4 py-3">Customer</th>
-                  <th className="text-left px-4 py-3">Cashier / Waiter</th>
-                  <th className="text-left px-4 py-3">Outlet</th>
-                  <th className="text-left px-4 py-3 hidden lg:table-cell">Terminal</th>
-                  <th className="text-center px-4 py-3">Items</th>
-                  <th className="text-right px-4 py-3">Total</th>
-                  <th className="text-center px-4 py-3">Payment</th>
-                  <th className="text-center px-4 py-3">Actions</th>
+                  <th className="text-left px-3 sm:px-4 py-3">Order #</th>
+                  <th className="text-left px-3 sm:px-4 py-3 hidden sm:table-cell">Date &amp; Time</th>
+                  <th className="text-left px-3 sm:px-4 py-3">Customer</th>
+                  <th className="text-left px-3 sm:px-4 py-3 hidden md:table-cell">Cashier / Waiter</th>
+                  <th className="text-left px-3 sm:px-4 py-3 hidden md:table-cell">Outlet</th>
+                  <th className="text-left px-3 sm:px-4 py-3 hidden lg:table-cell">Terminal</th>
+                  <th className="text-center px-3 sm:px-4 py-3 hidden sm:table-cell">Items</th>
+                  <th className="text-right px-3 sm:px-4 py-3">Total</th>
+                  <th className="text-center px-3 sm:px-4 py-3 hidden sm:table-cell">Payment</th>
+                  <th className="text-center px-3 sm:px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {paginated.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900 transition-colors">
-                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white text-sm">{o.order_number}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-3 font-bold text-gray-900 dark:text-white text-sm whitespace-nowrap">{o.order_number}</td>
+                    <td className="px-3 sm:px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap hidden sm:table-cell">
                       {new Date(o.created_at).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in Customer"}</td>
-                    <td className="px-5 py-3">
+                    <td className="px-3 sm:px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in"}</td>
+                    <td className="px-3 sm:px-5 py-3 hidden md:table-cell">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{o.created_by_name || "—"}</p>
                       {o.created_by_role && (
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">{o.created_by_role}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{outletName(o.outlet_id)}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm hidden lg:table-cell">{o.terminal_id ? terminalName(o.terminal_id) : "—"}</td>
-                    <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-300 text-sm">{o.items?.length || 0}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-green-600 dark:text-green-400 text-sm">{formatCurrency(o.total)}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 sm:px-4 py-3 text-gray-600 dark:text-gray-300 text-sm hidden md:table-cell">{outletName(o.outlet_id)}</td>
+                    <td className="px-3 sm:px-4 py-3 text-gray-500 dark:text-gray-400 text-sm hidden lg:table-cell">{o.terminal_id ? terminalName(o.terminal_id) : "—"}</td>
+                    <td className="px-3 sm:px-4 py-3 text-center text-gray-600 dark:text-gray-300 text-sm hidden sm:table-cell">{o.items?.length || 0}</td>
+                    <td className="px-3 sm:px-4 py-3 text-right font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(o.total)}</td>
+                    <td className="px-3 sm:px-4 py-3 text-center hidden sm:table-cell">
                       {o.payment_method && o.payment_method !== "pending" ? (
                         <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold uppercase",
                           PAYMENT_BADGE[o.payment_method] || "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300")}>
@@ -328,7 +328,7 @@ export default function OrdersSection() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 sm:px-4 py-3 text-center">
                       <button onClick={() => setViewOrder(o)}
                         className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                         <Eye size={16} />

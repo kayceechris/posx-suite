@@ -377,7 +377,7 @@ export default function AdminPage() {
         </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
           <button onClick={() => setSidebarOpen((v) => !v)} className="lg:hidden text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
             <Menu size={22} />
           </button>
@@ -397,7 +397,7 @@ export default function AdminPage() {
               </button>
 
               {bellOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl z-50 overflow-hidden">
+                <div className="fixed top-14 left-2 right-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl z-50 overflow-hidden max-h-[80vh] overflow-y-auto">
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <p className="text-sm font-bold text-gray-900 dark:text-white">Alerts</p>
                   </div>
@@ -483,7 +483,7 @@ export default function AdminPage() {
                   ? <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                   : user?.name?.[0]?.toUpperCase() || "A"}
               </div>
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{user?.name || "Admin"}</span>
+              <span className="hidden sm:block text-sm font-semibold text-gray-700 dark:text-gray-200">{user?.name || "Admin"}</span>
             </div>
           </div>
         </header>
@@ -572,14 +572,14 @@ function DashboardContent({ analytics, loading, userName }) {
           <h2 className="font-bold text-gray-900 dark:text-white text-base">Recent Orders</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[440px]">
+          <table className="w-full">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-4 py-3">Order #</th>
-                <th className="text-left px-4 py-3">Customer</th>
-                <th className="text-left px-4 py-3">Items</th>
-                <th className="text-left px-4 py-3">Total</th>
-                <th className="text-left px-4 py-3">Payment</th>
+                <th className="text-left px-3 sm:px-4 py-3">Order #</th>
+                <th className="text-left px-3 sm:px-4 py-3 hidden sm:table-cell">Customer</th>
+                <th className="text-left px-3 sm:px-4 py-3 hidden sm:table-cell">Items</th>
+                <th className="text-left px-3 sm:px-4 py-3">Total</th>
+                <th className="text-left px-3 sm:px-4 py-3 hidden sm:table-cell">Payment</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -587,11 +587,11 @@ function DashboardContent({ analytics, loading, userName }) {
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">No orders yet</td></tr>
               ) : recentOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm whitespace-nowrap">{order.order_number}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{order.customer_name || "Walk-in"}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{order.items?.length ?? 0}</td>
-                  <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(order.total)}</td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 sm:px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm whitespace-nowrap">{order.order_number}</td>
+                  <td className="px-3 sm:px-4 py-3 text-gray-600 dark:text-gray-300 text-sm hidden sm:table-cell">{order.customer_name || "Walk-in"}</td>
+                  <td className="px-3 sm:px-4 py-3 text-gray-600 dark:text-gray-300 text-sm hidden sm:table-cell">{order.items?.length ?? 0}</td>
+                  <td className="px-3 sm:px-4 py-3 font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(order.total)}</td>
+                  <td className="px-3 sm:px-4 py-3 text-sm hidden sm:table-cell">
                     <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap",
                       !order.payment_method || order.payment_method === "pending"
                         ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
