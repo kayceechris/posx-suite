@@ -270,11 +270,8 @@ function UserList() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([
-      api.getUsers(),
-      api.getOutlets(),
-      api.getUserTypes().catch((e) => { setUserTypesErr(e.message); return []; }),
-    ]).then(([u, o, ut]) => { setUsers(u); setOutlets(o); setUserTypes(ut); })
+    Promise.all([api.getUsers(), api.getOutlets()])
+      .then(([u, o]) => { setUsers(u); setOutlets(o); setUserTypes(loadStoredTypes()); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -285,7 +282,8 @@ function UserList() {
 
   const fetchUserTypes = () => {
     setUserTypesErr("");
-    api.getUserTypes().then(setUserTypes).catch((e) => setUserTypesErr(e.message));
+    // User types are stored in localStorage by the User Types page
+    setUserTypes(loadStoredTypes());
   };
 
   const openAdd = () => {
