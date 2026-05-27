@@ -214,6 +214,8 @@ export default function TablesPage() {
   const [activeTab, setActiveTab] = useState("table");
   const [tables, setTables] = useState([]);
   const [barTabs, setBarTabs] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [activeFloorId, setActiveFloorId] = useState("__all__");
   const [reservationMap, setReservationMap] = useState({}); // table_id → reservation
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -237,14 +239,15 @@ export default function TablesPage() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [t, b, upcoming] = await Promise.all([
+      const [t, b, upcoming, f] = await Promise.all([
         api.getTables(),
         api.getBarTabs(),
         api.getUpcomingReservations().catch(() => []),
+        api.getFloors().catch(() => []),
       ]);
       setTables(t);
       setBarTabs(b);
-      // Build table_id → reservation map (first upcoming per table wins)
+      setFloors(f);
       const map = {};
       for (const r of upcoming) {
         if (!map[r.table_id]) map[r.table_id] = r;
@@ -297,8 +300,17 @@ export default function TablesPage() {
     }
   };
 
-  const entities = activeTab === "table" ? tables : barTabs;
   const isBarTabView = activeTab === "bartab";
+
+  // Floor tabs: filter by the outlet saved in localStorage (if set)
+  const outletFloors = floors.filter((f) => !selectedOutlet || f.outlet_id === selectedOutlet);
+  const hasFloors = !isBarTabView && outletFloors.length > 0;
+
+  const allTables = activeTab === "table" ? tables : barTabs;
+  const entities = hasFloors && activeFloorId !== "__all__"
+    ? allTables.filter((t) => t.floor_id === activeFloorId)
+    : allTables;
+
   const available = entities.filter((e) => !e.status || e.status === "available").length;
   const occupied = entities.filter((e) => e.status === "occupied").length;
 
@@ -334,7 +346,7 @@ export default function TablesPage() {
               {[["table", "Table"], ["bartab", "Bar Tab"]].map(([id, label]) => (
                 <button
                   key={id}
-                  onClick={() => setActiveTab(id)}
+                  onClick={() => { setActiveTab(id); setActiveFloorId("__all__"); }}
                   className={cn(
                     "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
                     activeTab === id
@@ -356,7 +368,7 @@ export default function TablesPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="flex items-center gap-5 mb-6">
+          <div className="flex items-center gap-5 mb-4 flex-wrap">
             {[
               { label: "Available", color: "bg-green-400" },
               { label: activeTab === "table" ? "Your Tables" : "Your Bar Tabs", color: "bg-blue-400" },
@@ -369,6 +381,37 @@ export default function TablesPage() {
               </div>
             ))}
           </div>
+
+          {/* Floor filter tabs — only shown in table view when floors exist */}
+          {hasFloors && (
+            <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
+              <button
+                onClick={() => setActiveFloorId("__all__")}
+                className={cn(
+                  "px-4 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border-2",
+                  activeFloorId === "__all__"
+                    ? "bg-white dark:bg-gray-700 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300"
+                )}>
+                All ({allTables.length})
+              </button>
+              {outletFloors.map((floor) => {
+                const count = allTables.filter((t) => t.floor_id === floor.id).length;
+                return (
+                  <button key={floor.id}
+                    onClick={() => setActiveFloorId(floor.id)}
+                    className={cn(
+                      "px-4 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border-2",
+                      activeFloorId === floor.id
+                        ? "bg-white dark:bg-gray-700 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300"
+                    )}>
+                    {floor.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-20">

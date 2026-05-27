@@ -128,9 +128,10 @@ export default function TablesSection() {
   const [activeFloorId, setActiveFloorId] = useState("__all__");
 
   // Add-floor inline input
-  const [showFloorInput, setShowFloorInput] = useState(false);
-  const [newFloorName,   setNewFloorName]   = useState("");
-  const [floorSaving,    setFloorSaving]    = useState(false);
+  const [showFloorInput,    setShowFloorInput]    = useState(false);
+  const [newFloorName,      setNewFloorName]      = useState("");
+  const [newFloorOutletId,  setNewFloorOutletId]  = useState("");
+  const [floorSaving,       setFloorSaving]       = useState(false);
   const floorInputRef = useRef(null);
 
   // Rename-floor inline
@@ -144,7 +145,11 @@ export default function TablesSection() {
   const load = async () => {
     setLoading(true);
     try {
-      const [t, o, f] = await Promise.all([api.getTables(), api.getOutlets(), api.getFloors()]);
+      const [t, o, f] = await Promise.all([
+        api.getTables(),
+        api.getOutlets(),
+        api.getFloors().catch(() => []),  // non-fatal — floors route may not be deployed yet
+      ]);
       setTables(t);
       setOutlets(o);
       setFloors(f);
@@ -210,15 +215,18 @@ export default function TablesSection() {
   // ── Floor actions ─────────────────────────────────────────────────────────
   const handleAddFloor = async (e) => {
     e.preventDefault();
-    if (!newFloorName.trim() || !activeOutletId) return;
+    const targetOutlet = newFloorOutletId || activeOutletId || outlets[0]?.id;
+    if (!newFloorName.trim() || !targetOutlet) return;
     setFloorSaving(true);
     try {
+      const floorCount = floors.filter((f) => f.outlet_id === targetOutlet).length;
       const created = await api.createFloor({
         name: newFloorName.trim(),
-        outlet_id: activeOutletId,
-        sort_order: outletFloors.length,
+        outlet_id: targetOutlet,
+        sort_order: floorCount,
       });
-      setNewFloorName(""); setShowFloorInput(false);
+      setNewFloorName(""); setNewFloorOutletId(""); setShowFloorInput(false);
+      setActiveOutletId(targetOutlet);
       await load();
       setActiveFloorId(created.id);
     } catch (err) { alert(err.message); }
@@ -359,15 +367,23 @@ export default function TablesSection() {
         {/* Add floor */}
         <div className="flex items-center ml-1 pb-0.5">
           {showFloorInput ? (
-            <form onSubmit={handleAddFloor} className="flex items-center gap-1.5">
+            <form onSubmit={handleAddFloor} className="flex items-center gap-1.5 flex-wrap">
               <input ref={floorInputRef} value={newFloorName} onChange={(e) => setNewFloorName(e.target.value)}
                 placeholder="Floor name…"
                 className="w-36 px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none" />
+              {multiOutlet && (
+                <select
+                  value={newFloorOutletId || activeOutletId || ""}
+                  onChange={(e) => setNewFloorOutletId(e.target.value)}
+                  className="px-2.5 py-1.5 text-sm border-2 border-green-500 rounded-xl bg-white dark:bg-gray-700 dark:text-white focus:outline-none">
+                  {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              )}
               <button type="submit" disabled={floorSaving || !newFloorName.trim()}
                 className="px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 disabled:opacity-40 transition-colors">
                 {floorSaving ? "…" : "Add"}
               </button>
-              <button type="button" onClick={() => { setShowFloorInput(false); setNewFloorName(""); }}
+              <button type="button" onClick={() => { setShowFloorInput(false); setNewFloorName(""); setNewFloorOutletId(""); }}
                 className="text-gray-400 hover:text-gray-600 p-1"><X size={15} /></button>
             </form>
           ) : (
