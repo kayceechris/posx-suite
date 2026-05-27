@@ -15,7 +15,7 @@ function today() { return new Date().toISOString().split("T")[0]; }
 function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; }
 function fmtDate(s) { return new Date(s).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }); }
 
-const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800";
+const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800";
 const LABEL = "block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5";
 
 // ─── Shared Modal ─────────────────────────────────────────────────────────────

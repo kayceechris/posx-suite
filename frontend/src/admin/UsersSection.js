@@ -415,7 +415,7 @@ function UserList() {
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900"
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900"
                   placeholder=""
                 />
               </div>
@@ -430,7 +430,7 @@ function UserList() {
                   required={!editUser}
                   value={form.pincode}
                   onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, "") })}
-                  className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900"
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900"
                   placeholder="4-6 digits"
                 />
               </div>
@@ -442,7 +442,7 @@ function UserList() {
                   <select
                     value={form.role}
                     onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900 appearance-none"
+                    className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900 appearance-none"
                   >
                     {ROLES.map((r) => (
                       <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
@@ -459,7 +459,7 @@ function UserList() {
                   <select
                     value={form.outlet_id}
                     onChange={(e) => setForm({ ...form, outlet_id: e.target.value })}
-                    className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm focus:outline-none focus:border-blue-600 bg-white dark:bg-gray-800 appearance-none"
+                    className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-600 bg-white dark:bg-gray-800 appearance-none"
                   >
                     <option value="">None</option>
                     {outlets.map((o) => (
@@ -635,7 +635,7 @@ function CreateUserTypeModal({ onClose, onSave }) {
             onChange={(e) => setName(e.target.value)}
             required
             autoFocus
-            className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm focus:outline-none focus:border-blue-600"
+            className="w-full px-3 py-2.5 border-2 border-blue-400 rounded-xl text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-600"
             placeholder="e.g. Manager, Cashier, Waiter"
           />
         </div>
