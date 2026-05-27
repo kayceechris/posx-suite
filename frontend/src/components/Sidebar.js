@@ -63,8 +63,12 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
     ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),
     { label: "Held Orders", icon: ClipboardList, path: "/held-orders" },
     ...(hasTableSupport ? [{ label: "Tables", icon: Monitor, path: "/tables" }] : []),
-    ...(user?.role === "admin" || user?.permissions?.includes("approve_purchase")
-      ? [{ label: "Admin", icon: LayoutDashboard, path: "/admin" }] : []),
+    ...((() => {
+      if (!user) return false;
+      if (user.role === "admin" || user.role === "manager") return true;
+      const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
+      return user.permissions?.some(p => adminPerms.includes(p));
+    })() ? [{ label: "Admin", icon: LayoutDashboard, path: "/admin" }] : []),
     ...extraItems,
   ];
 
@@ -275,7 +279,7 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
           {!collapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
         </button>
 
-        {!["waiter", "cashier"].includes(user?.role) && (
+        {(["admin", "manager"].includes(user?.role) || user?.permissions?.length > 0) && (
           <button
             onClick={onSettingsClick ?? (() => navigate("/admin"))}
             title={collapsed ? "Settings" : undefined}

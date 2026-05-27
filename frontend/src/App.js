@@ -49,7 +49,8 @@ function AppRoutes() {
   }
 
   const hasTableSupport = ["restaurant", "nightclub", "bar", "cafe"].includes(settings?.business_type);
-  const canAccessAdmin = user?.role === "admin" || user?.permissions?.includes("approve_purchase");
+  const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
+  const canAccessAdmin = user?.role === "admin" || user?.role === "manager" || user?.permissions?.some(p => adminPerms.includes(p));
   const defaultPath = canAccessAdmin ? "/admin" : hasTableSupport ? "/tables" : "/pos";
 
   return (
@@ -63,7 +64,7 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          user?.role === "admin" || user?.permissions?.includes("approve_purchase") ? (
+          canAccessAdmin ? (
             <AdminPage />
           ) : (
             <Navigate to={defaultPath} replace />
