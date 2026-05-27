@@ -11,7 +11,7 @@ import { useInstallPWA } from "../hooks/useInstallPWA";
 import { useTheme } from "../context/ThemeContext";
 import { cn } from "../lib/utils";
 
-export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen = false, onMobileClose }) {
+export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen = false, onMobileClose, sidebarMiddle }) {
   const { user, logout } = useAuth();
   const { settings } = useBusiness();
   const navigate = useNavigate();
@@ -208,6 +208,13 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
           );
         })}
       </nav>
+
+      {/* Injected middle content (e.g. outlet picker on Tables page) */}
+      {sidebarMiddle && (
+        <div className="px-2 pb-2 border-t border-white/5">
+          {sidebarMiddle(collapsed)}
+        </div>
+      )}
 
       {/* Bottom: sync + settings + user + logout */}
       <div className="px-2 py-4 border-t border-white/5 space-y-0.5">

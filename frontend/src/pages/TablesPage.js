@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin } from "lucide-react";
+import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -325,6 +325,12 @@ export default function TablesPage() {
     }
   };
 
+  const handleSelectOutlet = (outletId) => {
+    setSelectedOutlet(outletId);
+    localStorage.setItem("pos_outlet", outletId);
+    setActiveFloorId(null);
+  };
+
   const isBarTabView = activeTab === "bartab";
   const hasFloors = !isBarTabView && outletFloors.length > 0;
 
@@ -342,6 +348,44 @@ export default function TablesPage() {
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         onSettingsClick={() => setShowTerminalModal(true)}
+        sidebarMiddle={outlets.length > 1 ? (collapsed) => (
+          <div className="pt-3">
+            {!collapsed && (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-3 mb-1.5">
+                Outlet
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {outlets.map((o) => {
+                const active = selectedOutlet === o.id;
+                return (
+                  <button
+                    key={o.id}
+                    onClick={() => handleSelectOutlet(o.id)}
+                    title={collapsed ? o.name : undefined}
+                    className={cn(
+                      "w-full flex items-center rounded-xl text-sm font-medium transition-all duration-150",
+                      collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
+                      active
+                        ? "bg-blue-600/20 text-blue-400"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <Building2
+                      size={17}
+                      className={active ? "text-blue-400" : "text-gray-500"}
+                      strokeWidth={active ? 2.5 : 2}
+                    />
+                    {!collapsed && <span className="truncate">{o.name}</span>}
+                    {!collapsed && active && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 min-w-0">
