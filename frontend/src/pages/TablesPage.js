@@ -215,7 +215,7 @@ export default function TablesPage() {
   const [tables, setTables] = useState([]);
   const [barTabs, setBarTabs] = useState([]);
   const [floors, setFloors] = useState([]);
-  const [activeFloorId, setActiveFloorId] = useState("__all__");
+  const [activeFloorId, setActiveFloorId] = useState(null);
   const [reservationMap, setReservationMap] = useState({}); // table_id → reservation
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -260,6 +260,20 @@ export default function TablesPage() {
     }
   }, []);
 
+  // Auto-select first floor whenever the floor list or outlet changes
+  const outletFloors = floors.filter((f) => !selectedOutlet || f.outlet_id === selectedOutlet);
+  useEffect(() => {
+    if (outletFloors.length > 0) {
+      setActiveFloorId((prev) => {
+        const stillValid = outletFloors.some((f) => f.id === prev);
+        return stillValid ? prev : outletFloors[0].id;
+      });
+    } else {
+      setActiveFloorId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floors, selectedOutlet]);
+
   useEffect(() => {
     load();
     Promise.all([api.getTerminals(), api.getOutlets()])
@@ -301,13 +315,10 @@ export default function TablesPage() {
   };
 
   const isBarTabView = activeTab === "bartab";
-
-  // Floor tabs: filter by the outlet saved in localStorage (if set)
-  const outletFloors = floors.filter((f) => !selectedOutlet || f.outlet_id === selectedOutlet);
   const hasFloors = !isBarTabView && outletFloors.length > 0;
 
   const allTables = activeTab === "table" ? tables : barTabs;
-  const entities = hasFloors && activeFloorId !== "__all__"
+  const entities = hasFloors && activeFloorId
     ? allTables.filter((t) => t.floor_id === activeFloorId)
     : allTables;
 
@@ -346,7 +357,7 @@ export default function TablesPage() {
               {[["table", "Table"], ["bartab", "Bar Tab"]].map(([id, label]) => (
                 <button
                   key={id}
-                  onClick={() => { setActiveTab(id); setActiveFloorId("__all__"); }}
+                  onClick={() => { setActiveTab(id); setActiveFloorId(outletFloors[0]?.id ?? null); }}
                   className={cn(
                     "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
                     activeTab === id
@@ -385,16 +396,6 @@ export default function TablesPage() {
           {/* Floor filter tabs — only shown in table view when floors exist */}
           {hasFloors && (
             <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
-              <button
-                onClick={() => setActiveFloorId("__all__")}
-                className={cn(
-                  "px-4 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border-2",
-                  activeFloorId === "__all__"
-                    ? "bg-white dark:bg-gray-700 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300"
-                )}>
-                All ({allTables.length})
-              </button>
               {outletFloors.map((floor) => {
                 const count = allTables.filter((t) => t.floor_id === floor.id).length;
                 return (
