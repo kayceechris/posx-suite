@@ -33,11 +33,30 @@ async def get_notifications_summary(current_user: User = Depends(get_current_use
     # Pending purchase orders (if the purchases collection exists)
     pending_purchases = await db.purchase_orders.count_documents({"status": "pending"})
 
+    # Upcoming reservations — confirmed bookings starting within the next 2 hours
+    now_local = datetime.now()
+    cutoff_local = now_local + timedelta(hours=2)
+    today_str = now_local.date().isoformat()
+    upcoming_reservations_list = await db.reservations.find(
+        {"status": "confirmed", "date": {"$gte": today_str}},
+        {"_id": 0, "date": 1, "time": 1, "duration": 1}
+    ).to_list(500)
+    upcoming_reservations = 0
+    for res in upcoming_reservations_list:
+        try:
+            res_dt = datetime.fromisoformat(f"{res['date']}T{res['time']}:00")
+            res_end = res_dt + timedelta(minutes=res.get("duration") or 90)
+            if res_dt <= cutoff_local and res_end > now_local:
+                upcoming_reservations += 1
+        except Exception:
+            pass
+
     return {
         "pending_requisitions": pending_reqs,
         "low_stock": low_stock,
         "todays_orders": todays_orders,
         "pending_purchases": pending_purchases,
+        "upcoming_reservations": upcoming_reservations,
     }
 
 

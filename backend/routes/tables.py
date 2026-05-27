@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import datetime, timedelta
 
 from database import db
 from models import User, Table, TableCreate, TableTransferRequest
@@ -7,9 +8,64 @@ from auth import get_current_user
 
 router = APIRouter(prefix="/api")
 
+RESERVATION_LOCK_HOURS = 2  # lock tables this many hours before a reservation
+
+
+async def _sync_reservation_locks():
+    """
+    Auto-lock tables that have a confirmed reservation starting within the next
+    RESERVATION_LOCK_HOURS hours, and release tables whose reservation window
+    has fully expired.  Called on every GET /tables so no external scheduler
+    is needed.
+    """
+    now = datetime.now()
+    lock_cutoff = now + timedelta(hours=RESERVATION_LOCK_HOURS)
+    today = now.date().isoformat()
+
+    # All confirmed reservations from today onwards
+    confirmed = await db.reservations.find(
+        {"status": "confirmed", "date": {"$gte": today}},
+        {"_id": 0, "table_id": 1, "date": 1, "time": 1, "duration": 1}
+    ).to_list(500)
+
+    tables_to_lock = set()
+
+    for res in confirmed:
+        try:
+            res_dt = datetime.fromisoformat(f"{res['date']}T{res['time']}:00")
+            res_end = res_dt + timedelta(minutes=res.get("duration") or 90)
+        except Exception:
+            continue
+
+        # Lock window: now ≤ reservation_start ≤ cutoff, and reservation hasn't ended yet
+        if res_dt <= lock_cutoff and res_end > now:
+            tables_to_lock.add(res["table_id"])
+
+    # Lock available tables that enter the window
+    for table_id in tables_to_lock:
+        await db.tables.update_one(
+            {"id": table_id, "status": "available"},
+            {"$set": {"status": "reserved"}}
+        )
+
+    # Unlock reserved tables that no longer have an active upcoming reservation
+    reserved_tables = await db.tables.find(
+        {"status": "reserved"},
+        {"_id": 0, "id": 1}
+    ).to_list(500)
+
+    for table in reserved_tables:
+        if table["id"] not in tables_to_lock:
+            await db.tables.update_one(
+                {"id": table["id"]},
+                {"$set": {"status": "available"}}
+            )
+
 
 @router.get("/tables")
 async def get_tables(outlet_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    await _sync_reservation_locks()
+
     query = {}
     if outlet_id:
         query["outlet_id"] = outlet_id
@@ -61,6 +117,8 @@ async def claim_table(table_id: str, current_user: User = Depends(get_current_us
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
 
+    if table["status"] == "reserved":
+        raise HTTPException(status_code=400, detail="Table is reserved for an upcoming booking and cannot be seated until then")
     if table["status"] == "occupied" and table.get("waiter_id") != current_user.id:
         raise HTTPException(status_code=400, detail="Table is already occupied by another waiter")
 

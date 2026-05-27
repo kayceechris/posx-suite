@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Building2, Package, Warehouse, ShoppingBag, UserCircle,
   ClipboardList, BarChart2, BookOpen, ArrowLeft, LogOut, ChevronRight, ChevronDown,
-  Menu, Moon, ShoppingCart, DollarSign, Sun, UserCheck, Box, LayoutGrid, Settings, Store, Bell,
+  Menu, Moon, ShoppingCart, DollarSign, Sun, UserCheck, Box, LayoutGrid, Settings, Store, Bell, CalendarClock,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
@@ -197,7 +197,7 @@ export default function AdminPage() {
   const bellRef = useRef(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [notifSummary, setNotifSummary] = useState({ pending_requisitions: 0, low_stock: 0, todays_orders: 0, pending_purchases: 0 });
+  const [notifSummary, setNotifSummary] = useState({ pending_requisitions: 0, low_stock: 0, todays_orders: 0, pending_purchases: 0, upcoming_reservations: 0 });
   const [preFillPO, setPreFillPO] = useState(null);
 
   const isPrivileged = user?.role === "admin" || user?.role === "manager";
@@ -378,9 +378,9 @@ export default function AdminPage() {
                 className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 <Bell size={17} />
-                {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0 || notifSummary.pending_purchases > 0) && (
+                {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0 || notifSummary.pending_purchases > 0 || notifSummary.upcoming_reservations > 0) && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-                    {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock + notifSummary.pending_purchases, 99)}
+                    {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock + notifSummary.pending_purchases + notifSummary.upcoming_reservations, 99)}
                   </span>
                 )}
               </button>
@@ -390,10 +390,25 @@ export default function AdminPage() {
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <p className="text-sm font-bold text-gray-900 dark:text-white">Alerts</p>
                   </div>
-                  {notifSummary.pending_requisitions === 0 && notifSummary.low_stock === 0 && notifSummary.pending_purchases === 0 ? (
+                  {notifSummary.pending_requisitions === 0 && notifSummary.low_stock === 0 && notifSummary.pending_purchases === 0 && notifSummary.upcoming_reservations === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-gray-400">No active alerts</p>
                   ) : (
                     <div className="py-1">
+                      {notifSummary.upcoming_reservations > 0 && (
+                        <button
+                          onClick={() => { setBellOpen(false); setActiveSection("floor"); setExpandedSection("floor"); setSubViews((s) => ({ ...s, floor: "reservations" })); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <CalendarClock size={15} className="text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Upcoming Reservations</p>
+                            <p className="text-xs text-gray-400">{notifSummary.upcoming_reservations} table{notifSummary.upcoming_reservations !== 1 ? "s" : ""} reserved within 2 hours</p>
+                          </div>
+                          <span className="min-w-[20px] h-5 px-1.5 bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.upcoming_reservations > 99 ? "99+" : notifSummary.upcoming_reservations}</span>
+                        </button>
+                      )}
                       {notifSummary.pending_requisitions > 0 && (
                         <button
                           onClick={() => { setBellOpen(false); setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: "requisitions" })); }}
