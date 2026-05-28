@@ -369,6 +369,18 @@ def _relay_loop(ws_url: str, outlet_id: str):
         time.sleep(5)
 
 
+def _keepalive_loop(backend_url: str):
+    """Ping the backend via HTTP every 10 minutes to prevent Render free-tier spin-down."""
+    import urllib.request
+    ping_url = backend_url.rstrip("/") + "/api/ping"
+    while True:
+        time.sleep(10 * 60)
+        try:
+            urllib.request.urlopen(ping_url, timeout=10)
+        except Exception:
+            pass
+
+
 def _start_relay(backend_url: str, outlet_id: str):
     ws_url = (
         backend_url
@@ -377,8 +389,8 @@ def _start_relay(backend_url: str, outlet_id: str):
         .rstrip("/")
     )
     ws_url = f"{ws_url}/api/ws/bridge?outlet_id={outlet_id}&token={SECRET_TOKEN}"
-    t = threading.Thread(target=_relay_loop, args=(ws_url, outlet_id), daemon=True)
-    t.start()
+    threading.Thread(target=_relay_loop,     args=(ws_url, outlet_id), daemon=True).start()
+    threading.Thread(target=_keepalive_loop, args=(backend_url,),       daemon=True).start()
     return ws_url
 
 
