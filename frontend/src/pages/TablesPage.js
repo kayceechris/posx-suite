@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2 } from "lucide-react";
+import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2, GitMerge } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -94,6 +94,77 @@ function TransferModal({ entityId, isBarTab, currentOwnerId, onClose, onTransfer
   );
 }
 
+// ─── Merge Modal ─────────────────────────────────────────────────────────────
+function MergeModal({ table, allTables, onClose, onMerged }) {
+  const [selected, setSelected] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const candidates = allTables.filter(
+    (t) => t.id !== table.id && t.status === "occupied" && !t.merged_into
+  );
+
+  const handleConfirm = async () => {
+    if (!selected) return;
+    setSaving(true); setError("");
+    try {
+      await api.mergeTable(table.id, selected);
+      onMerged();
+    } catch (err) {
+      setError(err.message || "Merge failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-5 text-white">
+          <h3 className="font-bold text-lg">Merge Table {table.number}</h3>
+          <p className="text-white/75 text-sm mt-0.5">Combine with another occupied table for one bill</p>
+        </div>
+        <div className="p-5">
+          <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+            {candidates.length === 0 && (
+              <p className="text-center text-gray-400 text-sm py-4">No occupied tables available to merge</p>
+            )}
+            {candidates.map((t) => (
+              <button key={t.id} onClick={() => setSelected(t.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all",
+                  selected === t.id
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-900/30"
+                    : "border-gray-200 dark:border-gray-600 hover:border-orange-300"
+                )}>
+                <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center font-black text-orange-600 dark:text-orange-300 flex-shrink-0 text-sm">
+                  {t.number}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white text-sm">Table {t.number}</p>
+                  <p className="text-xs text-gray-400">{t.waiter_name || "Occupied"}</p>
+                </div>
+                {selected === t.id && <CheckCircle2 size={16} className="ml-auto text-orange-500" />}
+              </button>
+            ))}
+          </div>
+          {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+          <div className="flex gap-3">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-2xl font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
+              Cancel
+            </button>
+            <button onClick={handleConfirm} disabled={!selected || saving}
+              className="flex-[2] py-2.5 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 disabled:opacity-40 transition-colors text-sm">
+              {saving ? "Merging…" : "Merge Tables"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Status helpers ───────────────────────────────────────────────────────────
 function fmt12(time24) {
   if (!time24) return "";
@@ -113,12 +184,13 @@ function tableStatus(entity, userId, isBarTab, reservation) {
 }
 
 // ─── Entity Card ──────────────────────────────────────────────────────────────
-function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reservation, onClick, onRelease, onTransfer }) {
+function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reservation, onClick, onRelease, onTransfer, onMerge, mergedWith, primaryTable }) {
   const status = tableStatus(entity, userId, isBarTab, reservation);
   const isPrivileged = ["admin", "manager"].includes(userRole);
   const canRelease = isPrivileged || (status === "mine" && (userPermissions?.includes("release_tables") || userPermissions?.includes("manage_tables")));
   const canTransfer = isPrivileged || (status === "mine" && userPermissions?.includes("transfer_tables"));
-  const showActions = (status === "mine" || (isPrivileged && status === "occupied")) && (canRelease || canTransfer);
+  const canMerge = !isBarTab && (status === "mine" || (isPrivileged && status === "occupied")) && !entity.merged_into;
+  const showActions = (status === "mine" || (isPrivileged && status === "occupied")) && (canRelease || canTransfer || canMerge);
 
   const styles = {
     available: { card: "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 hover:shadow-green-100", icon: "bg-green-500", label: "text-green-700 dark:text-green-400" },
@@ -177,6 +249,17 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
             {ownerName || (status === "mine" ? "You" : "Occupied")}
           </span>
         )}
+        {/* Merged indicator */}
+        {entity.merged_into && primaryTable && (
+          <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300">
+            <GitMerge size={10} /> Merged → T{primaryTable.number}
+          </span>
+        )}
+        {mergedWith?.length > 0 && (
+          <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300">
+            <GitMerge size={10} /> +{mergedWith.map(t => `T${t.number}`).join(", ")}
+          </span>
+        )}
       </button>
 
       {/* Release + Transfer buttons */}
@@ -197,6 +280,15 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
             >
               <ArrowLeftRight size={11} />
               <span className="truncate">Move</span>
+            </button>
+          )}
+          {canMerge && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onMerge(entity); }}
+              className="flex-1 py-1.5 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-1"
+            >
+              <GitMerge size={11} />
+              <span className="truncate">Merge</span>
             </button>
           )}
         </div>
@@ -221,6 +313,7 @@ export default function TablesPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [transferTarget, setTransferTarget] = useState(null);
+  const [mergeTarget, setMergeTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [terminals, setTerminals] = useState([]);
@@ -514,6 +607,9 @@ export default function TablesPage() {
                   onClick={(e) => handleEntityClick(e, isBarTabView)}
                   onRelease={(e) => handleRelease(e, isBarTabView)}
                   onTransfer={(e) => setTransferTarget({ entity: e, isBarTab: isBarTabView })}
+                  onMerge={(e) => setMergeTarget(e)}
+                  mergedWith={tables.filter(t => t.merged_into === entity.id)}
+                  primaryTable={entity.merged_into ? tables.find(t => t.id === entity.merged_into) : null}
                 />
               ))}
             </div>
@@ -531,6 +627,20 @@ export default function TablesPage() {
           onTransferred={() => {
             setTransferTarget(null);
             showToast("Transferred successfully");
+            load(true);
+          }}
+        />
+      )}
+
+      {/* Merge modal */}
+      {mergeTarget && (
+        <MergeModal
+          table={mergeTarget}
+          allTables={tables}
+          onClose={() => setMergeTarget(null)}
+          onMerged={() => {
+            setMergeTarget(null);
+            showToast(`Table ${mergeTarget.number} merged successfully`);
             load(true);
           }}
         />

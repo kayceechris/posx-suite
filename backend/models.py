@@ -297,6 +297,7 @@ class Table(BaseModel):
     waiter_name: Optional[str] = None
     current_order_id: Optional[str] = None
     seats: int = 4
+    merged_into: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

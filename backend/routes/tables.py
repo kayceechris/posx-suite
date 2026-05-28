@@ -209,6 +209,45 @@ async def release_table(table_id: str, current_user: User = Depends(get_current_
     return updated
 
 
+@router.post("/tables/{table_id}/merge")
+async def merge_tables(table_id: str, data: dict, current_user: User = Depends(get_current_user)):
+    """Merge another table into this one for a combined bill."""
+    merge_table_id = data.get("merge_table_id")
+    if not merge_table_id or merge_table_id == table_id:
+        raise HTTPException(400, "Invalid merge_table_id")
+
+    table_a = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    table_b = await db.tables.find_one({"id": merge_table_id}, {"_id": 0})
+    if not table_a or not table_b:
+        raise HTTPException(404, "Table not found")
+    if table_b.get("merged_into"):
+        raise HTTPException(400, f"Table {table_b['number']} is already merged with another table")
+
+    await db.tables.update_one(
+        {"id": merge_table_id},
+        {"$set": {"merged_into": table_id}}
+    )
+    return {"ok": True}
+
+
+@router.post("/tables/{table_id}/unmerge")
+async def unmerge_table(table_id: str, data: dict, current_user: User = Depends(get_current_user)):
+    """Split a merged table back out — both tables remain occupied independently."""
+    merge_table_id = data.get("merge_table_id")
+    if not merge_table_id:
+        raise HTTPException(400, "merge_table_id required")
+
+    table_b = await db.tables.find_one({"id": merge_table_id}, {"_id": 0})
+    if not table_b:
+        raise HTTPException(404, "Table not found")
+
+    await db.tables.update_one(
+        {"id": merge_table_id},
+        {"$unset": {"merged_into": ""}}
+    )
+    return {"ok": True}
+
+
 @router.delete("/tables/{table_id}")
 async def delete_table(table_id: str, current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  ArrowLeft, CheckCircle2, ChevronDown, ChefHat, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X,
+  ArrowLeft, CheckCircle2, ChevronDown, ChefHat, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X, GitMerge,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -236,6 +236,8 @@ export default function TablePOSPage() {
 
   const [cart, setCart] = useState([]);
   const [originalItems, setOriginalItems] = useState([]); // items from the loaded held/sent order
+  const [mergedTables, setMergedTables] = useState([]);
+  const [mergedOrders, setMergedOrders] = useState([]);
   const [showPay, setShowPay] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -294,6 +296,23 @@ export default function TablePOSPage() {
           }
         }
         setEntity(entityData || null);
+
+        // Load tables merged into this one (not bar tabs)
+        if (!isBarTab && entityData) {
+          try {
+            const allTables = await api.getTables();
+            const merged = allTables.filter((t) => t.merged_into === entityId);
+            setMergedTables(merged);
+            if (merged.length > 0) {
+              const orders = await Promise.all(
+                merged.filter((t) => t.current_order_id).map((t) =>
+                  api.getOrder(t.current_order_id).catch(() => null)
+                )
+              );
+              setMergedOrders(orders.filter(Boolean));
+            }
+          } catch { /* non-fatal */ }
+        }
       } catch (err) {
         showToast("Failed to load data", "error");
       } finally {
@@ -344,6 +363,9 @@ export default function TablePOSPage() {
   const taxRate = parseFloat(settings?.tax_rate || 0);
   const tax = settings?.tax_enabled ? subtotal * taxRate / 100 : 0;
   const total = subtotal + tax;
+  const mergedTotal = mergedOrders.reduce((s, o) => s + (o.total || 0), 0);
+  const combinedTotal = total + mergedTotal;
+  const isMerged = mergedTables.length > 0;
 
   const filtered = products.filter((p) => {
     const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
@@ -402,23 +424,29 @@ export default function TablePOSPage() {
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
-  const handlePrintReceipt = (method) => {
+  const handlePrintReceipt = (method, overrideItems, overrideTotal) => {
     let usbPrinter = null;
     try {
       const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
       usbPrinter = saved.find((x) => x.mode === "usb" && x.type === "receipt") || null;
     } catch (_) {}
+    const receiptItems = overrideItems || cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price }));
+    const receiptTotal = overrideTotal ?? total;
+    const receiptSubtotal = overrideTotal != null ? overrideTotal / (1 + taxRate / 100) : subtotal;
+    const tableName = isMerged
+      ? `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} + ${mergedTables.map((t) => `T${t.number}`).join(", ")}`
+      : `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`;
     printService.printReceipt({
       businessName: settings?.business_name || "Restaurant",
       address: settings?.address || "",
       phone: settings?.phone || "",
-      tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
+      tableName,
       cashier: user?.name || "",
-      items: cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
-      subtotal,
-      taxAmount: tax,
+      items: receiptItems,
+      subtotal: receiptSubtotal,
+      taxAmount: receiptTotal - receiptSubtotal,
       discount: 0,
-      total,
+      total: receiptTotal,
       paymentMethod: method,
       layoutSettings: settings?.receipt_settings || {},
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
@@ -567,15 +595,37 @@ export default function TablePOSPage() {
     if (name !== undefined) setCustomerName(name);
     if (!isOnline) {
       try {
-        await queueOrder("checkout", buildOrderPayload("completed", method, name), `Sale — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(total)}`);
+        await queueOrder("checkout", buildOrderPayload("completed", method, name), `Sale — ${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""} — ${formatCurrency(combinedTotal)}`);
         showToast("Saved offline — will sync when connected");
         setCart([]); setCustomerName(""); navigate("/tables");
       } catch { showToast("Failed to save offline", "error"); } finally { setSubmitting(false); }
       return;
     }
     try {
+      // Complete this table's order
       await api.createOrder(buildOrderPayload("completed", method, name));
-      if (method !== "credit") handlePrintReceipt(method);
+
+      // Complete and unmerge all merged tables
+      for (const mt of mergedTables) {
+        try {
+          if (mt.current_order_id) {
+            await api.updateOrder(mt.current_order_id, { status: "completed", payment_method: method });
+          }
+          await api.unmergeTable(entityId, mt.id);
+        } catch { /* non-fatal per table */ }
+      }
+
+      // Print combined receipt if there are merged tables
+      if (isMerged) {
+        const allItems = [
+          ...cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price })),
+          ...mergedOrders.flatMap((o) => (o.items || []).map((i) => ({ name: i.product_name || i.name, quantity: i.quantity, price: i.price }))),
+        ];
+        handlePrintReceipt(method, allItems, combinedTotal);
+      } else if (method !== "credit") {
+        handlePrintReceipt(method);
+      }
+
       showToast(method === "credit" ? "Credit sale recorded!" : `Order completed via ${method}!`);
       setCart([]);
       setCustomerName("");
@@ -584,6 +634,20 @@ export default function TablePOSPage() {
       showToast(err.message || "Failed to complete order", "error");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSplitTable = async (mergedTableId) => {
+    try {
+      await api.unmergeTable(entityId, mergedTableId);
+      setMergedTables((prev) => prev.filter((t) => t.id !== mergedTableId));
+      setMergedOrders((prev) => {
+        const mt = mergedTables.find((t) => t.id === mergedTableId);
+        return mt ? prev.filter((o) => o.id !== mt.current_order_id) : prev;
+      });
+      showToast("Tables split successfully");
+    } catch (err) {
+      showToast(err.message || "Failed to split tables", "error");
     }
   };
 
@@ -766,13 +830,51 @@ export default function TablePOSPage() {
               )}
             </div>
 
+            {/* Merged tables section */}
+            {isMerged && (
+              <div className="px-4 pt-2 pb-1 border-t border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+                {mergedTables.map((mt) => {
+                  const mo = mergedOrders.find((o) => o.id === mt.current_order_id);
+                  return (
+                    <div key={mt.id} className="mb-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400">
+                          <GitMerge size={11} /> Table {mt.number}
+                        </span>
+                        <button onClick={() => handleSplitTable(mt.id)}
+                          className="text-[10px] font-bold text-red-500 hover:text-red-700 transition-colors">
+                          Split
+                        </button>
+                      </div>
+                      {mo?.items?.map((item, i) => (
+                        <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-400 py-0.5">
+                          <span>{item.quantity}x {item.product_name || item.name}</span>
+                          <span>{formatCurrency((item.price || 0) * (item.quantity || 1))}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-bold text-orange-600 dark:text-orange-400 mt-1 border-t border-orange-200 dark:border-orange-700 pt-1">
+                        <span>Table {mt.number} total</span>
+                        <span>{formatCurrency(mo?.total || 0)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {cart.length > 0 && (
               <div className="px-4 pt-3 pb-2 border-t border-gray-100 dark:border-gray-700">
                 <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
                   <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
                 </div>
+                {isMerged && (
+                  <div className="flex justify-between text-sm text-orange-600 dark:text-orange-400 mb-1">
+                    <span>Merged tables</span><span>+{formatCurrency(mergedTotal)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-black text-gray-900 dark:text-white text-base mb-3">
-                  <span>Total</span><span className="text-green-600 dark:text-green-400">{formatCurrency(total)}</span>
+                  <span>{isMerged ? "Combined Total" : "Total"}</span>
+                  <span className="text-green-600 dark:text-green-400">{formatCurrency(combinedTotal)}</span>
                 </div>
               </div>
             )}
@@ -931,7 +1033,7 @@ export default function TablePOSPage() {
 
       {showPay && (
         <PaymentModal
-          total={total}
+          total={combinedTotal}
           paymentTypes={paymentTypes}
           customerName={customerName}
           onCustomerNameChange={setCustomerName}

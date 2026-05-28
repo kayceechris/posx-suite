@@ -464,6 +464,10 @@ export const api = {
     request(`/api/tables/${id}/claim`, { method: "POST" }),
   releaseTable: (id) =>
     request(`/api/tables/${id}/release`, { method: "POST" }),
+  mergeTable: (tableId, mergeTableId) =>
+    request(`/api/tables/${tableId}/merge`, { method: "POST", body: JSON.stringify({ merge_table_id: mergeTableId }) }),
+  unmergeTable: (tableId, mergeTableId) =>
+    request(`/api/tables/${tableId}/unmerge`, { method: "POST", body: JSON.stringify({ merge_table_id: mergeTableId }) }),
 
   // Floors
   getFloors: (outlet_id) =>
