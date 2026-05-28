@@ -250,6 +250,17 @@ function buildKitchenBytes(data) {
   return b;
 }
 
+// ─── Local Network Access permission (Chrome 130+) ───────────────────────────
+async function requestLocalNetworkAccess() {
+  try {
+    if (navigator.permissions?.request) {
+      await navigator.permissions.request({ name: "local-network-access" });
+    }
+  } catch {
+    // Not supported or already decided — proceed anyway
+  }
+}
+
 // ─── Bridge communication ─────────────────────────────────────────────────────
 async function sendToBridge({ bridgeUrl, printerIp, printerPort = 9100, bytes }) {
   const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
@@ -384,8 +395,9 @@ export const printService = {
    */
   async testBridge(bridgeUrl) {
     try {
+      await requestLocalNetworkAccess();
       const res = await fetch(`${bridgeUrl}/health`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return false;
       const data = await res.json();

@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-POSx Suite Local Print Bridge v1.5
+POSx Suite Local Print Bridge v2.0
 - Run this on any Windows PC on the same Wi-Fi as your printers.
-- Serves HTTPS with a self-signed cert (requires `cryptography` package).
-- Falls back to plain HTTP if cryptography is not installed.
+- Serves HTTPS using mkcert (trusted on Android/iOS/desktop — no warnings).
+- Falls back to plain HTTP if mkcert.exe is not in this folder.
 
 Setup:
-  1. Double-click start.bat (installs dependencies automatically)
-  2. Note the URL shown (https://...) and enter it in the POSx app Bridge URL field.
-  3. On each tablet/phone: visit that URL in the browser once and accept the
-     security warning ("Advanced" -> "Proceed") to trust the cert.
-  4. Add printers in Terminal Settings -> Printers tab.
+  1. Download mkcert.exe from https://github.com/FiloSottile/mkcert/releases
+     and place it in the same folder as bridge.py / start.bat
+  2. Double-click start.bat — it installs the CA and generates certs automatically
+  3. On each Android device (one-time):
+     a. Copy rootCA.pem (path printed on startup) to the device
+     b. Settings -> Biometrics and security -> Install from device storage
+        -> CA certificate -> select rootCA.pem
+  4. Enter the https:// URL shown on startup into the POSx app Bridge URL field
 """
 import datetime
 import ipaddress
@@ -37,7 +40,44 @@ _CERT_FILE   = os.path.join(_BRIDGE_DIR, "bridge.crt")
 _KEY_FILE    = os.path.join(_BRIDGE_DIR, "bridge.key")
 
 
-# ── HTTPS self-signed cert ─────────────────────────────────────────────────────
+# ── HTTPS via mkcert (trusted) ─────────────────────────────────────────────────
+
+def _setup_mkcert_https(local_ip: str) -> bool:
+    """Use mkcert.exe (if present) to generate a CA-signed trusted cert.
+    Returns True if bridge.crt + bridge.key are ready to use."""
+    mkcert = os.path.join(_BRIDGE_DIR, "mkcert.exe")
+    if not os.path.exists(mkcert):
+        return False
+
+    if os.path.exists(_CERT_FILE) and os.path.exists(_KEY_FILE):
+        print("  [mkcert] Certs already exist, using existing.")
+        return True
+
+    print("  [mkcert] Installing local CA (may prompt for admin)...")
+    try:
+        subprocess.run([mkcert, "-install"], check=True, capture_output=True, text=True, timeout=30)
+        print(f"  [mkcert] Generating cert for {local_ip}...")
+        subprocess.run(
+            [mkcert, "-cert-file", _CERT_FILE, "-key-file", _KEY_FILE,
+             local_ip, "localhost", "127.0.0.1"],
+            check=True, capture_output=True, text=True, timeout=30,
+        )
+        return True
+    except Exception as e:
+        print(f"  [!] mkcert setup failed: {e}")
+        return False
+
+
+def _mkcert_caroot() -> str:
+    mkcert = os.path.join(_BRIDGE_DIR, "mkcert.exe")
+    try:
+        r = subprocess.run([mkcert, "-CAROOT"], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
+# ── HTTPS self-signed cert (fallback, not trusted by JS fetch) ─────────────────
 
 def _generate_cert(local_ip: str) -> bool:
     """Generate a self-signed TLS cert valid for local_ip and localhost."""
@@ -408,21 +448,47 @@ def main():
 
     server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
 
+    # Try mkcert first (proper trusted HTTPS), then fall back to HTTP
+    ssl_ctx = None
+    _setup_mkcert_https(local_ip)
+    if os.path.exists(_CERT_FILE) and os.path.exists(_KEY_FILE):
+        try:
+            ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_ctx.load_cert_chain(_CERT_FILE, _KEY_FILE)
+            server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
+        except Exception as e:
+            print(f"  [!] SSL load failed ({e}), falling back to HTTP")
+            ssl_ctx = None
+
+    protocol = "https" if ssl_ctx else "http"
+    bridge_url = f"{protocol}://{local_ip}:{PORT}"
+
     print("=" * 65)
-    print("  POSx Suite Local Print Bridge v1.6")
+    print("  POSx Suite Local Print Bridge v2.0")
     print("=" * 65)
-    print(f"  Protocol      : HTTP")
-    print(f"  Your local IP : http://{local_ip}:{PORT}")
-    print(f"  -> Use this URL in the POSx app Bridge URL field")
+    print(f"  Protocol      : {'HTTPS (trusted)' if ssl_ctx else 'HTTP'}")
+    print(f"  Bridge URL    : {bridge_url}")
+    print(f"  -> Paste this into the POSx app Bridge URL field")
     print()
-    print("  FIRST-TIME TABLET / PHONE SETUP (Android Chrome):")
-    print(f"  1. Open Chrome and go to:")
-    print(f"     chrome://flags/#unsafely-treat-insecure-origin-as-secure")
-    print(f"  2. In the text box add:  http://{local_ip}:{PORT}")
-    print(f"  3. Set dropdown to 'Enabled', tap Relaunch")
-    print(f"  4. Paste http://{local_ip}:{PORT} into the app and Test Bridge")
+
+    if ssl_ctx:
+        ca_dir = _mkcert_caroot()
+        ca_path = os.path.join(ca_dir, "rootCA.pem") if ca_dir else ""
+        print("  ANDROID SETUP (one-time per device):")
+        print(f"  1. Copy this file to your Android device:")
+        print(f"     {ca_path or 'rootCA.pem (run mkcert -CAROOT to find it)'}")
+        print(f"     (USB, WhatsApp to yourself, email, Google Drive, etc.)")
+        print(f"  2. On Android: Settings -> Biometrics and security")
+        print(f"     -> Install from device storage -> CA certificate")
+        print(f"     -> select rootCA.pem")
+        print(f"  3. Done — works on ALL browsers, no warnings, no flags")
+    else:
+        print("  NO HTTPS: mkcert.exe not found in this folder.")
+        print("  Download from: github.com/FiloSottile/mkcert/releases")
+        print("  Place mkcert.exe here and restart to enable trusted HTTPS.")
+
     print()
-    print(f"  Localhost URL : http://localhost:{PORT}")
+    print(f"  Localhost URL : {protocol}://localhost:{PORT}")
     print(f"  -> Use this if the app runs on this same PC")
     print()
     print("  Press Ctrl+C to stop")

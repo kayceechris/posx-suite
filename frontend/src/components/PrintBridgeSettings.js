@@ -51,19 +51,19 @@ export default function PrintBridgeSettings({ onClose }) {
       {/* How it works */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1.5">
         <p className="font-bold">How to set up:</p>
-        <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC</p>
-        <p>2. Copy the URL shown (e.g. <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">http://192.168.1.10:8765</code>)</p>
-        <p>3. Paste it below, click <strong>Save Settings</strong>, then <strong>Test Bridge</strong></p>
+        <p>1. Place <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">mkcert.exe</code> in the print-bridge folder, then double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code></p>
+        <p>2. Copy the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://</code> URL shown and paste it below</p>
+        <p>3. Click <strong>Save Settings</strong>, then <strong>Test Bridge</strong></p>
         <p>4. Add printers in Terminal Settings → Printers tab</p>
         <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-          <p><strong>Same PC as bridge?</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">http://localhost:8765</code></p>
-          <p><strong>Tablet / phone?</strong> Use the IP address shown in the bridge window</p>
+          <p><strong>Same PC as bridge?</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">https://localhost:8765</code></p>
+          <p><strong>Tablet / phone?</strong> Use the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://</code> IP address shown in the bridge window</p>
         </div>
         <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
-          <p className="font-bold text-orange-700 dark:text-orange-400">Android tablet one-time setup (do once per device):</p>
-          <p className="mt-1">1. Open Chrome → address bar → type <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">chrome://flags</code></p>
-          <p>2. Search <strong>insecure origins treated as secure</strong></p>
-          <p>3. Add <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">http://&lt;bridge-ip&gt;:8765</code> → set <strong>Enabled</strong> → Relaunch</p>
+          <p className="font-bold text-orange-700 dark:text-orange-400">Android one-time setup (per device):</p>
+          <p className="mt-1">1. Copy <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">rootCA.pem</code> from the PC to the device</p>
+          <p>2. Settings → Biometrics and security → Install from device storage → <strong>CA certificate</strong></p>
+          <p>3. Tap <strong>Test Bridge</strong> — Chrome will ask "Allow access to local network?" → tap <strong>Allow</strong></p>
         </div>
       </div>
 
