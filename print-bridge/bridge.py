@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """
-POSx Suite Local Print Bridge v2.0
-- Run this on any Windows PC on the same Wi-Fi as your printers.
-- Serves HTTPS using mkcert (trusted on Android/iOS/desktop — no warnings).
-- Falls back to plain HTTP if mkcert.exe is not in this folder.
+POSx Suite Local Print Bridge v3.0
+Connects to the POSx backend via WebSocket relay — works from any browser,
+any device, any network. No cert setup, no Chrome flags required.
 
 Setup:
-  1. Download mkcert.exe from https://github.com/FiloSottile/mkcert/releases
-     and place it in the same folder as bridge.py / start.bat
-  2. Double-click start.bat — it installs the CA and generates certs automatically
-  3. On each Android device (one-time):
-     a. Copy rootCA.pem (path printed on startup) to the device
-     b. Settings -> Biometrics and security -> Install from device storage
-        -> CA certificate -> select rootCA.pem
-  4. Enter the https:// URL shown on startup into the POSx app Bridge URL field
+  1. Edit relay.conf: set BACKEND_URL to your Render backend URL
+  2. Double-click start.bat
+  3. Done — the bridge registers itself with the backend automatically.
+     Printing works from any browser on any device.
 """
 import datetime
 import ipaddress
@@ -24,6 +19,7 @@ import ssl
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 try:
@@ -303,6 +299,89 @@ def _list_windows_printers():
         return []
 
 
+# ── Backend WebSocket relay ────────────────────────────────────────────────────
+
+def _load_relay_conf():
+    conf = os.path.join(_BRIDGE_DIR, "relay.conf")
+    result = {"backend_url": "", "outlet_id": "default"}
+    if not os.path.exists(conf):
+        return result
+    with open(conf) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("BACKEND_URL="):
+                result["backend_url"] = line.split("=", 1)[1].strip()
+            elif line.startswith("OUTLET_ID="):
+                result["outlet_id"] = line.split("=", 1)[1].strip()
+    return result
+
+
+def _handle_relay_job(ws, message):
+    try:
+        job = json.loads(message)
+    except Exception:
+        return
+    job_id  = job.get("job_id", "")
+    jtype   = job.get("type", "network")
+    try:
+        if jtype == "usb":
+            printer_name = job.get("printer_name", "").strip()
+            data = bytes(job.get("data", []))
+            _raw_print_windows(printer_name, data)
+            ws.send(json.dumps({"job_id": job_id, "ok": True}))
+            print(f"  [Relay] USB print OK → '{printer_name}'")
+        else:
+            ip   = job.get("ip", "")
+            port = int(job.get("port", 9100))
+            data = bytes(job.get("data", []))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(6)
+            sock.connect((ip, port))
+            sock.sendall(data)
+            sock.close()
+            ws.send(json.dumps({"job_id": job_id, "ok": True}))
+            print(f"  [Relay] Network print OK → {ip}:{port}")
+    except Exception as e:
+        ws.send(json.dumps({"job_id": job_id, "ok": False, "error": str(e)}))
+        print(f"  [Relay] Print error: {e}")
+
+
+def _relay_loop(ws_url: str, outlet_id: str):
+    try:
+        import websocket as _ws_lib
+    except ImportError:
+        print("  [Relay] ERROR: websocket-client not installed.")
+        print("  [Relay] Run:  pip install websocket-client")
+        return
+
+    while True:
+        try:
+            ws = _ws_lib.WebSocketApp(
+                ws_url,
+                on_open=lambda ws: print(f"  [Relay] Connected to backend (outlet: {outlet_id})"),
+                on_message=_handle_relay_job,
+                on_error=lambda ws, e: print(f"  [Relay] Error: {e}"),
+                on_close=lambda ws, c, m: print(f"  [Relay] Disconnected — reconnecting in 5s..."),
+            )
+            ws.run_forever(ping_interval=30, ping_timeout=10)
+        except Exception as e:
+            print(f"  [Relay] Crashed: {e}")
+        time.sleep(5)
+
+
+def _start_relay(backend_url: str, outlet_id: str):
+    ws_url = (
+        backend_url
+        .replace("https://", "wss://")
+        .replace("http://", "ws://")
+        .rstrip("/")
+    )
+    ws_url = f"{ws_url}/api/ws/bridge?outlet_id={outlet_id}&token={SECRET_TOKEN}"
+    t = threading.Thread(target=_relay_loop, args=(ws_url, outlet_id), daemon=True)
+    t.start()
+    return ws_url
+
+
 # ── Firewall ───────────────────────────────────────────────────────────────────
 
 def _ensure_firewall_rule():
@@ -446,55 +525,44 @@ def main():
     local_ip = _local_ip()
     _ensure_firewall_rule()
 
-    server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
+    # ── Start WebSocket relay to backend ──────────────────────────────────────
+    relay_conf = _load_relay_conf()
+    relay_active = False
+    if relay_conf["backend_url"]:
+        _start_relay(relay_conf["backend_url"], relay_conf["outlet_id"])
+        relay_active = True
 
-    # Try mkcert first (proper trusted HTTPS), then fall back to HTTP
+    # ── Start local HTTPS server (fallback / direct mode) ─────────────────────
+    server = HTTPServer(("0.0.0.0", PORT), PrintBridgeHandler)
     ssl_ctx = None
     _setup_mkcert_https(local_ip)
     if os.path.exists(_CERT_FILE) and os.path.exists(_KEY_FILE):
         try:
             ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ssl_ctx.load_cert_chain(_CERT_FILE, _KEY_FILE)
-            try:
-                ssl_ctx.set_alpn_protocols(["http/1.1"])
-            except Exception:
-                pass
             server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
         except Exception as e:
             print(f"  [!] SSL load failed ({e}), falling back to HTTP")
             ssl_ctx = None
 
-    protocol = "https" if ssl_ctx else "http"
-    bridge_url = f"{protocol}://{local_ip}:{PORT}"
+    protocol  = "https" if ssl_ctx else "http"
+    local_url = f"{protocol}://{local_ip}:{PORT}"
 
     print("=" * 65)
-    print("  POSx Suite Local Print Bridge v2.0")
+    print("  POSx Suite Local Print Bridge v3.0")
     print("=" * 65)
-    print(f"  Protocol      : {'HTTPS (trusted)' if ssl_ctx else 'HTTP'}")
-    print(f"  Bridge URL    : {bridge_url}")
-    print(f"  -> Paste this into the POSx app Bridge URL field")
-    print()
-
-    if ssl_ctx:
-        ca_dir = _mkcert_caroot()
-        ca_path = os.path.join(ca_dir, "rootCA.pem") if ca_dir else ""
-        print("  ANDROID SETUP (one-time per device):")
-        print(f"  1. Copy this file to your Android device:")
-        print(f"     {ca_path or 'rootCA.pem (run mkcert -CAROOT to find it)'}")
-        print(f"     (USB, WhatsApp to yourself, email, Google Drive, etc.)")
-        print(f"  2. On Android: Settings -> Biometrics and security")
-        print(f"     -> Install from device storage -> CA certificate")
-        print(f"     -> select rootCA.pem")
-        print(f"  3. Done — works on ALL browsers, no warnings, no flags")
+    if relay_active:
+        print(f"  Relay Mode    : ENABLED")
+        print(f"  Backend URL   : {relay_conf['backend_url']}")
+        print(f"  Outlet ID     : {relay_conf['outlet_id']}")
+        print(f"  -> Connecting to backend... (check above for [Relay] Connected)")
+        print()
+        print("  Printing works from ANY browser on ANY device — no setup needed.")
     else:
-        print("  NO HTTPS: mkcert.exe not found in this folder.")
-        print("  Download from: github.com/FiloSottile/mkcert/releases")
-        print("  Place mkcert.exe here and restart to enable trusted HTTPS.")
-
-    print()
-    print(f"  Localhost URL : {protocol}://localhost:{PORT}")
-    print(f"  -> Use this if the app runs on this same PC")
+        print(f"  Relay Mode    : DISABLED (relay.conf not configured)")
+        print(f"  -> Edit relay.conf and set BACKEND_URL to enable relay mode.")
+        print()
+        print(f"  Local URL     : {local_url}")
     print()
     print("  Press Ctrl+C to stop")
     print("=" * 65)

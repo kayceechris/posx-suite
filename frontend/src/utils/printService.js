@@ -250,18 +250,35 @@ function buildKitchenBytes(data) {
   return b;
 }
 
-// ─── Local Network Access permission (Chrome 130+) ───────────────────────────
-async function requestLocalNetworkAccess() {
-  try {
-    if (navigator.permissions?.request) {
-      await navigator.permissions.request({ name: "local-network-access" });
-    }
-  } catch {
-    // Not supported or already decided — proceed anyway
-  }
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://posx-suite.onrender.com";
+
+function _authHeader() {
+  const token = localStorage.getItem("posx_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// ─── Bridge communication ─────────────────────────────────────────────────────
+// ─── Relay via backend WebSocket (permanent fix — no browser restrictions) ────
+async function sendViaRelay({ type = "network", printerIp, printerPort = 9100, printerName, bytes }) {
+  const user = JSON.parse(localStorage.getItem("posx_user") || "{}");
+  const outlet_id = user.outlet_id || "default";
+  const body = type === "usb"
+    ? { type: "usb", printer_name: printerName, data: bytes, outlet_id }
+    : { type: "network", ip: printerIp, port: printerPort, data: bytes, outlet_id };
+
+  const res = await fetch(`${BACKEND_URL}/api/print-relay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ..._authHeader() },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Relay error ${res.status}`);
+  }
+  return res.json();
+}
+
+// ─── Bridge communication (legacy direct mode) ────────────────────────────────
 async function sendToBridge({ bridgeUrl, printerIp, printerPort = 9100, bytes }) {
   const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
   const res = await fetch(`${bridgeUrl}/print`, {
@@ -393,22 +410,17 @@ export const printService = {
   /**
    * Test bridge connection. Returns true if reachable.
    */
-  async testBridge(bridgeUrl) {
+  async testBridge(_bridgeUrl) {
     try {
-      await requestLocalNetworkAccess();
-    } catch (e) {
-      // permission API unavailable — proceed
-    }
-    try {
-      const res = await fetch(`${bridgeUrl}/health`, {
-        signal: AbortSignal.timeout(5000),
-        targetAddressSpace: "private",
+      const res = await fetch(`${BACKEND_URL}/api/print-relay/status`, {
+        headers: _authHeader(),
+        signal: AbortSignal.timeout(8000),
       });
-      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+      if (!res.ok) return false;
       const data = await res.json();
-      return data.ok === true ? { ok: true } : { ok: false, error: "Unexpected response" };
-    } catch (err) {
-      return { ok: false, error: err.message || err.name || "Unknown error" };
+      return data.connected === true;
+    } catch {
+      return false;
     }
   },
 
@@ -433,10 +445,6 @@ export const printService = {
   },
 
   async _print(bytes, data, printerConfig, type) {
-    const bridgeUrl = (printerConfig.bridgeUrl
-      || localStorage.getItem("print_bridge_url") || "").trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
-
     let usbPrinter = printerConfig.printer || null;
     let networkPrinter = null;
     if (!usbPrinter) {
@@ -451,43 +459,27 @@ export const printService = {
     const printerIp   = printerConfig.ip   || networkPrinter?.ip_address || "";
     const printerPort = printerConfig.port || networkPrinter?.port || 9100;
 
+    // ── USB printer via relay ────────────────────────────────────────────────
     if (usbPrinter) {
-      if (!bridgeUrl) throw new Error("Set a Bridge URL in Terminal Settings → Printers");
       const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
       if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
-      const res = await fetch(`${bridgeUrl}/print-usb`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-        body: JSON.stringify({ printer_name: printerName, data: bytes }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (res.ok) return { success: true, method: "usb" };
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Bridge error ${res.status}`);
+      await sendViaRelay({ type: "usb", printerName, bytes });
+      return { success: true, method: "relay-usb" };
     }
 
-    // Network printer via bridge /print
-    let networkAttemptFailed = false;
+    // ── Network printer via relay ────────────────────────────────────────────
     if (printerIp) {
-      try {
-        await sendToBridge({ bridgeUrl, printerIp, printerPort, bytes });
-        return { success: true, method: "bridge" };
-      } catch (err) {
-        console.warn("[PrintService] Bridge failed:", err.message);
-        networkAttemptFailed = true;
-      }
+      await sendViaRelay({ type: "network", printerIp, printerPort, bytes });
+      return { success: true, method: "relay-network" };
     }
 
-    // If bridge URL is configured but printing failed → give accurate error
-    if (bridgeUrl) {
-      if (networkAttemptFailed) {
-        throw new Error("Cannot reach the print bridge — make sure the bridge app is running on your PC and the bridge URL is correct");
-      }
-      throw new Error("No printer configured for this terminal — open Terminal Settings → Printers tab to add a printer");
+    // ── No printer configured → browser fallback ─────────────────────────────
+    if (!printerIp && !usbPrinter) {
+      throw new Error("No printer configured — open Terminal Settings → Printers tab to add a printer");
     }
 
-    // Browser fallback (only when bridge is not configured at all)
-    console.warn("[PrintService] falling back to browser print — bridgeUrl empty");
+    // Browser fallback (only when no printer configured at all)
+    console.warn("[PrintService] falling back to browser print");
     if (type === "receipt") {
       browserPrint(receiptToHtml(data));
     } else {

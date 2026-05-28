@@ -1,42 +1,18 @@
 import React, { useState } from "react";
-import { Printer, Wifi, CheckCircle2, XCircle, Loader2, Save, X } from "lucide-react";
+import { Printer, Wifi, CheckCircle2, XCircle, Loader2, X } from "lucide-react";
 import { printService } from "../utils/printService";
 
 export default function PrintBridgeSettings({ onClose }) {
-  const [bridgeUrl,   setBridgeUrl]   = useState(() => localStorage.getItem("print_bridge_url")   || "");
-  const [bridgeToken, setBridgeToken] = useState(() => localStorage.getItem("print_bridge_token") || "posx-bridge-2025");
-  const [testing,     setTesting]     = useState(false);
-  const [status,      setStatus]      = useState(null); // null | "ok" | "fail"
-  const [saved,       setSaved]       = useState(false);
-
-  const [bridgeError, setBridgeError] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [status,  setStatus]  = useState(null); // null | "ok" | "fail"
 
   const testBridge = async () => {
     setTesting(true);
     setStatus(null);
-    setBridgeError(null);
-    const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    const result = await printService.testBridge(cleanUrl);
-    if (result?.ok) {
-      setStatus("ok");
-    } else {
-      setStatus("fail");
-      setBridgeError(result?.error || null);
-    }
+    const ok = await printService.testBridge();
+    setStatus(ok ? "ok" : "fail");
     setTesting(false);
   };
-
-  const save = () => {
-    const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    if (cleanUrl !== bridgeUrl) setBridgeUrl(cleanUrl);
-    localStorage.setItem("print_bridge_url",   cleanUrl);
-    localStorage.setItem("print_bridge_token", bridgeToken);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-500";
-  const LABEL = "block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5";
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-6 space-y-6">
@@ -58,59 +34,29 @@ export default function PrintBridgeSettings({ onClose }) {
 
       {/* How it works */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-800 dark:text-blue-300 space-y-1.5">
-        <p className="font-bold">How to set up:</p>
-        <p>1. Place <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">mkcert.exe</code> in the print-bridge folder, then double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code></p>
-        <p>2. Copy the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://</code> URL shown and paste it below</p>
-        <p>3. Click <strong>Save Settings</strong>, then <strong>Test Bridge</strong></p>
-        <p>4. Add printers in Terminal Settings → Printers tab</p>
-        <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-          <p><strong>Same PC as bridge?</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded font-bold">https://localhost:8765</code></p>
-          <p><strong>Tablet / phone?</strong> Use the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://</code> IP address shown in the bridge window</p>
-        </div>
-        <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
-          <p className="font-bold text-orange-700 dark:text-orange-400">Android one-time setup (per device):</p>
-          <p className="mt-1">1. Copy <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">rootCA.pem</code> from the PC to the device</p>
-          <p>2. Settings → Biometrics and security → Install from device storage → <strong>CA certificate</strong></p>
-          <p>3. Tap <strong>Test Bridge</strong> — Chrome will ask "Allow access to local network?" → tap <strong>Allow</strong></p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className={LABEL}>Bridge URL (PC running bridge.py)</label>
-          <input
-            className={INPUT}
-            value={bridgeUrl}
-            onChange={(e) => { setBridgeUrl(e.target.value); setStatus(null); }}
-            placeholder="https://192.168.1.10:8765"
-          />
-        </div>
-        <div>
-          <label className={LABEL}>Bridge Secret Token</label>
-          <input
-            className={INPUT}
-            value={bridgeToken}
-            onChange={(e) => setBridgeToken(e.target.value)}
-            placeholder="posx-bridge-2025"
-          />
-          <p className="text-xs text-gray-400 mt-1">Must match the SECRET_TOKEN in bridge.py</p>
+        <p className="font-bold text-sm">How to set up:</p>
+        <p>1. Double-click <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">start.bat</code> on the Windows PC — it connects automatically.</p>
+        <p>2. Tap <strong>Test Bridge</strong> below to confirm the connection.</p>
+        <p>3. Add printers in Terminal Settings → Printers tab.</p>
+        <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700 text-green-700 dark:text-green-400">
+          <p className="font-bold">✓ Works on all browsers and devices — no Chrome flags or cert setup needed.</p>
         </div>
       </div>
 
       {/* Status */}
       {status === "ok" && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">
-          <CheckCircle2 size={16} /> Bridge is reachable!
+          <CheckCircle2 size={16} /> Bridge is connected and ready!
         </div>
       )}
       {status === "fail" && (
         <div className="px-4 py-3 rounded-xl text-sm font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 space-y-1">
-          <div className="flex items-center gap-2"><XCircle size={16} /> Cannot reach bridge.</div>
-          {bridgeError && <div className="text-xs font-mono break-all opacity-80">{bridgeError}</div>}
+          <div className="flex items-center gap-2"><XCircle size={16} /> Bridge not connected.</div>
+          <div className="text-xs opacity-80">Make sure start.bat is running on the PC.</div>
         </div>
       )}
 
-      {/* Buttons */}
+      {/* Button */}
       <div className="flex flex-wrap gap-3">
         <button
           onClick={testBridge}
@@ -119,12 +65,6 @@ export default function PrintBridgeSettings({ onClose }) {
         >
           {testing ? <Loader2 size={15} className="animate-spin" /> : <Wifi size={15} />}
           {testing ? "Testing..." : "Test Bridge"}
-        </button>
-        <button
-          onClick={save}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors ml-auto"
-        >
-          {saved ? <><CheckCircle2 size={15} /> Saved!</> : <><Save size={15} /> Save Settings</>}
         </button>
       </div>
     </div>
