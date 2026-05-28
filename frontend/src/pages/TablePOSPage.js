@@ -520,9 +520,10 @@ export default function TablePOSPage() {
           printService.printKitchenTicket({
             tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
             orderNo: "",
+            waiterName: user?.name || "",
             items: items.map((i) => ({ name: i.product_name, quantity: i.quantity, note: i.note })),
             station: printer.name || "KITCHEN",
-          }, printerConfig).catch(console.warn);
+          }, printerConfig).catch((err) => showToast(`${printer.name} print failed: ${err.message}`, "error"));
         }
       } catch (_) {}
       setCart([]);

@@ -219,6 +219,7 @@ function buildKitchenBytes(data) {
     items = [],
     note = "",
     station = "KITCHEN",
+    waiterName = "",
   } = data;
 
   const b = [];
@@ -231,6 +232,7 @@ function buildKitchenBytes(data) {
   add(...CMD.SIZE_DOUBLE_H);
   if (tableName) line(`TABLE: ${tableName}`);
   add(...CMD.SIZE_NORMAL, ...CMD.BOLD_OFF);
+  if (waiterName) line(`Waiter: ${waiterName}`);
   line(`Order: ${orderNo}`);
   line(new Date().toLocaleTimeString());
   line(divider("="));
