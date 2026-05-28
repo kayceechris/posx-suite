@@ -454,7 +454,12 @@ def main():
     if os.path.exists(_CERT_FILE) and os.path.exists(_KEY_FILE):
         try:
             ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ssl_ctx.load_cert_chain(_CERT_FILE, _KEY_FILE)
+            try:
+                ssl_ctx.set_alpn_protocols(["http/1.1"])
+            except Exception:
+                pass
             server.socket = ssl_ctx.wrap_socket(server.socket, server_side=True)
         except Exception as e:
             print(f"  [!] SSL load failed ({e}), falling back to HTTP")

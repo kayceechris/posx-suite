@@ -402,6 +402,7 @@ export const printService = {
     try {
       const res = await fetch(`${bridgeUrl}/health`, {
         signal: AbortSignal.timeout(5000),
+        targetAddressSpace: "private",
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
       const data = await res.json();
