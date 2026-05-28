@@ -130,95 +130,77 @@ async def ping_printer(data: dict, current_user: User = Depends(get_current_user
 
 @router.post("/printers/{printer_id}/test")
 async def test_print(printer_id: str, current_user: User = Depends(get_current_user)):
-    """Send a test page to a saved printer."""
+    """Send a test page via the relay bridge."""
+    import json, uuid
+    from routes.print_relay import _bridges, _jobs
+
     printer = await db.printers.find_one({"id": printer_id}, {"_id": 0})
     if not printer:
         raise HTTPException(status_code=404, detail="Printer not found")
 
-    mode = printer.get("mode", "usb")
+    outlet_id = getattr(current_user, "outlet_id", None) or "default"
+    ws = _bridges.get(outlet_id) or _bridges.get("default") or next(iter(_bridges.values()), None)
+    if ws is None:
+        raise HTTPException(503, "Print bridge not connected — make sure bridge.py is running on the PC")
 
-    if mode == "network":
-        ip = (printer.get("ip_address") or "").strip()
-        port = int(printer.get("port") or 9100)
-        if not ip:
-            raise HTTPException(status_code=400, detail="Network printer has no IP address configured")
+    mode = printer.get("mode", "network")
+    pname = printer.get("name", "Printer")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        now = datetime.datetime.now().strftime("%Y-%m-%d  %H:%M:%S")
-        pname = printer.get("name", "Printer")
-        sep = b"-" * 32 + b"\n"
+    def _enc(s): return list(s.encode())
 
-        test_data = (
-            b"\x1b\x40"                          # ESC @ — initialize / reset
-            b"\x1b\x61\x01"                      # ESC a 1 — center align
-            b"\x1b\x21\x30"                      # ESC ! — double width + double height
-            b"TEST PRINT\n"
-            b"\x1b\x21\x00"                      # ESC ! — normal size
-            b"\x1b\x45\x01"                      # ESC E — bold on
-            b"Printer is working!\n"
-            b"\x1b\x45\x00"                      # ESC E — bold off
-            + sep +
-            b"\x1b\x61\x00"                      # ESC a 0 — left align
-            + f"Printer : {pname}\n".encode() +
-            f"Address : {ip}:{port}\n".encode() +
-            f"Time    : {now}\n".encode() +
-            sep +
-            b"\x1b\x61\x01"                      # center
-            b"** Connection OK **\n"
-            b"\n\n\n\n"
-            b"\x1d\x56\x42\x00"                  # GS V B 0 — feed and full cut
-        )
+    job_id = str(uuid.uuid4())
+    loop = asyncio.get_event_loop()
+    future = loop.create_future()
+    _jobs[job_id] = future
 
-        def _send():
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(8)
-            try:
-                s.connect((ip, port))
-                s.sendall(test_data)
-                s.shutdown(socket.SHUT_WR)
-            finally:
-                s.close()
-
-        try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, _send)
-            return {"success": True, "message": "Test page sent to printer"}
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Could not reach printer at {ip}:{port} — {e}")
-
-    elif mode == "usb":
-        if sys.platform != "win32":
-            raise HTTPException(status_code=400, detail="USB printing only supported on the Windows server")
-
-        win_name = (printer.get("windows_printer_name") or printer.get("name") or "").strip()
-        if not win_name:
-            raise HTTPException(
-                status_code=400,
-                detail="No Windows printer name configured. Edit the printer to set the system printer name.",
+    try:
+        if mode == "network":
+            ip = (printer.get("ip_address") or "").strip()
+            port = int(printer.get("port") or 9100)
+            if not ip:
+                raise HTTPException(400, "Network printer has no IP address configured")
+            test_bytes = list(
+                b"\x1b\x40" + b"\x1b\x61\x01" + b"\x1b\x21\x30"
+                + b"TEST PRINT\n" + b"\x1b\x21\x00" + b"\x1b\x45\x01"
+                + b"Printer is working!\n" + b"\x1b\x45\x00"
+                + b"-" * 32 + b"\n" + b"\x1b\x61\x00"
+                + f"Printer : {pname}\n".encode()
+                + f"Address : {ip}:{port}\n".encode()
+                + f"Time    : {now}\n".encode()
+                + b"-" * 32 + b"\n" + b"\x1b\x61\x01"
+                + b"** Connection OK **\n" + b"\n\n\n\n" + b"\x1d\x56\x42\x00"
             )
+            await ws.send_text(json.dumps({"type": "network", "ip": ip, "port": port, "data": test_bytes, "job_id": job_id}))
 
-        def _print_usb():
-            r = subprocess.run(
-                ["wmic", "printer", "where", f"Name='{win_name}'", "call", "PrintTestPage"],
-                capture_output=True, text=True, timeout=15,
-            )
-            ok = r.returncode == 0 or "ReturnValue = 0" in r.stdout
-            return ok, (r.stderr or r.stdout).strip()
+        elif mode == "usb":
+            win_name = (printer.get("windows_printer_name") or printer.get("name") or "").strip()
+            if not win_name:
+                raise HTTPException(400, "No Windows printer name configured — edit the printer to set the system printer name")
+            test_bytes = [
+                0x1b, 0x40, 0x1b, 0x61, 0x01, 0x1b, 0x21, 0x30,
+                *_enc("TEST PRINT\n"),
+                0x1b, 0x21, 0x00, 0x1b, 0x61, 0x00,
+                *_enc(f"Printer : {win_name}\n"),
+                *_enc(f"Time    : {now}\n"),
+                0x1b, 0x61, 0x01,
+                *_enc("** ESC/POS OK **\n"),
+                0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x41, 0x03,
+            ]
+            await ws.send_text(json.dumps({"type": "usb", "printer_name": win_name, "data": test_bytes, "job_id": job_id}))
 
-        try:
-            loop = asyncio.get_event_loop()
-            ok, detail = await loop.run_in_executor(None, _print_usb)
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=str(e))
+        else:
+            raise HTTPException(400, f"Unsupported printer mode: {mode}")
 
-        if ok:
-            return {"success": True, "message": "Test page sent to printer"}
-        raise HTTPException(status_code=502, detail=detail or "Printer not found or unavailable")
+        result = await asyncio.wait_for(asyncio.shield(future), timeout=15.0)
+        if not result.get("ok"):
+            raise HTTPException(502, result.get("error", "Print failed"))
+        return {"success": True, "message": "Test page sent to printer"}
 
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Test print is not supported for '{mode}' connection mode from the server.",
-        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Bridge timed out — check printer connection")
+    finally:
+        _jobs.pop(job_id, None)
 
 
 @router.get("/printers/assigned")
