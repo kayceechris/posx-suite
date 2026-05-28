@@ -5,6 +5,7 @@ import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { OfflineProvider } from "./context/OfflineContext";
 import OfflineBanner from "./components/OfflineBanner";
+import { useKeepAlive } from "./hooks/useKeepAlive";
 import SetupPage from "./pages/SetupPage";
 import LoginPage from "./pages/LoginPage";
 import HeldOrdersPage from "./pages/HeldOrdersPage";
@@ -18,6 +19,7 @@ import CustomerDisplayPage from "./pages/CustomerDisplayPage";
 function AppRoutes() {
   const { user } = useAuth();
   const { settings, loading } = useBusiness();
+  useKeepAlive();
 
   if (loading) {
     return (

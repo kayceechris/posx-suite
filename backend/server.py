@@ -27,6 +27,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+@app.get("/api/ping")
+async def ping():
+    return {"ok": True}
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
