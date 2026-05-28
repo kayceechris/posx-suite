@@ -319,6 +319,7 @@ export default function TablePOSPage() {
       return [...prev, {
         product_id: product.id,
         product_name: product.name,
+        category_id: product.category_id || "",
         quantity: 1,
         price: product.price,
         total: product.price,
@@ -472,18 +473,55 @@ export default function TablePOSPage() {
         await api.createOrder(buildOrderPayload("sent_to_kitchen", "pending"));
       }
       showToast("Order sent to kitchen!");
-      // Print kitchen tickets for only the new/additional items
+      // Route kitchen tickets to correct printers based on printer groups
       try {
-        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-        const kitchenPrinters = saved.filter((x) => x.type === "kitchen");
+        const saved  = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+        const groups = JSON.parse(localStorage.getItem("pos_printer_groups")  || "[]");
         const itemsToPrint = existingOrderId ? kitchenItems : cart;
-        for (const kp of kitchenPrinters) {
-          const printerConfig = kp.mode === "usb" ? { printer: kp } : { ip: kp.ip_address, port: kp.port || 9100 };
+        // All non-receipt printers (kitchen, bar, label, etc.)
+        const stationPrinters = saved.filter((x) => x.type !== "receipt");
+
+        // Build a map: printer.id → items[] using group routing
+        const tickets = new Map();
+        for (const item of itemsToPrint) {
+          let routed = false;
+          for (const printer of stationPrinters) {
+            const printerGroupIds = printer.printer_group_ids || [];
+            for (const gid of printerGroupIds) {
+              const group = groups.find((g) => g.id === gid);
+              if (!group) continue;
+              const productMatch  = (group.product_ids  || []).includes(item.product_id);
+              const categoryMatch = (group.category_ids || []).includes(item.category_id);
+              if (productMatch || categoryMatch) {
+                if (!tickets.has(printer.id)) tickets.set(printer.id, { printer, items: [] });
+                tickets.get(printer.id).items.push(item);
+                routed = true;
+                break;
+              }
+            }
+            if (routed) break;
+          }
+          // Fallback: send to kitchen-type printers, or all station printers if none
+          if (!routed) {
+            const fallback = stationPrinters.filter((p) => p.type === "kitchen");
+            const targets  = fallback.length > 0 ? fallback : stationPrinters;
+            for (const p of targets) {
+              if (!tickets.has(p.id)) tickets.set(p.id, { printer: p, items: [] });
+              tickets.get(p.id).items.push(item);
+            }
+          }
+        }
+
+        for (const { printer, items } of tickets.values()) {
+          if (!items.length) continue;
+          const printerConfig = printer.mode === "usb"
+            ? { printer }
+            : { ip: printer.ip_address, port: printer.port || 9100 };
           printService.printKitchenTicket({
             tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
             orderNo: "",
-            items: itemsToPrint.map((i) => ({ name: i.product_name, quantity: i.quantity })),
-            station: kp.name || "KITCHEN",
+            items: items.map((i) => ({ name: i.product_name, quantity: i.quantity, note: i.note })),
+            station: printer.name || "KITCHEN",
           }, printerConfig).catch(console.warn);
         }
       } catch (_) {}

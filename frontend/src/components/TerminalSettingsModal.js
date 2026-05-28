@@ -178,6 +178,7 @@ export default function TerminalSettingsModal({
         setSavedPrinters(printers);
         setPrinterGroups(groups);
         localStorage.setItem("pos_saved_printers", JSON.stringify(printers));
+        localStorage.setItem("pos_printer_groups", JSON.stringify(groups));
         _cacheUsbPrinterNames(printers);
       })
       .catch(console.error)

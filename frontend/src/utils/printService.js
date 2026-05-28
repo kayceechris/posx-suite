@@ -445,36 +445,41 @@ export const printService = {
   },
 
   async _print(bytes, data, printerConfig, type) {
-    let usbPrinter = printerConfig.printer || null;
-    let networkPrinter = null;
-    if (!usbPrinter) {
-      try {
-        const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
-        const matched = saved.filter((x) => x.type === type);
-        usbPrinter = matched.find((x) => x.mode === "usb") || null;
-        if (!usbPrinter) networkPrinter = matched.find((x) => x.mode === "network" && x.ip_address) || null;
-      } catch (_) {}
+    // ── Explicit printerConfig takes full priority ────────────────────────────
+    if (printerConfig.printer) {
+      const printerName = (printerConfig.printer.windows_printer_name || printerConfig.printer.name || "").trim();
+      if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
+      await sendViaRelay({ type: "usb", printerName, bytes });
+      return { success: true, method: "relay-usb" };
+    }
+    if (printerConfig.ip) {
+      await sendViaRelay({ type: "network", printerIp: printerConfig.ip, printerPort: printerConfig.port || 9100, bytes });
+      return { success: true, method: "relay-network" };
     }
 
-    const printerIp   = printerConfig.ip   || networkPrinter?.ip_address || "";
-    const printerPort = printerConfig.port || networkPrinter?.port || 9100;
+    // ── Auto-discover from localStorage (receipt prints / fallback) ───────────
+    let usbPrinter = null;
+    let networkPrinter = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem("pos_saved_printers") || "[]");
+      const matched = saved.filter((x) => x.type === type);
+      usbPrinter = matched.find((x) => x.mode === "usb") || null;
+      if (!usbPrinter) networkPrinter = matched.find((x) => x.mode === "network" && x.ip_address) || null;
+    } catch (_) {}
 
-    // ── USB printer via relay ────────────────────────────────────────────────
     if (usbPrinter) {
       const printerName = (usbPrinter.windows_printer_name || usbPrinter.name || "").trim();
       if (!printerName) throw new Error("USB printer has no system name — open Terminal Settings → Printers and edit it");
       await sendViaRelay({ type: "usb", printerName, bytes });
       return { success: true, method: "relay-usb" };
     }
-
-    // ── Network printer via relay ────────────────────────────────────────────
-    if (printerIp) {
-      await sendViaRelay({ type: "network", printerIp, printerPort, bytes });
+    if (networkPrinter) {
+      await sendViaRelay({ type: "network", printerIp: networkPrinter.ip_address, printerPort: networkPrinter.port || 9100, bytes });
       return { success: true, method: "relay-network" };
     }
 
     // ── No printer configured → browser fallback ─────────────────────────────
-    if (!printerIp && !usbPrinter) {
+    if (!usbPrinter && !networkPrinter) {
       throw new Error("No printer configured — open Terminal Settings → Printers tab to add a printer");
     }
 
