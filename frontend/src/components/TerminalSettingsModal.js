@@ -5,6 +5,8 @@ import { cn } from "../lib/utils";
 import MobilePrinterScanner from "./MobilePrinterScanner";
 import { useAuth } from "../context/AuthContext";
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://posx-suite.onrender.com";
+
 const TABS = ["Terminal", "Printers", "Display", "Peripherals"];
 
 const PRINTER_TYPES = ["receipt", "kitchen", "bar", "label"];
@@ -67,8 +69,6 @@ export default function TerminalSettingsModal({
   });
   const [pingStatus, setPingStatus] = useState(null); // null | "testing" | "ok" | "fail"
   const [pingError, setPingError]   = useState("");
-  const [bridgeUrlLocal, setBridgeUrlLocal] = useState(() => localStorage.getItem("print_bridge_url") || "");
-  const saveBridgeUrl = (url) => { const clean = url.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, ""); setBridgeUrlLocal(clean); localStorage.setItem("print_bridge_url", clean); };
 
   // Test print state per printer id: { status: "idle"|"loading"|"ok"|"error", msg: "" }
   const [testPrintState, setTestPrintState] = useState({});
@@ -201,26 +201,11 @@ export default function TerminalSettingsModal({
     }
   };
 
-  const openAddPrinter = async () => {
+  const openAddPrinter = () => {
     setShowAdd(true);
     setPrinterErr(""); setPingStatus(null); setPingError("");
     setPrinterForm((f) => ({ ...f, outlet_id: outlets[0]?.id || "", printer_group_ids: [] }));
-    if (!isAdmin) return;
-    setAddLoading(true);
-    try {
-      const bridgeUrl = localStorage.getItem("print_bridge_url") || "";
-      if (bridgeUrl) {
-        const res = await fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) });
-        const data = res.ok ? await res.json() : { printers: [] };
-        setWinPrinters(data.printers || []);
-      } else {
-        setWinPrinters([]);
-      }
-    } catch {
-      setWinPrinters([]);
-    } finally {
-      setAddLoading(false);
-    }
+    setWinPrinters([]);
   };
 
   const handleAddPrinter = async (e) => {
@@ -274,43 +259,35 @@ export default function TerminalSettingsModal({
     setTestPrintState((prev) => ({ ...prev, [printer.id]: { status: "loading", msg: "" } }));
     try {
       if (printer.mode === "usb") {
-        const bridgeUrl = (localStorage.getItem("print_bridge_url") || "").trim();
-        if (!bridgeUrl) {
-          throw new Error("Set a Bridge URL in printer settings to test USB printers");
-        }
-        const token = localStorage.getItem("print_bridge_token") || "posx-bridge-2025";
         const printerName = (printer.windows_printer_name || printer.name || "").trim();
-
-        // Build a minimal ESC/POS test receipt to verify raw printing end-to-end
+        const authToken = localStorage.getItem("posx_token");
+        const user = JSON.parse(localStorage.getItem("posx_user") || "{}");
+        const outlet_id = user.outlet_id || "default";
         const e = (s) => Array.from(new TextEncoder().encode(s));
         const testBytes = [
-          0x1b, 0x40,               // ESC @ init
-          0x1b, 0x61, 0x01,         // center
-          0x1b, 0x21, 0x30,         // double width+height
+          0x1b, 0x40,
+          0x1b, 0x61, 0x01,
+          0x1b, 0x21, 0x30,
           ...e("TEST PRINT\n"),
-          0x1b, 0x21, 0x00,         // normal
-          0x1b, 0x61, 0x00,         // left
+          0x1b, 0x21, 0x00,
+          0x1b, 0x61, 0x00,
           ...e(`Printer : ${printerName}\n`),
           ...e(`Time    : ${new Date().toLocaleString()}\n`),
           ...e("--------------------------------\n"),
           0x1b, 0x61, 0x01,
           ...e("** ESC/POS OK **\n"),
           0x0a, 0x0a, 0x0a,
-          0x1d, 0x56, 0x41, 0x03,   // cut
+          0x1d, 0x56, 0x41, 0x03,
         ];
-
-        const res = await fetch(`${bridgeUrl}/print-usb`, {
+        const res = await fetch(`${BACKEND_URL}/api/print-relay`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Bridge-Token": token },
-          body: JSON.stringify({ printer_name: printerName, data: testBytes }),
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
+          body: JSON.stringify({ type: "usb", printer_name: printerName, data: testBytes, outlet_id }),
           signal: AbortSignal.timeout(15000),
         });
         if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error("Bridge is outdated — stop and restart bridge.py, then try again");
-          }
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || `Bridge error ${res.status}`);
+          throw new Error(data.detail || `Bridge error ${res.status}`);
         }
       } else {
         await api.testPrint(printer.id);
@@ -323,18 +300,10 @@ export default function TerminalSettingsModal({
     }
   };
 
-  const handleStartEdit = async (printer) => {
+  const handleStartEdit = (printer) => {
     setEditingPrinterId(printer.id);
     setEditWinName(printer.windows_printer_name || printer.name || "");
     setEditWinPrinters([]);
-    const bridgeUrl = (localStorage.getItem("print_bridge_url") || "").trim();
-    if (bridgeUrl) {
-      try {
-        const res = await fetch(`${bridgeUrl}/printers`, { signal: AbortSignal.timeout(3000) });
-        const data = res.ok ? await res.json() : { printers: [] };
-        setEditWinPrinters(data.printers || []);
-      } catch { /* bridge not reachable */ }
-    }
   };
 
   const handleSavePrinterName = async (printerId) => {
@@ -543,31 +512,7 @@ export default function TerminalSettingsModal({
                       </div>
                     )}
 
-                    {/* Bridge URL (needed for WiFi scanning) */}
-                    {printerForm.mode === "network" && (
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block">
-                          Bridge URL <span className="font-normal text-gray-400">(bridge.py on your PC)</span>
-                        </label>
-                        <input
-                          type="url"
-                          value={bridgeUrlLocal}
-                          onChange={(e) => saveBridgeUrl(e.target.value)}
-                          placeholder="http://192.168.1.10:8765"
-                          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-400"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">Run bridge.py on a Windows PC on the same Wi-Fi. Required for WiFi scanning.</p>
-                      </div>
-                    )}
-
-                    {/* Scanner -- always shown when connection mode matches */}
-                    {printerForm.mode === "network" && (
-                      <MobilePrinterScanner
-                        mode="wifi"
-                        forceShow={true}
-                        onSelectWifi={(ip) => { setPrinterForm((f) => ({ ...f, ip_address: ip })); setPingStatus(null); }}
-                      />
-                    )}
+                    {/* Scanner -- bluetooth only */}
                     {printerForm.mode === "bluetooth" && (
                       <MobilePrinterScanner
                         mode="bluetooth"
