@@ -65,6 +65,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return User(**user)
 
 
+def has_perm(user: User, *permissions: str) -> bool:
+    """True if user is admin/manager by role, OR has any of the given permissions."""
+    if user.role.lower() in ("admin", "manager"):
+        return True
+    user_perms = user.permissions or []
+    return any(p in user_perms for p in permissions)
+
+
 async def check_permission(user: User, resource: str, action: str):
     """Helper function to check if user has permission"""
     if user.role == "admin":

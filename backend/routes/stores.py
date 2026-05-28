@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from database import db
 from models import Store, StoreCreate, User
-from auth import get_current_user
+from auth import get_current_user, has_perm
 
 router = APIRouter(prefix="/api")
 
@@ -42,7 +42,7 @@ async def get_stores(current_user: User = Depends(get_current_user)):
 
 @router.post("/stores")
 async def create_store(data: StoreCreate, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["admin", "manager"]:
+    if not has_perm(current_user, "create_store"):
         raise HTTPException(403, "Not authorized")
     store = Store(
         id=_make_store_key(data.name),
@@ -59,7 +59,7 @@ async def create_store(data: StoreCreate, current_user: User = Depends(get_curre
 
 @router.put("/stores/{store_id}")
 async def update_store(store_id: str, data: dict, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["admin", "manager"]:
+    if not has_perm(current_user, "edit_store"):
         raise HTTPException(403, "Not authorized")
     existing = await db.stores.find_one({"id": store_id}, {"_id": 0})
     if not existing:
@@ -78,7 +78,7 @@ async def update_store(store_id: str, data: dict, current_user: User = Depends(g
 
 @router.delete("/stores/{store_id}")
 async def delete_store(store_id: str, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["admin", "manager"]:
+    if not has_perm(current_user, "delete_store"):
         raise HTTPException(403, "Not authorized")
     existing = await db.stores.find_one({"id": store_id}, {"_id": 0})
     if not existing:

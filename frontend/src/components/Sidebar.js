@@ -161,7 +161,7 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
               <p className="text-white font-bold text-sm leading-tight truncate">
                 {settings?.business_name || "POSx Suite"}
               </p>
-              <p className="text-gray-500 text-[11px] mt-0.5">POS Station</p>
+              <p className="text-gray-500 text-[11px] mt-0.5 truncate">{user?.name || "POS Station"}</p>
             </div>
             <button
               onClick={toggleCollapse}

@@ -3,14 +3,14 @@ from typing import List
 
 from database import db
 from models import User, UserCreate
-from auth import get_current_user, hash_pincode, verify_pincode
+from auth import get_current_user, hash_pincode, verify_pincode, has_perm
 
 router = APIRouter(prefix="/api")
 
 
 @router.get("/users", response_model=List[User])
 async def get_users(current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["admin", "manager"]:
+    if not has_perm(current_user, "view_users", "manage_users"):
         raise HTTPException(status_code=403, detail="Not authorized")
     users = await db.users.find({}, {"_id": 0}).to_list(1000)
     return [User(**u) for u in users]
@@ -18,7 +18,7 @@ async def get_users(current_user: User = Depends(get_current_user)):
 
 @router.post("/users", response_model=User)
 async def create_user(user_data: UserCreate, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if not has_perm(current_user, "manage_users"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     existing_users = await db.users.find({}, {"_id": 0}).to_list(1000)
@@ -36,7 +36,7 @@ async def create_user(user_data: UserCreate, current_user: User = Depends(get_cu
 
 @router.put("/users/{user_id}", response_model=User)
 async def update_user(user_id: str, user_data: dict, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if not has_perm(current_user, "manage_users"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     existing = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -54,7 +54,7 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
 
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if not has_perm(current_user, "manage_users"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     result = await db.users.delete_one({"id": user_id})

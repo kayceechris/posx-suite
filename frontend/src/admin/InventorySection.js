@@ -2379,8 +2379,8 @@ export default function InventorySection({ view = "stock" }) {
   const perms = user?.permissions || [];
   const can = (p) => isPrivileged || perms.includes(p);
 
-  if (view === "main-store")     return can("update_stock")             ? <MainStoreView />     : <AccessDenied label="Main Store" />;
-  if (view === "stores")         return can("update_stock")             ? <StoresView />        : <AccessDenied label="Store Management" />;
+  if (view === "main-store")     return can("view_stores")              ? <MainStoreView />     : <AccessDenied label="Main Store" />;
+  if (view === "stores")         return can("view_stores")              ? <StoresView />        : <AccessDenied label="Store Management" />;
   if (view === "stock-count")    return can("update_stock")             ? <StockCountView />    : <AccessDenied label="Stock Count" />;
   if (view === "update-stock")   return can("update_stock")             ? <UpdateStockView />   : <AccessDenied label="Update Stock" />;
   if (view === "transfer-stock") return can("transfer_stock")           ? <TransferStockView /> : <AccessDenied label="Transfer Stock" />;
