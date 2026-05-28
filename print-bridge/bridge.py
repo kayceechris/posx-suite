@@ -324,6 +324,17 @@ def _handle_relay_job(ws, message):
     job_id  = job.get("job_id", "")
     jtype   = job.get("type", "network")
     try:
+        if jtype == "ping":
+            ip   = job.get("ip", "")
+            port = int(job.get("port", 9100))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            result = sock.connect_ex((ip, port))
+            sock.close()
+            ok = result == 0
+            ws.send(json.dumps({"job_id": job_id, "ok": ok, "error": None if ok else f"Cannot reach {ip}:{port}"}))
+            print(f"  [Relay] Ping {ip}:{port} → {'OK' if ok else 'FAIL'}")
+            return
         if jtype == "usb":
             printer_name = job.get("printer_name", "").strip()
             data = bytes(job.get("data", []))

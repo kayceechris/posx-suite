@@ -99,27 +99,33 @@ async def delete_printer(printer_id: str, current_user: User = Depends(get_curre
 
 @router.post("/printers/ping")
 async def ping_printer(data: dict, current_user: User = Depends(get_current_user)):
-    """Test whether a network printer at ip:port is reachable."""
+    """Test whether a network printer is reachable — routed through the local bridge relay."""
+    import json, uuid
+    from routes.print_relay import _bridges, _jobs
+
     ip = (data.get("ip_address") or "").strip()
     port = int(data.get("port") or 9100)
     if not ip:
         raise HTTPException(status_code=400, detail="ip_address required")
 
-    def _check():
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(3)
-        try:
-            result = sock.connect_ex((ip, port))
-            return result == 0
-        finally:
-            sock.close()
+    outlet_id = getattr(current_user, "outlet_id", None) or "default"
+    ws = _bridges.get(outlet_id) or _bridges.get("default") or next(iter(_bridges.values()), None)
 
+    if ws is None:
+        return {"reachable": False, "error": "Print bridge not connected — make sure bridge.py is running on the PC"}
+
+    job_id = str(uuid.uuid4())
+    loop = asyncio.get_event_loop()
+    future = loop.create_future()
+    _jobs[job_id] = future
     try:
-        loop = asyncio.get_event_loop()
-        reachable = await loop.run_in_executor(None, _check)
-        return {"reachable": reachable, "ip": ip, "port": port}
-    except Exception as e:
-        return {"reachable": False, "error": str(e)}
+        await ws.send_text(json.dumps({"type": "ping", "ip": ip, "port": port, "job_id": job_id}))
+        result = await asyncio.wait_for(asyncio.shield(future), timeout=8.0)
+        return {"reachable": result.get("ok", False), "ip": ip, "port": port, "error": result.get("error")}
+    except asyncio.TimeoutError:
+        return {"reachable": False, "error": "Bridge timed out testing printer"}
+    finally:
+        _jobs.pop(job_id, None)
 
 
 @router.post("/printers/{printer_id}/test")
