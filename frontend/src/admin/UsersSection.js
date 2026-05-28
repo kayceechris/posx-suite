@@ -270,8 +270,8 @@ function UserList() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getUsers(), api.getOutlets()])
-      .then(([u, o]) => { setUsers(u); setOutlets(o); setUserTypes(loadStoredTypes()); })
+    Promise.all([api.getUsers(), api.getOutlets(), api.getUserTypes().catch(() => [])])
+      .then(([u, o, ut]) => { setUsers(u); setOutlets(o); setUserTypes(ut); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -282,8 +282,9 @@ function UserList() {
 
   const fetchUserTypes = () => {
     setUserTypesErr("");
-    // User types are stored in localStorage by the User Types page
-    setUserTypes(loadStoredTypes());
+    api.getUserTypes()
+      .then(setUserTypes)
+      .catch((e) => { setUserTypesErr(e.message); });
   };
 
   const openAdd = () => {
@@ -490,7 +491,15 @@ function UserList() {
                 <div className="relative">
                   <select
                     value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    onChange={(e) => {
+                      const newRole = e.target.value;
+                      const customType = userTypes.find((ut) => ut.name.toLowerCase() === newRole);
+                      setForm((prev) => ({
+                        ...prev,
+                        role: newRole,
+                        permissions: customType ? customType.permissions : prev.permissions,
+                      }));
+                    }}
                     className="w-full px-3 py-2.5 border-2 border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-900 appearance-none"
                   >
                     <optgroup label="Base Roles">
@@ -682,11 +691,15 @@ function CreateUserTypeModal({ onClose, onSave }) {
     e.preventDefault();
     if (!name.trim()) { setError("Type name is required."); return; }
     setSaving(true);
-    const newType = { id: Date.now().toString(), name: name.trim(), permissions: selectedPerms, createdAt: new Date().toISOString() };
-    const existing = loadStoredTypes();
-    saveStoredTypes([...existing, newType]);
-    onSave();
-    onClose();
+    try {
+      await api.createUserType({ name: name.trim(), permissions: selectedPerms });
+      onSave();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -739,16 +752,20 @@ function CreateUserTypeModal({ onClose, onSave }) {
 
 function UserTypes() {
   const [types, setTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = () => setTypes(loadStoredTypes());
+  const load = () => {
+    setLoading(true);
+    api.getUserTypes().then(setTypes).catch(() => {}).finally(() => setLoading(false));
+  };
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Delete this user type?")) return;
-    saveStoredTypes(loadStoredTypes().filter((t) => t.id !== id));
-    load();
+    try { await api.deleteUserType(id); load(); }
+    catch (e) { alert(e.message); }
   };
 
   return (

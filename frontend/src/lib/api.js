@@ -138,6 +138,9 @@ export const api = {
   // Users
   getUsers: () => request("/api/users"),
   getUserTypes: () => request("/api/user-types"),
+  createUserType: (data) => request("/api/user-types", { method: "POST", body: JSON.stringify(data) }),
+  updateUserType: (id, data) => request(`/api/user-types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteUserType: (id) => request(`/api/user-types/${id}`, { method: "DELETE" }),
   createUser: (data) =>
     request("/api/users", { method: "POST", body: JSON.stringify(data) }),
   updateUser: (id, data) =>
