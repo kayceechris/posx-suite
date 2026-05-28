@@ -666,9 +666,9 @@ function PermissionModule({ mod, selected, onToggleModule, onTogglePermission, e
   );
 }
 
-function CreateUserTypeModal({ onClose, onSave }) {
-  const [name, setName] = useState("");
-  const [selectedPerms, setSelectedPerms] = useState([]);
+function CreateUserTypeModal({ onClose, onSave, editType = null }) {
+  const [name, setName] = useState(editType?.name || "");
+  const [selectedPerms, setSelectedPerms] = useState(editType?.permissions || []);
   const [expandedMods, setExpandedMods] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -692,7 +692,11 @@ function CreateUserTypeModal({ onClose, onSave }) {
     if (!name.trim()) { setError("Type name is required."); return; }
     setSaving(true);
     try {
-      await api.createUserType({ name: name.trim(), permissions: selectedPerms });
+      if (editType) {
+        await api.updateUserType(editType.id, { name: name.trim(), permissions: selectedPerms });
+      } else {
+        await api.createUserType({ name: name.trim(), permissions: selectedPerms });
+      }
       onSave();
       onClose();
     } catch (err) {
@@ -703,7 +707,7 @@ function CreateUserTypeModal({ onClose, onSave }) {
   };
 
   return (
-    <Modal title="Create User Type" onClose={onClose} wide>
+    <Modal title={editType ? "Edit User Type" : "Create User Type"} onClose={onClose} wide>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Type Name</label>
@@ -742,7 +746,7 @@ function CreateUserTypeModal({ onClose, onSave }) {
           </button>
           <button type="submit" disabled={saving}
             className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving ? "Creating…" : "Create User Type"}
+            {saving ? "Saving…" : editType ? "Save Changes" : "Create User Type"}
           </button>
         </div>
       </form>
@@ -754,6 +758,7 @@ function UserTypes() {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editType, setEditType] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -799,13 +804,18 @@ function UserTypes() {
             return (
               <div key={type.id} className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-700 p-4 shadow-sm">
                 <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-bold text-gray-900 dark:text-white text-base">{type.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 dark:text-white text-base truncate">{type.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{type.permissions.length} of {totalPerms} permissions</p>
                   </div>
-                  <button onClick={() => handleDelete(type.id)} className="text-gray-300 hover:text-red-500 transition-colors ml-2 flex-shrink-0">
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button onClick={() => setEditType(type)} className="text-gray-400 hover:text-blue-500 transition-colors p-1" title="Edit">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(type.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1" title="Delete">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {PERMISSION_MODULES.map((mod) => {
@@ -825,6 +835,7 @@ function UserTypes() {
       )}
 
       {showCreate && <CreateUserTypeModal onClose={() => setShowCreate(false)} onSave={load} />}
+      {editType && <CreateUserTypeModal onClose={() => setEditType(null)} onSave={load} editType={editType} />}
     </div>
   );
 }
