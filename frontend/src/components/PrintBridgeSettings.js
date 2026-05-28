@@ -9,12 +9,20 @@ export default function PrintBridgeSettings({ onClose }) {
   const [status,      setStatus]      = useState(null); // null | "ok" | "fail"
   const [saved,       setSaved]       = useState(false);
 
+  const [bridgeError, setBridgeError] = useState(null);
+
   const testBridge = async () => {
     setTesting(true);
     setStatus(null);
+    setBridgeError(null);
     const cleanUrl = bridgeUrl.trim().replace(/[).,\s]+$/, "").replace(/\/+$/, "");
-    const ok = await printService.testBridge(cleanUrl);
-    setStatus(ok ? "ok" : "fail");
+    const result = await printService.testBridge(cleanUrl);
+    if (result?.ok) {
+      setStatus("ok");
+    } else {
+      setStatus("fail");
+      setBridgeError(result?.error || null);
+    }
     setTesting(false);
   };
 
@@ -96,8 +104,9 @@ export default function PrintBridgeSettings({ onClose }) {
         </div>
       )}
       {status === "fail" && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
-          <XCircle size={16} /> Cannot reach bridge. Check the URL and that bridge.py is running.
+        <div className="px-4 py-3 rounded-xl text-sm font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 space-y-1">
+          <div className="flex items-center gap-2"><XCircle size={16} /> Cannot reach bridge.</div>
+          {bridgeError && <div className="text-xs font-mono break-all opacity-80">{bridgeError}</div>}
         </div>
       )}
 

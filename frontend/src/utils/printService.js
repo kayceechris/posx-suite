@@ -396,14 +396,18 @@ export const printService = {
   async testBridge(bridgeUrl) {
     try {
       await requestLocalNetworkAccess();
+    } catch (e) {
+      // permission API unavailable — proceed
+    }
+    try {
       const res = await fetch(`${bridgeUrl}/health`, {
         signal: AbortSignal.timeout(5000),
       });
-      if (!res.ok) return false;
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
       const data = await res.json();
-      return data.ok === true;
-    } catch {
-      return false;
+      return data.ok === true ? { ok: true } : { ok: false, error: "Unexpected response" };
+    } catch (err) {
+      return { ok: false, error: err.message || err.name || "Unknown error" };
     }
   },
 
