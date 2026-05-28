@@ -262,33 +262,37 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
         )}
       </button>
 
-      {/* Release + Transfer buttons */}
+      {/* Release + Transfer + Merge buttons */}
       {showActions && (
-        <div className="flex gap-2 w-full mt-1">
-          {canRelease && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onRelease(entity); }}
-              className="flex-1 py-1.5 rounded-xl border-2 border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-            >
-              Release
-            </button>
-          )}
-          {canTransfer && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onTransfer(entity); }}
-              className="flex-1 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-1"
-            >
-              <ArrowLeftRight size={11} />
-              <span className="truncate">Move</span>
-            </button>
+        <div className="flex flex-col gap-1.5 w-full mt-1">
+          {(canRelease || canTransfer) && (
+            <div className="flex gap-2">
+              {canRelease && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRelease(entity); }}
+                  className="flex-1 py-1.5 rounded-xl border-2 border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                >
+                  Release
+                </button>
+              )}
+              {canTransfer && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTransfer(entity); }}
+                  className="flex-1 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-1"
+                >
+                  <ArrowLeftRight size={11} />
+                  <span className="truncate">Move</span>
+                </button>
+              )}
+            </div>
           )}
           {canMerge && (
             <button
               onClick={(e) => { e.stopPropagation(); onMerge(entity); }}
-              className="flex-1 py-1.5 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-1"
+              className="w-full py-1.5 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-1"
             >
               <GitMerge size={11} />
-              <span className="truncate">Merge</span>
+              <span>Merge with another table</span>
             </button>
           )}
         </div>
