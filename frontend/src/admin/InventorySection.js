@@ -8,6 +8,7 @@ import {
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import { useAuth } from "../context/AuthContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import ExportBtn from "../components/ExportBtn";
 import { downloadCSV, printReport } from "../lib/export";
 
@@ -1666,12 +1667,18 @@ function ConsolidatedView() {
 
 const _EMPTY_RECEIVE_ITEM = { ingredientId: "", newName: "", received: "", minQty: "10", batchNumber: "", expiryDate: "", unit: "pcs" };
 
-function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onReceived }) {
+function ReceiveStockModal({ mode = "ingredient", catalog, ingredients, outlets, initialOutletId, onClose, onReceived }) {
+  // Accept either `catalog` (new) or `ingredients` (legacy) as the source list
+  const initialCatalog = catalog || ingredients || [];
+  const isProductMode = mode === "product";
+  const SUBJECT = isProductMode ? "Product" : "Ingredient";
+  const SUBJECT_FIELD = isProductMode ? "product_id" : "ingredient_id";
+
   const [outletId, setOutletId] = useState(initialOutletId || outlets[0]?.id || "");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([{ ..._EMPTY_RECEIVE_ITEM }]);
   const [currentStock, setCurrentStock] = useState([]);
-  const [allIngredients, setAllIngredients] = useState(ingredients || []);
+  const [allCatalog, setAllCatalog] = useState(initialCatalog);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1680,31 +1687,32 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
     api.getStock(outletId, "main").then(setCurrentStock).catch(console.error);
   }, [outletId]); // eslint-disable-line
 
-  useEffect(() => { setAllIngredients(ingredients || []); }, [ingredients]);
+  useEffect(() => { setAllCatalog(catalog || ingredients || []); }, [catalog, ingredients]);
 
-  const stockFor = (iid) => currentStock.find((x) => x.ingredient_id === iid);
-  const currentQty = (iid) => Number(stockFor(iid)?.quantity || 0);
+  const stockFor = (id) => currentStock.find((x) => x[SUBJECT_FIELD] === id);
+  const currentQty = (id) => Number(stockFor(id)?.quantity || 0);
 
-  const filteredIngredients = allIngredients.filter(
-    (p) => !search || p.name.toLowerCase().includes(search.toLowerCase())
+  const filteredCatalog = allCatalog.filter(
+    (p) => !search || (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const setField = (idx, key, val) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
 
-  const handleIngredientChange = (idx, val) => {
-    if (val === "__new__") {
+  const handleSubjectChange = (idx, val) => {
+    // "__new__" only applies in ingredient mode — products must be created in Products section
+    if (val === "__new__" && !isProductMode) {
       setItems((prev) => prev.map((it, i) => i !== idx ? it : { ...it, ingredientId: "__new__", newName: "", minQty: "10" }));
       return;
     }
-    const s = currentStock.find((x) => x.ingredient_id === val);
-    const ing = allIngredients.find((x) => x.id === val);
+    const s = currentStock.find((x) => x[SUBJECT_FIELD] === val);
+    const cat = allCatalog.find((x) => x.id === val);
     setItems((prev) => prev.map((it, i) => i !== idx ? it : {
       ...it,
       ingredientId: val,
       newName: "",
       minQty: s?.min_quantity ? String(s.min_quantity) : "10",
-      unit: ing?.unit || "pcs",
+      unit: cat?.unit || (isProductMode ? "" : "pcs"),
     }));
   };
 
@@ -1714,30 +1722,30 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
   const handleSubmit = async (e) => {
     e.preventDefault();
     const valid = items.filter((it) =>
-      (it.ingredientId && it.ingredientId !== "__new__" || (it.ingredientId === "__new__" && it.newName.trim()))
+      ((it.ingredientId && it.ingredientId !== "__new__") || (it.ingredientId === "__new__" && it.newName.trim()))
       && parseFloat(it.received) > 0
     );
     if (!valid.length) { setError("Add at least one item with a valid quantity."); return; }
     setSaving(true); setError("");
     try {
       for (const it of valid) {
-        let iid = it.ingredientId;
-        // Auto-create new ingredients on the fly
-        if (iid === "__new__") {
+        let id = it.ingredientId;
+        // Auto-create new ingredients on the fly (ingredient mode only)
+        if (id === "__new__" && !isProductMode) {
           const created = await api.createIngredient({
             name: it.newName.trim(),
             unit: it.unit || "pcs",
             cost_price: 0,
             active: true,
           });
-          iid = created.id;
-          setAllIngredients((prev) => [...prev, created]);
+          id = created.id;
+          setAllCatalog((prev) => [...prev, created]);
         }
         await api.updateStock({
-          ingredient_id: iid,
+          [SUBJECT_FIELD]: id,
           outlet_id: outletId,
           store: "main",
-          quantity: currentQty(iid) + parseFloat(it.received),
+          quantity: currentQty(id) + parseFloat(it.received),
           min_quantity: parseFloat(it.minQty) || 10,
           batch_number: it.batchNumber || null,
           expiry_date: it.expiryDate || null,
@@ -1762,10 +1770,10 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* Controls row */}
           <div className="px-6 pt-4 pb-3 flex-shrink-0">
-            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Search Product</label>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Search {SUBJECT}</label>
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter products…"
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Filter ${SUBJECT.toLowerCase()}s…`}
                 className="w-full pl-8 pr-3 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none" />
             </div>
           </div>
@@ -1775,7 +1783,7 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
             <table className="w-full min-w-[760px] text-sm">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left py-2 pr-3 min-w-[240px]">Ingredient</th>
+                  <th className="text-left py-2 pr-3 min-w-[240px]">{SUBJECT}</th>
                   <th className="text-center py-2 px-3 w-24">Current</th>
                   <th className="text-center py-2 px-3 w-28">+ Receive</th>
                   <th className="text-center py-2 px-3 w-24">New Total</th>
@@ -1799,7 +1807,7 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
                               autoFocus
                               value={item.newName}
                               onChange={(e) => setField(idx, "newName", e.target.value)}
-                              placeholder="New ingredient name…"
+                              placeholder={`New ${SUBJECT.toLowerCase()} name…`}
                               className="flex-1 px-2 py-1.5 border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-white rounded-lg text-sm focus:outline-none"
                             />
                             <select
@@ -1811,11 +1819,11 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
                             </select>
                           </div>
                         ) : (
-                          <select value={item.ingredientId} onChange={(e) => handleIngredientChange(idx, e.target.value)}
+                          <select value={item.ingredientId} onChange={(e) => handleSubjectChange(idx, e.target.value)}
                             className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500">
-                            <option value="">Select ingredient…</option>
-                            {filteredIngredients.map((p) => <option key={p.id} value={p.id}>{p.name}{p.unit ? ` (${p.unit})` : ""}</option>)}
-                            <option value="__new__">+ Add new ingredient</option>
+                            <option value="">Select {SUBJECT.toLowerCase()}…</option>
+                            {filteredCatalog.map((p) => <option key={p.id} value={p.id}>{p.name}{p.unit ? ` (${p.unit})` : ""}</option>)}
+                            {!isProductMode && <option value="__new__">+ Add new ingredient</option>}
                           </select>
                         )}
                       </td>
@@ -1892,7 +1900,9 @@ function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onR
 
 // ─── Import CSV Modal ─────────────────────────────────────────────────────────
 
-function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
+function ImportCsvModal({ outletId, outletName, mode = "ingredient", onClose, onImported }) {
+  const isProductMode = mode === "product";
+  const SUBJECT = isProductMode ? "Product" : "Ingredient";
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);
   const [result, setResult] = useState(null);
@@ -1900,11 +1910,14 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
   const fileRef = useRef(null);
 
   const downloadTemplate = () => {
-    const csv = "name,quantity,min_quantity,unit,category,cost_price,batch_number,expiry_date\nBasmati rice,100,20,kg,Grains,800,,\nTomato paste,50,10,pcs,Sauces,500,BATCH001,2026-12-31\n";
+    const csv = isProductMode
+      ? "name,quantity,min_quantity,batch_number,expiry_date\nCoca-Cola 500ml,100,20,,\nBread loaf,50,10,BATCH001,2026-12-31\n"
+      : "name,quantity,min_quantity,unit,category,cost_price,batch_number,expiry_date\nBasmati rice,100,20,kg,Grains,800,,\nTomato paste,50,10,pcs,Sauces,500,BATCH001,2026-12-31\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "main_store_ingredients_template.csv";
+    a.href = url;
+    a.download = isProductMode ? "main_store_products_template.csv" : "main_store_ingredients_template.csv";
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
@@ -1931,7 +1944,7 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
     if (!file || !outletId) return;
     setLoading(true);
     try {
-      const res = await api.importStockCsv(outletId, "main", file);
+      const res = await api.importStockCsv(outletId, "main", file, mode);
       setResult(res);
       onImported?.();
     } catch (err) {
@@ -1956,9 +1969,18 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
 
         <div className="p-6 space-y-5">
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300 space-y-1">
-            <p className="font-semibold">CSV Format</p>
-            <p className="font-mono text-xs">name, quantity, min_quantity, unit (opt), category (opt), cost_price (opt), batch_number (opt), expiry_date (opt)</p>
-            <p className="text-xs opacity-80 mt-1">New ingredients will be auto-created in your catalog.</p>
+            <p className="font-semibold">CSV Format ({SUBJECT} mode)</p>
+            {isProductMode ? (
+              <>
+                <p className="font-mono text-xs">name, quantity, min_quantity, batch_number (opt), expiry_date (opt)</p>
+                <p className="text-xs opacity-80 mt-1">Rows are matched to existing products by name. Create products in <strong>Products → All Products</strong> first.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-mono text-xs">name, quantity, min_quantity, unit (opt), category (opt), cost_price (opt), batch_number (opt), expiry_date (opt)</p>
+                <p className="text-xs opacity-80 mt-1">New ingredients will be auto-created in your catalog.</p>
+              </>
+            )}
             <button onClick={downloadTemplate} className="mt-2 text-xs font-bold underline hover:no-underline">
               Download template CSV
             </button>
@@ -2049,8 +2071,13 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
 // ─── Main Store View ──────────────────────────────────────────────────────────
 
 function MainStoreView() {
+  const businessConfig = useBusinessConfig();
+  const isProductMode = businessConfig.stockMode === "product";
+  const SUBJECT_LABEL = isProductMode ? "Product" : "Ingredient";
+  const SUBJECT_LABEL_PLURAL = isProductMode ? "Products" : "Ingredients";
+
   const [stock, setStock] = useState([]);
-  const [ingredients, setIngredients] = useState([]);
+  const [catalog, setCatalog] = useState([]);   // ingredients OR products
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [outletId, setOutletId] = useState("");
@@ -2060,31 +2087,30 @@ function MainStoreView() {
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
 
+  const loadCatalog = () => isProductMode ? api.getProducts() : api.getIngredients();
+
   const loadStock = () => {
     setLoading(true);
-    Promise.all([
-      api.getStock(null, "main"),
-      api.getIngredients().catch(() => []),
-    ])
-      .then(([s, ings]) => { setStock(s); setIngredients(ings); })
+    Promise.all([api.getStock(null, "main"), loadCatalog().catch(() => [])])
+      .then(([s, c]) => { setStock(s); setCatalog(c); })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    Promise.all([api.getIngredients().catch(() => []), api.getOutlets()])
-      .then(([ings, o]) => {
-        setIngredients(ings);
+    Promise.all([loadCatalog().catch(() => []), api.getOutlets()])
+      .then(([c, o]) => {
+        setCatalog(c);
         setOutlets(o);
         if (o.length > 0) setOutletId(o[0].id);
         loadStock();
       })
       .catch(console.error);
-  }, []); // eslint-disable-line
+  }, [isProductMode]); // eslint-disable-line
 
   const totalUnits = stock.reduce((s, x) => s + (parseFloat(x.quantity) || 0), 0);
   const lowCount = stock.filter((s) => parseFloat(s.quantity) <= parseFloat(s.min_quantity || 10)).length;
-  const filtered = stock.filter((s) => !search || (s.ingredient_name || "").toLowerCase().includes(search.toLowerCase()));
+  const filtered = stock.filter((s) => !search || (s.subject_name || s.ingredient_name || s.product_name || "").toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
@@ -2095,7 +2121,11 @@ function MainStoreView() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Main Store</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Central warehouse of raw ingredients — receive goods here, then transfer to Kitchen &amp; Bar stores</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">
+              {isProductMode
+                ? "Central inventory of products — receive goods here as they arrive from suppliers"
+                : "Central warehouse of raw ingredients — receive goods here, then transfer to Kitchen & Bar stores"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -2118,7 +2148,7 @@ function MainStoreView() {
 
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: "Ingredients", value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
+          { label: SUBJECT_LABEL_PLURAL, value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
           { label: "Total Units", value: totalUnits.toLocaleString(), color: "text-gray-900 dark:text-white", bg: "bg-gray-50 dark:bg-gray-800" },
           { label: "Low Stock", value: lowCount, color: lowCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: lowCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
         ].map((c) => (
@@ -2132,7 +2162,7 @@ function MainStoreView() {
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ingredients…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${SUBJECT_LABEL_PLURAL.toLowerCase()}…`}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
         </div>
       </div>
@@ -2143,7 +2173,11 @@ function MainStoreView() {
             <ShoppingBag size={28} className="text-blue-400" />
           </div>
           <p className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">Main Store is Empty</p>
-          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">Add ingredients here first. Kitchen and Bar stores will then receive items via transfers.</p>
+          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">
+            {isProductMode
+              ? "Add product stock here as goods arrive from suppliers."
+              : "Add ingredients here first. Kitchen and Bar stores will then receive items via transfers."}
+          </p>
           <button onClick={() => setShowReceive(true)}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Receive Stock Now
@@ -2154,7 +2188,7 @@ function MainStoreView() {
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-4 py-3">Ingredient</th>
+                <th className="text-left px-4 py-3">{SUBJECT_LABEL}</th>
                 <th className="text-center px-3 py-3">Qty</th>
                 <th className="text-center px-3 py-3">Unit</th>
                 <th className="text-center px-3 py-3">Min</th>
@@ -2171,7 +2205,7 @@ function MainStoreView() {
                 const expiring = !expired && item.expiry_date && ((new Date(item.expiry_date) - new Date()) / 86400000) <= 30;
                 return (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.ingredient_name}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.subject_name || item.ingredient_name || item.product_name}</td>
                     <td className="px-3 py-3 text-center">
                       <span className={cn("font-black text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
                     </td>
@@ -2200,7 +2234,7 @@ function MainStoreView() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No ingredients found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No {SUBJECT_LABEL_PLURAL.toLowerCase()} found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -2208,7 +2242,8 @@ function MainStoreView() {
 
       {showReceive && (
         <ReceiveStockModal
-          ingredients={ingredients}
+          mode={isProductMode ? "product" : "ingredient"}
+          catalog={catalog}
           outlets={outlets}
           initialOutletId={outletId}
           onClose={() => setShowReceive(false)}
@@ -2224,6 +2259,7 @@ function MainStoreView() {
         <ImportCsvModal
           outletId={outletId}
           outletName={outlets.find(o => o.id === outletId)?.name}
+          mode={isProductMode ? "product" : "ingredient"}
           onClose={() => setShowImport(false)}
           onImported={loadStock}
         />

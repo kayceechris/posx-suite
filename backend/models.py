@@ -140,24 +140,28 @@ class IngredientCreate(BaseModel):
 
 class Stock(BaseModel):
     """
-    Tracks quantity of an Ingredient in a specific store.
-    All stores (main, kitchen, bar) deal in Ingredients only.
-    Finished Products are tracked separately via Sales/Orders.
+    Polymorphic stock record:
+      - Food/beverage businesses (restaurant, bar, etc.) set `ingredient_id`
+        and track raw ingredients across Main/Kitchen/Bar stores.
+      - Retail/supermarket businesses set `product_id` and track finished
+        goods directly. Exactly one of the two MUST be set.
     """
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    ingredient_id: str                 # links to Ingredient catalog
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
     outlet_id: str
-    store: str = "main"                # "main" | "kitchen" | "bar"
+    store: str = "main"
     quantity: float
     min_quantity: float = 10
     batch_number: Optional[str] = None
-    expiry_date: Optional[str] = None  # ISO date string YYYY-MM-DD
+    expiry_date: Optional[str] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class StockUpdate(BaseModel):
-    ingredient_id: str
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
     outlet_id: str
     store: str = "main"
     quantity: float
@@ -167,8 +171,9 @@ class StockUpdate(BaseModel):
 
 
 class StockTransfer(BaseModel):
-    """Transfer ingredients from one store to another (e.g. Main → Kitchen)."""
-    ingredient_id: str
+    """Transfer stock from one store to another (e.g. Main → Kitchen)."""
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
     outlet_id: str
     from_store: str
     to_store: str

@@ -212,12 +212,13 @@ export const api = {
   getConsolidatedStock: () => request("/api/stock/consolidated"),
   getExpiringStock: (days = 30) => request(`/api/stock/expiring?days=${days}`),
 
-  // CSV import to a store
-  importStockCsv: (outlet_id, store, file) => {
+  // CSV import to a store. mode = "ingredient" (default) or "product".
+  importStockCsv: (outlet_id, store, file, mode = "ingredient") => {
     const token = localStorage.getItem("posx_token");
     const form = new FormData();
     form.append("outlet_id", outlet_id);
     form.append("store", store);
+    form.append("mode", mode);
     form.append("file", file);
     return fetch(`${BASE_URL}/api/stock/import-csv`, {
       method: "POST",
