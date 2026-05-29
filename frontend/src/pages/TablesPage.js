@@ -292,7 +292,7 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
               className="w-full py-1.5 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-1"
             >
               <GitMerge size={11} />
-              <span>Merge with another table</span>
+              <span>Merge Tables</span>
             </button>
           )}
         </div>
