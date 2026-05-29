@@ -1617,12 +1617,19 @@ function LabelPrinterSettings() {
 // --- Danger Zone / Data Management ---
 
 const DATA_GROUPS = [
-  { key: "orders",       label: "Orders & Sales",    desc: "All completed, pending, and voided orders" },
+  { key: "orders",       label: "Orders & Sales",     desc: "All completed, pending, and voided orders" },
   { key: "bar_tabs",     label: "Bar Tabs",           desc: "All open and closed bar tabs" },
   { key: "reservations", label: "Reservations",       desc: "All table reservations" },
   { key: "customers",    label: "Customers",          desc: "All customer profiles" },
   { key: "tables",       label: "Tables",             desc: "All table layouts (floors are kept)" },
   { key: "floors",       label: "Floors",             desc: "All floor sections (delete tables first)" },
+  { key: "stores",       label: "Stores",             desc: "Non-main stores (Main Store is protected)", danger: true },
+  { key: "inventory",    label: "Inventory / Stock",  desc: "All stock records across stores & outlets", danger: true },
+  { key: "products",     label: "Products",           desc: "All products in the catalog", danger: true },
+  { key: "ingredients",  label: "Ingredients",        desc: "All ingredient definitions", danger: true },
+  { key: "recipes",      label: "Recipes",            desc: "All product recipes" },
+  { key: "outlets",      label: "Outlets",            desc: "All outlets — stock and orders may reference these", danger: true },
+  { key: "users",        label: "Users (except admins)", desc: "Removes all non-admin users (waiters, cashiers, managers, custom roles). Admin accounts are preserved.", danger: true },
 ];
 
 function DangerZoneSettings() {
@@ -1682,7 +1689,7 @@ function DangerZoneSettings() {
         <>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Select which data to permanently remove:</p>
           <div className="space-y-2 mb-6">
-            {DATA_GROUPS.map(({ key, label, desc }) => (
+            {DATA_GROUPS.map(({ key, label, desc, danger }) => (
               <button
                 key={key}
                 onClick={() => toggle(key)}
@@ -1697,8 +1704,15 @@ function DangerZoneSettings() {
                 }`}>
                   {selected.includes(key) && <Check size={12} className="text-white" strokeWidth={3} />}
                 </div>
-                <div className="min-w-0">
-                  <p className={`text-sm font-bold ${selected.includes(key) ? "text-red-700 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}`}>{label}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`text-sm font-bold ${selected.includes(key) ? "text-red-700 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}`}>{label}</p>
+                    {danger && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                        High Impact
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                 </div>
               </button>
