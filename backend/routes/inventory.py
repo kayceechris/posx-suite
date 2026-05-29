@@ -13,6 +13,16 @@ from auth import get_current_user, has_perm
 
 router = APIRouter(prefix="/api")
 
+# Main Store is a single global warehouse — it isn't tied to a specific outlet.
+# We tag all Main Store stock records with this constant outlet so reads/writes
+# don't depend on which outlet the user is currently looking at.
+MAIN_STORE_OUTLET = "global"
+
+
+def _normalize_outlet_for_store(store: str, outlet_id: str) -> str:
+    """Main Store stock is outlet-agnostic — always use the global outlet."""
+    return MAIN_STORE_OUTLET if (store or "main") == "main" else outlet_id
+
 
 def _require_admin(user: User):
     if not has_perm(user, "update_stock", "view_inventory"):
@@ -107,9 +117,10 @@ async def update_stock(stock_data: StockUpdate, current_user: User = Depends(get
             raise HTTPException(404, f"Product '{subject_id}' not found")
 
     store = stock_data.store or "main"
+    outlet_id = _normalize_outlet_for_store(store, stock_data.outlet_id)
     set_doc = {
         subject_field: subject_id,
-        "outlet_id": stock_data.outlet_id,
+        "outlet_id": outlet_id,
         "store": store,
         "quantity": stock_data.quantity,
         "min_quantity": stock_data.min_quantity,
@@ -120,7 +131,7 @@ async def update_stock(stock_data: StockUpdate, current_user: User = Depends(get
     if stock_data.expiry_date is not None:
         set_doc["expiry_date"] = stock_data.expiry_date
 
-    key = {subject_field: subject_id, "outlet_id": stock_data.outlet_id, "store": store}
+    key = {subject_field: subject_id, "outlet_id": outlet_id, "store": store}
     existing = await db.stock.find_one(key, {"_id": 0, "id": 1})
     if existing:
         await db.stock.update_one(key, {"$set": set_doc})
@@ -202,9 +213,10 @@ async def import_stock_csv(
                 continue
             subject_field, subject_id = "product_id", product["id"]
 
+        effective_outlet = _normalize_outlet_for_store(store, outlet_id)
         set_doc: dict = {
             subject_field: subject_id,
-            "outlet_id": outlet_id,
+            "outlet_id": effective_outlet,
             "store": store,
             "quantity": qty,
             "min_quantity": min_qty,
@@ -217,7 +229,7 @@ async def import_stock_csv(
         if expiry:
             set_doc["expiry_date"] = expiry
 
-        key = {subject_field: subject_id, "outlet_id": outlet_id, "store": store}
+        key = {subject_field: subject_id, "outlet_id": effective_outlet, "store": store}
         existing = await db.stock.find_one(key, {"_id": 0, "id": 1})
         if existing:
             await db.stock.update_one(key, {"$set": set_doc})
@@ -247,8 +259,11 @@ async def transfer_stock(data: StockTransfer, current_user: User = Depends(get_c
         if not subj:
             raise HTTPException(404, "Product not found")
 
+    from_outlet = _normalize_outlet_for_store(data.from_store, data.outlet_id)
+    to_outlet   = _normalize_outlet_for_store(data.to_store,   data.outlet_id)
+
     source = await db.stock.find_one(
-        {subject_field: subject_id, "outlet_id": data.outlet_id, "store": data.from_store},
+        {subject_field: subject_id, "outlet_id": from_outlet, "store": data.from_store},
         {"_id": 0},
     )
     if not source:
@@ -257,24 +272,24 @@ async def transfer_stock(data: StockTransfer, current_user: User = Depends(get_c
         raise HTTPException(400, f"Insufficient stock: only {source['quantity']} available in {data.from_store}")
 
     await db.stock.update_one(
-        {subject_field: subject_id, "outlet_id": data.outlet_id, "store": data.from_store},
+        {subject_field: subject_id, "outlet_id": from_outlet, "store": data.from_store},
         {"$inc": {"quantity": -data.quantity}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}},
     )
 
     dest = await db.stock.find_one(
-        {subject_field: subject_id, "outlet_id": data.outlet_id, "store": data.to_store},
+        {subject_field: subject_id, "outlet_id": to_outlet, "store": data.to_store},
         {"_id": 0, "id": 1},
     )
     if dest:
         await db.stock.update_one(
-            {subject_field: subject_id, "outlet_id": data.outlet_id, "store": data.to_store},
+            {subject_field: subject_id, "outlet_id": to_outlet, "store": data.to_store},
             {"$inc": {"quantity": data.quantity}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}},
         )
     else:
         await db.stock.insert_one({
             "id": str(_uuid.uuid4()),
             subject_field: subject_id,
-            "outlet_id": data.outlet_id,
+            "outlet_id": to_outlet,
             "store": data.to_store,
             "quantity": data.quantity,
             "min_quantity": float(source.get("min_quantity", 10)),

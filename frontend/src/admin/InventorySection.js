@@ -1986,11 +1986,10 @@ function ImportCsvModal({ outletId, outletName, mode = "ingredient", onClose, on
             </button>
           </div>
 
-          {outletName && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Importing to: <span className="font-semibold text-gray-700 dark:text-gray-200">{outletName}</span> · Main Store
-            </p>
-          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Importing to: <span className="font-semibold text-gray-700 dark:text-gray-200">Main Store</span>
+            <span className="text-gray-400 ml-1">(serves all outlets and child stores)</span>
+          </p>
 
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">CSV File</label>
@@ -2112,6 +2111,13 @@ function MainStoreView() {
   const lowCount = stock.filter((s) => parseFloat(s.quantity) <= parseFloat(s.min_quantity || 10)).length;
   const filtered = stock.filter((s) => !search || (s.subject_name || s.ingredient_name || s.product_name || "").toLowerCase().includes(search.toLowerCase()));
 
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search, isProductMode]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <div>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -2199,7 +2205,7 @@ function MainStoreView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {filtered.map((item, i) => {
+              {pagedRows.map((item, i) => {
                 const low = parseFloat(item.quantity) <= parseFloat(item.min_quantity || 10);
                 const expired = item.expiry_date && new Date(item.expiry_date) < new Date();
                 const expiring = !expired && item.expiry_date && ((new Date(item.expiry_date) - new Date()) / 86400000) <= 30;
@@ -2237,6 +2243,33 @@ function MainStoreView() {
               {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No {SUBJECT_LABEL_PLURAL.toLowerCase()} found</td></tr>}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Showing <strong>{(safePage - 1) * PAGE_SIZE + 1}</strong>–<strong>{Math.min(safePage * PAGE_SIZE, filtered.length)}</strong> of <strong>{filtered.length}</strong>
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(1)} disabled={safePage === 1}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">«</button>
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Prev</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .reduce((acc, p, idx, arr) => { if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…"); acc.push(p); return acc; }, [])
+                  .map((p, i) => p === "…"
+                    ? <span key={`e${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                    : <button key={p} onClick={() => setPage(p)}
+                        className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                          p === safePage ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>{p}</button>
+                  )}
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">Next</button>
+                <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors">»</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2258,7 +2291,7 @@ function MainStoreView() {
       {showImport && (
         <ImportCsvModal
           outletId={outletId}
-          outletName={outlets.find(o => o.id === outletId)?.name}
+          outletName={null}
           mode={isProductMode ? "product" : "ingredient"}
           onClose={() => setShowImport(false)}
           onImported={loadStock}
