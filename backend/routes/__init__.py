@@ -35,6 +35,7 @@ from routes.notifications import router as notifications_router
 from routes.floors import router as floors_router
 from routes.admin_utils import router as admin_utils_router
 from routes.print_relay import router as print_relay_router
+from routes.ingredients import router as ingredients_router
 
 all_routers = [
     auth_router,
@@ -72,4 +73,5 @@ all_routers = [
     floors_router,
     admin_utils_router,
     print_relay_router,
+    ingredients_router,
 ]

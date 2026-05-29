@@ -16,7 +16,7 @@ class RecipeIngredient(BaseModel):
     name: str
     quantity: float = 0
     unit: str = ""
-    product_id: Optional[str] = None  # optional link to inventory product
+    ingredient_id: Optional[str] = None  # links to Ingredient in Main Store catalog
 
 
 class RecipeUpsert(BaseModel):

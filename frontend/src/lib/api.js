@@ -516,6 +516,15 @@ export const api = {
   upsertRecipe: (productId, data) => request(`/api/recipes/${productId}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteRecipe: (productId) => request(`/api/recipes/${productId}`, { method: "DELETE" }),
 
+  // Ingredients (Main Store catalog — raw materials, NOT finished products)
+  getIngredients: () => request("/api/ingredients"),
+  createIngredient: (data) => request("/api/ingredients", { method: "POST", body: JSON.stringify(data) }),
+  updateIngredient: (id, data) => request(`/api/ingredients/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteIngredient: (id) => request(`/api/ingredients/${id}`, { method: "DELETE" }),
+
+  // Stock transfer (Main → Kitchen / Bar)
+  transferStock: (data) => request("/api/stock/transfer", { method: "POST", body: JSON.stringify(data) }),
+
   // Image library
   getImages: (page = 1, search = "") =>
     request(`/api/images?page=${page}&limit=24&q=${encodeURIComponent(search)}`),

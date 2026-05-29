@@ -115,49 +115,87 @@ class ProductCreate(BaseModel):
     terminal_prices: List[TerminalPrice] = Field(default_factory=list)
 
 
+# ==================== INGREDIENT MODELS ====================
+
+class Ingredient(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    unit: str = "pcs"           # default measurement unit: g, kg, ml, L, pcs, etc.
+    category: Optional[str] = None
+    cost_price: float = 0.0
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class IngredientCreate(BaseModel):
+    name: str
+    unit: str = "pcs"
+    category: Optional[str] = None
+    cost_price: float = 0.0
+    active: bool = True
+
+
 # ==================== STOCK MODELS ====================
 
 class Stock(BaseModel):
+    """
+    Tracks quantity of an Ingredient in a specific store.
+    All stores (main, kitchen, bar) deal in Ingredients only.
+    Finished Products are tracked separately via Sales/Orders.
+    """
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    product_id: str
+    ingredient_id: str                 # links to Ingredient catalog
     outlet_id: str
-    store: str = "main"   # "main" | "kitchen" | "bar"
-    quantity: int
-    min_quantity: int = 10
+    store: str = "main"                # "main" | "kitchen" | "bar"
+    quantity: float
+    min_quantity: float = 10
     batch_number: Optional[str] = None
     expiry_date: Optional[str] = None  # ISO date string YYYY-MM-DD
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class StockUpdate(BaseModel):
-    product_id: str
+    ingredient_id: str
     outlet_id: str
-    store: str = "main"   # "main" | "kitchen" | "bar"
-    quantity: int
-    min_quantity: Optional[int] = 10
+    store: str = "main"
+    quantity: float
+    min_quantity: Optional[float] = 10
     batch_number: Optional[str] = None
     expiry_date: Optional[str] = None
+
+
+class StockTransfer(BaseModel):
+    """Transfer ingredients from one store to another (e.g. Main → Kitchen)."""
+    ingredient_id: str
+    outlet_id: str
+    from_store: str
+    to_store: str
+    quantity: float
+    notes: Optional[str] = None
 
 
 class StockMovement(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    product_id: str
-    from_outlet_id: Optional[str] = None
-    to_outlet_id: Optional[str] = None
-    quantity: int
-    type: str
+    ingredient_id: str
+    from_store: Optional[str] = None
+    to_store: Optional[str] = None
+    outlet_id: Optional[str] = None
+    quantity: float
+    type: str                          # "in" | "out" | "transfer"
     notes: Optional[str] = None
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class StockMovementCreate(BaseModel):
-    product_id: str
-    from_outlet_id: Optional[str] = None
-    to_outlet_id: Optional[str] = None
-    quantity: int
+    ingredient_id: str
+    from_store: Optional[str] = None
+    to_store: Optional[str] = None
+    outlet_id: Optional[str] = None
+    quantity: float
     type: str
     notes: Optional[str] = None
 

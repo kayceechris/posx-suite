@@ -127,7 +127,15 @@ function StockLevelsView() {
 
   useEffect(() => { load(); }, []);
 
-  const productName = (id) => products.find((p) => p.id === id)?.name || id;
+  const productName = (id) => {
+    // Legacy: id is a product_id string
+    const prod = products.find((p) => p.id === id);
+    if (prod) return prod.name;
+    // New: stock items now carry ingredient_name from the API
+    const stockItem = stock?.find?.((s) => s.ingredient_id === id || s.product_id === id);
+    if (stockItem?.ingredient_name) return stockItem.ingredient_name;
+    return id;
+  };
   const isLow = (item) => parseInt(item.quantity) <= parseInt(item.min_quantity || 10);
   const isExpiring = (item) => {
     if (!item.expiry_date) return false;
@@ -1025,7 +1033,13 @@ function ReorderView() {
   };
   useEffect(() => { load(); }, []);
 
-  const productName = (id) => products.find((p) => p.id === id)?.name || id;
+  const productName = (id) => {
+    const prod = products.find((p) => p.id === id);
+    if (prod) return prod.name;
+    const stockItem = lowStock.find((s) => s.ingredient_id === id || s.product_id === id);
+    if (stockItem?.ingredient_name) return stockItem.ingredient_name;
+    return id;
+  };
   const storeName = (id) => STORE_LABELS[id || "main"] || stores.find((s) => s.id === id)?.name || id || "Main Store";
   const deficit = (item) => Math.max(0, (item.min_quantity || 10) * 2 - parseInt(item.quantity || 0));
 
@@ -1636,13 +1650,14 @@ function ConsolidatedView() {
 
 // ─── Receive Stock Modal ──────────────────────────────────────────────────────
 
-const _EMPTY_RECEIVE_ITEM = { productId: "", received: "", minQty: "10", batchNumber: "", expiryDate: "" };
+const _EMPTY_RECEIVE_ITEM = { ingredientId: "", newName: "", received: "", minQty: "10", batchNumber: "", expiryDate: "", unit: "pcs" };
 
-function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onReceived }) {
+function ReceiveStockModal({ ingredients, outlets, initialOutletId, onClose, onReceived }) {
   const [outletId, setOutletId] = useState(initialOutletId || outlets[0]?.id || "");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([{ ..._EMPTY_RECEIVE_ITEM }]);
   const [currentStock, setCurrentStock] = useState([]);
+  const [allIngredients, setAllIngredients] = useState(ingredients || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1651,22 +1666,31 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
     api.getStock(outletId, "main").then(setCurrentStock).catch(console.error);
   }, [outletId]); // eslint-disable-line
 
-  const stockFor = (pid) => currentStock.find((x) => x.product_id === pid);
-  const currentQty = (pid) => stockFor(pid)?.quantity ?? 0;
+  useEffect(() => { setAllIngredients(ingredients || []); }, [ingredients]);
 
-  const filteredProducts = products.filter(
+  const stockFor = (iid) => currentStock.find((x) => x.ingredient_id === iid);
+  const currentQty = (iid) => Number(stockFor(iid)?.quantity || 0);
+
+  const filteredIngredients = allIngredients.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const setField = (idx, key, val) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
 
-  const handleProductChange = (idx, pid) => {
-    const s = currentStock.find((x) => x.product_id === pid);
+  const handleIngredientChange = (idx, val) => {
+    if (val === "__new__") {
+      setItems((prev) => prev.map((it, i) => i !== idx ? it : { ...it, ingredientId: "__new__", newName: "", minQty: "10" }));
+      return;
+    }
+    const s = currentStock.find((x) => x.ingredient_id === val);
+    const ing = allIngredients.find((x) => x.id === val);
     setItems((prev) => prev.map((it, i) => i !== idx ? it : {
       ...it,
-      productId: pid,
+      ingredientId: val,
+      newName: "",
       minQty: s?.min_quantity ? String(s.min_quantity) : "10",
+      unit: ing?.unit || "pcs",
     }));
   };
 
@@ -1675,21 +1699,36 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const valid = items.filter((it) => it.productId && parseInt(it.received) > 0);
+    const valid = items.filter((it) =>
+      (it.ingredientId && it.ingredientId !== "__new__" || (it.ingredientId === "__new__" && it.newName.trim()))
+      && parseFloat(it.received) > 0
+    );
     if (!valid.length) { setError("Add at least one item with a valid quantity."); return; }
     setSaving(true); setError("");
     try {
-      await Promise.all(valid.map((it) =>
-        api.updateStock({
-          product_id: it.productId,
+      for (const it of valid) {
+        let iid = it.ingredientId;
+        // Auto-create new ingredients on the fly
+        if (iid === "__new__") {
+          const created = await api.createIngredient({
+            name: it.newName.trim(),
+            unit: it.unit || "pcs",
+            cost_price: 0,
+            active: true,
+          });
+          iid = created.id;
+          setAllIngredients((prev) => [...prev, created]);
+        }
+        await api.updateStock({
+          ingredient_id: iid,
           outlet_id: outletId,
           store: "main",
-          quantity: currentQty(it.productId) + parseInt(it.received),
-          min_quantity: parseInt(it.minQty) || 10,
+          quantity: currentQty(iid) + parseFloat(it.received),
+          min_quantity: parseFloat(it.minQty) || 10,
           batch_number: it.batchNumber || null,
           expiry_date: it.expiryDate || null,
-        })
-      ));
+        });
+      }
       onReceived(`${valid.length} item${valid.length !== 1 ? "s" : ""} received into Main Store`);
     } catch (err) { setError(err.message); setSaving(false); }
   };
@@ -1719,10 +1758,10 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
 
           {/* Items table — scrollable */}
           <div className="flex-1 overflow-y-auto overflow-x-auto px-6 min-h-0">
-            <table className="w-full min-w-[700px] text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
                 <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left py-2 pr-3 min-w-[220px]">Product</th>
+                  <th className="text-left py-2 pr-3 min-w-[240px]">Ingredient</th>
                   <th className="text-center py-2 px-3 w-24">Current</th>
                   <th className="text-center py-2 px-3 w-28">+ Receive</th>
                   <th className="text-center py-2 px-3 w-24">New Total</th>
@@ -1734,17 +1773,37 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
                 {items.map((item, idx) => {
-                  const cur = item.productId ? currentQty(item.productId) : null;
-                  const add = parseInt(item.received) || 0;
+                  const cur = item.ingredientId && item.ingredientId !== "__new__" ? currentQty(item.ingredientId) : null;
+                  const add = parseFloat(item.received) || 0;
                   const newTotal = cur !== null ? cur + add : null;
                   return (
                     <tr key={idx} className="group">
                       <td className="py-2 pr-2">
-                        <select value={item.productId} onChange={(e) => handleProductChange(idx, e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500">
-                          <option value="">Select product…</option>
-                          {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
+                        {item.ingredientId === "__new__" ? (
+                          <div className="flex gap-1">
+                            <input
+                              autoFocus
+                              value={item.newName}
+                              onChange={(e) => setField(idx, "newName", e.target.value)}
+                              placeholder="New ingredient name…"
+                              className="flex-1 px-2 py-1.5 border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-white rounded-lg text-sm focus:outline-none"
+                            />
+                            <select
+                              value={item.unit}
+                              onChange={(e) => setField(idx, "unit", e.target.value)}
+                              className="px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-xs focus:outline-none"
+                            >
+                              {["pcs", "g", "kg", "ml", "L", "carton", "pack", "bottle"].map((u) => <option key={u}>{u}</option>)}
+                            </select>
+                          </div>
+                        ) : (
+                          <select value={item.ingredientId} onChange={(e) => handleIngredientChange(idx, e.target.value)}
+                            className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                            <option value="">Select ingredient…</option>
+                            {filteredIngredients.map((p) => <option key={p.id} value={p.id}>{p.name}{p.unit ? ` (${p.unit})` : ""}</option>)}
+                            <option value="__new__">+ Add new ingredient</option>
+                          </select>
+                        )}
                       </td>
                       <td className="py-2 px-2 text-center">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
@@ -1752,7 +1811,7 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
                         </span>
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" min="1" value={item.received}
+                        <input type="number" min="0" step="0.01" value={item.received}
                           onChange={(e) => setField(idx, "received", e.target.value)}
                           placeholder="0"
                           className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm text-center focus:outline-none focus:border-blue-500" />
@@ -1763,7 +1822,7 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
                           : <span className="text-gray-300 text-sm">—</span>}
                       </td>
                       <td className="py-2 px-2">
-                        <input type="number" min="0" value={item.minQty}
+                        <input type="number" min="0" step="0.01" value={item.minQty}
                           onChange={(e) => setField(idx, "minQty", e.target.value)}
                           className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm text-center focus:outline-none focus:border-blue-500" />
                       </td>
@@ -1807,7 +1866,7 @@ function ReceiveStockModal({ products, outlets, initialOutletId, onClose, onRece
               </button>
               <button type="submit" disabled={saving}
                 className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {saving ? "Receiving…" : `Receive ${items.filter(it => it.productId && parseInt(it.received) > 0).length || ""} Item${items.filter(it => it.productId && parseInt(it.received) > 0).length === 1 ? "" : "s"} into Main Store`}
+                {saving ? "Receiving…" : `Receive ${items.filter(it => ((it.ingredientId && it.ingredientId !== "__new__") || (it.ingredientId === "__new__" && it.newName.trim())) && parseFloat(it.received) > 0).length || ""} Item${items.filter(it => ((it.ingredientId && it.ingredientId !== "__new__") || (it.ingredientId === "__new__" && it.newName.trim())) && parseFloat(it.received) > 0).length === 1 ? "" : "s"} into Main Store`}
               </button>
             </div>
           </div>
@@ -1827,11 +1886,11 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
   const fileRef = useRef(null);
 
   const downloadTemplate = () => {
-    const csv = "product_name,quantity,min_quantity,batch_number,expiry_date\nCoca-Cola,100,20,,\nChicken Breast,50,10,BATCH001,2026-12-31\n";
+    const csv = "name,quantity,min_quantity,unit,category,cost_price,batch_number,expiry_date\nBasmati rice,100,20,kg,Grains,800,,\nTomato paste,50,10,pcs,Sauces,500,BATCH001,2026-12-31\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "main_store_import_template.csv";
+    a.href = url; a.download = "main_store_ingredients_template.csv";
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
@@ -1884,7 +1943,8 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
         <div className="p-6 space-y-5">
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <p className="font-semibold">CSV Format</p>
-            <p className="font-mono text-xs">product_name, quantity, min_quantity, batch_number (opt), expiry_date (opt)</p>
+            <p className="font-mono text-xs">name, quantity, min_quantity, unit (opt), category (opt), cost_price (opt), batch_number (opt), expiry_date (opt)</p>
+            <p className="text-xs opacity-80 mt-1">New ingredients will be auto-created in your catalog.</p>
             <button onClick={downloadTemplate} className="mt-2 text-xs font-bold underline hover:no-underline">
               Download template CSV
             </button>
@@ -1915,16 +1975,17 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
               <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 dark:bg-gray-800 text-gray-400 uppercase">
-                    <tr>{["Product", "Qty", "Min Qty", "Batch", "Expiry"].map(h => (
+                    <tr>{["Ingredient", "Qty", "Min Qty", "Unit", "Batch", "Expiry"].map(h => (
                       <th key={h} className="px-3 py-2 text-left font-bold">{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {preview.map((row, i) => (
                       <tr key={i} className="bg-white dark:bg-gray-900">
-                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.product_name}</td>
+                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.name || row.product_name}</td>
                         <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{row.quantity}</td>
                         <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{row.min_quantity}</td>
+                        <td className="px-3 py-2 text-gray-500">{row.unit || "pcs"}</td>
                         <td className="px-3 py-2 text-gray-500">{row.batch_number || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{row.expiry_date || "—"}</td>
                       </tr>
@@ -1938,7 +1999,11 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
           {result && !result.error && (
             <div className={cn("rounded-xl p-4 text-sm space-y-1", result.skipped > 0 ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300" : "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300")}>
               <p className="font-bold">Import complete</p>
-              <p>{result.imported} item(s) imported · {result.skipped} skipped</p>
+              <p>
+                {result.imported} item(s) imported
+                {typeof result.created === "number" && result.created > 0 && ` · ${result.created} new ingredient(s) auto-created`}
+                {result.skipped > 0 && ` · ${result.skipped} skipped`}
+              </p>
               {result.errors?.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-xs opacity-80 list-disc pl-4">
                   {result.errors.map((e, i) => <li key={i}>{e}</li>)}
@@ -1971,27 +2036,31 @@ function ImportCsvModal({ outletId, outletName, onClose, onImported }) {
 
 function MainStoreView() {
   const [stock, setStock] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [outletId, setOutletId] = useState("");
   const [showReceive, setShowReceive] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [transferItem, setTransferItem] = useState(null);
   const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
 
   const loadStock = () => {
     setLoading(true);
-    api.getStock(null, "main")
-      .then(setStock)
+    Promise.all([
+      api.getStock(null, "main"),
+      api.getIngredients().catch(() => []),
+    ])
+      .then(([s, ings]) => { setStock(s); setIngredients(ings); })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    Promise.all([api.getProducts(), api.getOutlets()])
-      .then(([p, o]) => {
-        setProducts(p.filter((pr) => pr.active !== false));
+    Promise.all([api.getIngredients().catch(() => []), api.getOutlets()])
+      .then(([ings, o]) => {
+        setIngredients(ings);
         setOutlets(o);
         if (o.length > 0) setOutletId(o[0].id);
         loadStock();
@@ -1999,10 +2068,9 @@ function MainStoreView() {
       .catch(console.error);
   }, []); // eslint-disable-line
 
-  const productName = (id) => products.find((p) => p.id === id)?.name || id;
-  const totalUnits = stock.reduce((s, x) => s + (parseInt(x.quantity) || 0), 0);
-  const lowCount = stock.filter((s) => parseInt(s.quantity) <= parseInt(s.min_quantity || 10)).length;
-  const filtered = stock.filter((s) => !search || productName(s.product_id).toLowerCase().includes(search.toLowerCase()));
+  const totalUnits = stock.reduce((s, x) => s + (parseFloat(x.quantity) || 0), 0);
+  const lowCount = stock.filter((s) => parseFloat(s.quantity) <= parseFloat(s.min_quantity || 10)).length;
+  const filtered = stock.filter((s) => !search || (s.ingredient_name || "").toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
@@ -2013,7 +2081,7 @@ function MainStoreView() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white">Main Store</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Central warehouse — receive goods here, then dispatch to Kitchen &amp; Bar via requisitions</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 hidden sm:block">Central warehouse of raw ingredients — receive goods here, then transfer to Kitchen &amp; Bar stores</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -2036,7 +2104,7 @@ function MainStoreView() {
 
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: "Products", value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
+          { label: "Ingredients", value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
           { label: "Total Units", value: totalUnits.toLocaleString(), color: "text-gray-900 dark:text-white", bg: "bg-gray-50 dark:bg-gray-800" },
           { label: "Low Stock", value: lowCount, color: lowCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: lowCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
         ].map((c) => (
@@ -2050,7 +2118,7 @@ function MainStoreView() {
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ingredients…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
         </div>
       </div>
@@ -2061,7 +2129,7 @@ function MainStoreView() {
             <ShoppingBag size={28} className="text-blue-400" />
           </div>
           <p className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">Main Store is Empty</p>
-          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">Add stock here first. Kitchen and Bar stores will then requisition items from Main Store.</p>
+          <p className="text-gray-400 text-sm mb-5 max-w-xs mx-auto">Add ingredients here first. Kitchen and Bar stores will then receive items via transfers.</p>
           <button onClick={() => setShowReceive(true)}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors">
             <Plus size={16} /> Receive Stock Now
@@ -2069,11 +2137,12 @@ function MainStoreView() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-300 dark:border-gray-600 shadow-sm overflow-x-auto">
-          <table className="w-full min-w-[520px]">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-4 py-3">Product</th>
+                <th className="text-left px-4 py-3">Ingredient</th>
                 <th className="text-center px-3 py-3">Qty</th>
+                <th className="text-center px-3 py-3">Unit</th>
                 <th className="text-center px-3 py-3">Min</th>
                 <th className="text-left px-3 py-3">Batch</th>
                 <th className="text-left px-3 py-3">Expiry</th>
@@ -2083,15 +2152,16 @@ function MainStoreView() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filtered.map((item, i) => {
-                const low = parseInt(item.quantity) <= parseInt(item.min_quantity || 10);
+                const low = parseFloat(item.quantity) <= parseFloat(item.min_quantity || 10);
                 const expired = item.expiry_date && new Date(item.expiry_date) < new Date();
                 const expiring = !expired && item.expiry_date && ((new Date(item.expiry_date) - new Date()) / 86400000) <= 30;
                 return (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{productName(item.product_id)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.ingredient_name}</td>
                     <td className="px-3 py-3 text-center">
                       <span className={cn("font-black text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
                     </td>
+                    <td className="px-3 py-3 text-center text-xs text-gray-500 dark:text-gray-400">{item.unit || "—"}</td>
                     <td className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{item.min_quantity || 10}</td>
                     <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{item.batch_number || "—"}</td>
                     <td className="px-3 py-3 text-xs">
@@ -2106,15 +2176,17 @@ function MainStoreView() {
                         : <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">OK</span>}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <button onClick={() => setShowReceive(true)}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                        Receive More
+                      <button
+                        onClick={() => setTransferItem(item)}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        Transfer
                       </button>
                     </td>
                   </tr>
                 );
               })}
-              {filtered.length === 0 && <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 text-sm">No products found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No ingredients found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -2122,7 +2194,7 @@ function MainStoreView() {
 
       {showReceive && (
         <ReceiveStockModal
-          products={products}
+          ingredients={ingredients}
           outlets={outlets}
           initialOutletId={outletId}
           onClose={() => setShowReceive(false)}
@@ -2142,6 +2214,116 @@ function MainStoreView() {
           onImported={loadStock}
         />
       )}
+
+      {transferItem && (
+        <TransferStockModal
+          item={transferItem}
+          fromStore="main"
+          onClose={() => setTransferItem(null)}
+          onTransferred={(msg) => {
+            setTransferItem(null);
+            loadStock();
+            setToast({ msg, type: "success" });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Transfer Stock Modal (Main → Kitchen / Bar / any) ────────────────────────
+
+function TransferStockModal({ item, fromStore = "main", onClose, onTransferred }) {
+  const [stores, setStores] = useState([]);
+  const [toStore, setToStore] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.getStores().then((all) => {
+      const dests = all.filter((s) => s.id !== fromStore);
+      setStores(dests);
+      if (dests.length > 0) setToStore(dests[0].id);
+    }).catch(() => {});
+  }, [fromStore]);
+
+  const max = Number(item?.quantity || 0);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const qty = parseFloat(quantity);
+    if (!toStore || !qty || qty <= 0) {
+      setError("Pick a destination store and a quantity greater than 0.");
+      return;
+    }
+    if (qty > max) {
+      setError(`Only ${max} ${item.unit || ""} available in ${fromStore} store.`);
+      return;
+    }
+    setSaving(true); setError("");
+    try {
+      await api.transferStock({
+        ingredient_id: item.ingredient_id,
+        outlet_id: item.outlet_id,
+        from_store: fromStore,
+        to_store: toStore,
+        quantity: qty,
+        notes: notes || null,
+      });
+      const destName = stores.find((s) => s.id === toStore)?.name || toStore;
+      onTransferred(`Transferred ${qty} ${item.unit || ""} of ${item.ingredient_name} → ${destName}`);
+    } catch (err) {
+      setError(err.message || "Transfer failed.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Transfer Stock</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{item.ingredient_name} · {max} {item.unit || ""} available</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">To Store</label>
+            <select value={toStore} onChange={(e) => setToStore(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500">
+              {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Quantity</label>
+            <input type="number" min="0" max={max} step="0.01"
+              value={quantity} onChange={(e) => setQuantity(e.target.value)}
+              placeholder={`Max ${max}`}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Notes (optional)</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. for tonight's service"
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500" />
+          </div>
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {saving ? "Transferring…" : "Transfer"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

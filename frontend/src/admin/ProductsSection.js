@@ -1922,10 +1922,16 @@ function ImageLibraryView() {
 // ─── Recipes View ─────────────────────────────────────────────────────────────
 const COMMON_UNITS = ["g", "kg", "ml", "L", "pcs", "cups", "tbsp", "tsp", "oz", "lb", "slice", "whole", "portion"];
 
-function RecipeModal({ product, recipe, products, onSave, onClose }) {
-  const empty = { id: crypto.randomUUID(), name: "", quantity: "", unit: "g", product_id: "" };
+function RecipeModal({ product, recipe, ingredientsCatalog = [], sourceStore = "kitchen", onSave, onClose }) {
+  const empty = { id: crypto.randomUUID(), name: "", quantity: "", unit: "g", ingredient_id: "" };
   const [ingredients, setIngredients] = useState(
-    recipe?.ingredients?.length ? recipe.ingredients.map((i) => ({ ...i, quantity: String(i.quantity) })) : [{ ...empty }]
+    recipe?.ingredients?.length
+      ? recipe.ingredients.map((i) => ({
+          ...i,
+          quantity: String(i.quantity),
+          ingredient_id: i.ingredient_id || i.product_id || "", // back-compat with old field
+        }))
+      : [{ ...empty }]
   );
   const [notes, setNotes]         = useState(recipe?.notes || "");
   const [prepTime, setPrepTime]   = useState(String(recipe?.prep_time || ""));
@@ -1933,14 +1939,27 @@ function RecipeModal({ product, recipe, products, onSave, onClose }) {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
 
-  const updateIng = (idx, key, val) =>
-    setIngredients((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
+  const updateIng = (idx, key, val) => {
+    setIngredients((prev) => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const next = { ...it, [key]: val };
+      // When user picks an ingredient from the catalog, auto-fill its name + unit
+      if (key === "ingredient_id" && val) {
+        const found = ingredientsCatalog.find((x) => x.id === val);
+        if (found) {
+          next.name = found.name;
+          if (found.unit) next.unit = found.unit;
+        }
+      }
+      return next;
+    }));
+  };
 
   const addIng = () => setIngredients((prev) => [...prev, { ...empty, id: crypto.randomUUID() }]);
   const removeIng = (idx) => setIngredients((prev) => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
-    const filled = ingredients.filter((i) => i.name.trim());
+    const filled = ingredients.filter((i) => i.name.trim() || i.ingredient_id);
     if (filled.length === 0) { setError("Add at least one ingredient."); return; }
     setSaving(true); setError("");
     try {
@@ -1950,7 +1969,7 @@ function RecipeModal({ product, recipe, products, onSave, onClose }) {
           name: i.name.trim(),
           quantity: parseFloat(i.quantity) || 0,
           unit: i.unit,
-          product_id: i.product_id || null,
+          ingredient_id: i.ingredient_id || null,
         })),
         notes,
         prep_time: parseInt(prepTime) || 0,
@@ -1996,28 +2015,47 @@ function RecipeModal({ product, recipe, products, onSave, onClose }) {
           {/* Ingredients */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ingredients</label>
+              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Ingredients
+                <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${sourceStore === "bar" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"}`}>
+                  from {sourceStore === "bar" ? "Bar Store" : "Kitchen Store"}
+                </span>
+              </label>
               <button type="button" onClick={addIng}
                 className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors">
                 <Plus size={12} /> Add
               </button>
             </div>
+            {ingredientsCatalog.length === 0 && (
+              <div className="mb-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
+                No ingredients available in the <strong>{sourceStore === "bar" ? "Bar" : "Kitchen"} Store</strong> yet.
+                Transfer ingredients from the Main Store first, then add them here.
+              </div>
+            )}
             <div className="space-y-2">
               {/* Column headers */}
-              <div className="grid grid-cols-[1fr_80px_90px_100px_24px] gap-2 px-1">
+              <div className="grid grid-cols-[1fr_80px_90px_24px] gap-2 px-1">
                 <span className="text-[10px] font-semibold text-gray-400 uppercase">Ingredient</span>
                 <span className="text-[10px] font-semibold text-gray-400 uppercase">Qty</span>
                 <span className="text-[10px] font-semibold text-gray-400 uppercase">Unit</span>
-                <span className="text-[10px] font-semibold text-gray-400 uppercase">Product link</span>
                 <span />
               </div>
               {ingredients.map((ing, idx) => (
-                <div key={ing.id} className="grid grid-cols-[1fr_80px_90px_100px_24px] gap-2 items-center">
-                  <input
-                    value={ing.name} onChange={(e) => updateIng(idx, "name", e.target.value)}
-                    placeholder="e.g. Flour"
-                    className="px-2.5 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500"
-                  />
+                <div key={ing.id} className="grid grid-cols-[1fr_80px_90px_24px] gap-2 items-center">
+                  <select
+                    value={ing.ingredient_id || ""}
+                    onChange={(e) => updateIng(idx, "ingredient_id", e.target.value)}
+                    className="px-2.5 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500 truncate"
+                  >
+                    <option value="">— select ingredient —</option>
+                    {ingredientsCatalog.map((it) => (
+                      <option key={it.id} value={it.id}>{it.name}</option>
+                    ))}
+                    {/* Keep existing selection visible even if it's no longer in store */}
+                    {ing.ingredient_id && !ingredientsCatalog.find((c) => c.id === ing.ingredient_id) && (
+                      <option value={ing.ingredient_id}>{ing.name || "(unknown)"}</option>
+                    )}
+                  </select>
                   <input
                     type="number" min="0" step="0.01"
                     value={ing.quantity} onChange={(e) => updateIng(idx, "quantity", e.target.value)}
@@ -2028,11 +2066,6 @@ function RecipeModal({ product, recipe, products, onSave, onClose }) {
                     className="px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-green-500">
                     {COMMON_UNITS.map((u) => <option key={u}>{u}</option>)}
                     <option value={ing.unit && !COMMON_UNITS.includes(ing.unit) ? ing.unit : "custom"}>custom</option>
-                  </select>
-                  <select value={ing.product_id || ""} onChange={(e) => updateIng(idx, "product_id", e.target.value)}
-                    className="px-2 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xs focus:outline-none focus:border-green-500">
-                    <option value="">— none —</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <button type="button" onClick={() => removeIng(idx)} disabled={ingredients.length === 1}
                     className="text-gray-300 hover:text-red-500 disabled:opacity-30 transition-colors">
@@ -2077,22 +2110,43 @@ function RecipesView() {
   const [search, setSearch]       = useState("");
   const [filterCat, setFilterCat] = useState("");
   const [categories, setCategories] = useState([]);
+  const [ingredientsCatalog, setIngredientsCatalog] = useState([]);
+  const [kitchenStock, setKitchenStock] = useState([]);
+  const [barStock, setBarStock]         = useState([]);
   const [modal, setModal]         = useState(null);  // { product, recipe | null }
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [prods, cats, recs] = await Promise.all([
-        api.getProducts(), api.getGroups(), api.getRecipes(),
+      const [prods, cats, recs, ings, kStock, bStock] = await Promise.all([
+        api.getProducts(),
+        api.getGroups(),
+        api.getRecipes(),
+        api.getIngredients().catch(() => []),
+        api.getStock(null, "kitchen").catch(() => []),
+        api.getStock(null, "bar").catch(() => []),
       ]);
       setProducts(prods);
       setCategories(cats);
+      setIngredientsCatalog(ings);
+      setKitchenStock(kStock);
+      setBarStock(bStock);
       const map = {};
       recs.forEach((r) => { map[r.product_id] = r; });
       setRecipes(map);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
+
+  // Build the ingredient subset for a given product: pulls from kitchen store
+  // (food products) or bar store (drinks products) based on its category.
+  const getIngredientsForProduct = (product) => {
+    const cat = categories.find((c) => c.id === product.category_id);
+    const mainCat = (cat?.main_category || "food").toLowerCase();
+    const store = mainCat === "drinks" ? barStock : kitchenStock;
+    const idsInStore = new Set(store.map((s) => s.ingredient_id));
+    return ingredientsCatalog.filter((i) => idsInStore.has(i.id));
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -2231,7 +2285,8 @@ function RecipesView() {
         <RecipeModal
           product={modal.product}
           recipe={modal.recipe}
-          products={products}
+          ingredientsCatalog={getIngredientsForProduct(modal.product)}
+          sourceStore={(categories.find((c) => c.id === modal.product.category_id)?.main_category || "food").toLowerCase() === "drinks" ? "bar" : "kitchen"}
           onSave={(data) => handleSave(modal.product.id, data)}
           onClose={() => setModal(null)}
         />
