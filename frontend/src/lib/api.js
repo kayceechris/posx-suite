@@ -526,6 +526,9 @@ export const api = {
   // Stock transfer (Main → Kitchen / Bar)
   transferStock: (data) => request("/api/stock/transfer", { method: "POST", body: JSON.stringify(data) }),
 
+  // Sync product images to Image Library (downloads external URLs, stores in DB)
+  syncProductImages: () => request("/api/admin/sync-product-images", { method: "POST" }),
+
   // Image library
   getImages: (page = 1, search = "") =>
     request(`/api/images?page=${page}&limit=24&q=${encodeURIComponent(search)}`),

@@ -1751,6 +1751,8 @@ function ImageLibraryView() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting]   = useState(null);
   const [uploadErr, setUploadErr] = useState("");
+  const [syncing, setSyncing]     = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
   const fileRef                   = useRef();
   const searchTimeout             = useRef(null);
 
@@ -1812,6 +1814,22 @@ function ImageLibraryView() {
 
   const [dragOver, setDragOver] = useState(false);
 
+  const handleSyncFromProducts = async () => {
+    if (syncing) return;
+    if (!window.confirm("Scan all products and download any external images into the Image Library? Products already using a library image are skipped.")) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await api.syncProductImages();
+      setSyncResult(res);
+      load(1, search);
+    } catch (err) {
+      setSyncResult({ error: err.message || "Sync failed" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div>
       <SectionHeader
@@ -1819,12 +1837,48 @@ function ImageLibraryView() {
         icon={<GalleryThumbnails size={20} className="text-indigo-600" />}
         iconBg="bg-indigo-100"
         action={
-          <button onClick={() => fileRef.current?.click()} disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-            <Upload size={15} /> {uploading ? "Uploading…" : "Upload Images"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleSyncFromProducts} disabled={syncing || uploading}
+              className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-xl text-sm font-semibold hover:bg-amber-200 dark:hover:bg-amber-900/50 disabled:opacity-50 transition-colors"
+              title="Download external product images and add them to the library">
+              {syncing ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /> Syncing…
+                </span>
+              ) : "Sync from Products"}
+            </button>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              <Upload size={15} /> {uploading ? "Uploading…" : "Upload Images"}
+            </button>
+          </div>
         }
       />
+
+      {syncResult && (
+        <div className={`mb-4 p-4 rounded-2xl border-2 text-sm ${
+          syncResult.error
+            ? "border-red-300 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+            : "border-green-300 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300"
+        }`}>
+          {syncResult.error ? (
+            <p className="font-bold">{syncResult.error}</p>
+          ) : (
+            <>
+              <p className="font-bold mb-1">Sync complete</p>
+              <p>
+                Scanned <strong>{syncResult.scanned}</strong> · Downloaded <strong>{syncResult.downloaded}</strong> · Already in library <strong>{syncResult.already_in_library}</strong> · Skipped <strong>{syncResult.skipped}</strong> · Failed <strong>{syncResult.failed}</strong>
+              </p>
+              {syncResult.errors?.length > 0 && (
+                <ul className="mt-2 text-xs opacity-80 list-disc pl-4 space-y-0.5">
+                  {syncResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
         onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
 
