@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Plus, Trash2, Check, X, Pencil, ToggleLeft, ToggleRight, Printer, AlertCircle, Settings, Receipt, CreditCard, Banknote, Smartphone, Building2, DollarSign, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { useBusiness } from "../context/BusinessContext";
+import { useAuth } from "../context/AuthContext";
 import PrintBridgeSettings from "../components/PrintBridgeSettings";
 import MobilePrinterScanner from "../components/MobilePrinterScanner";
 
@@ -58,6 +59,8 @@ const BUSINESS_TYPES = [
 
 function CompanySettings() {
   const { settings, refreshSettings } = useBusiness();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [form, setForm] = useState({ business_name: "", business_type: "restaurant", currency_symbol: "", address: "", phone: "", email: "", tax_id: "" });
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
@@ -135,20 +138,35 @@ function CompanySettings() {
             </div>
 
             <div>
-              <label className={LABEL}>Business Type</label>
+              <label className={LABEL}>
+                Business Type
+                {!isAdmin && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin only</span>}
+              </label>
               <div className="grid grid-cols-3 gap-2">
-                {BUSINESS_TYPES.map((t) => (
-                  <button key={t.id} type="button"
-                    onClick={() => setForm({ ...form, business_type: t.id })}
-                    className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors ${
-                      form.business_type === t.id
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300"
-                    }`}>
-                    {t.label}
-                  </button>
-                ))}
+                {BUSINESS_TYPES.map((t) => {
+                  const selected = form.business_type === t.id;
+                  const disabled = !isAdmin && !selected;
+                  return (
+                    <button key={t.id} type="button"
+                      onClick={() => isAdmin && setForm({ ...form, business_type: t.id })}
+                      disabled={!isAdmin}
+                      title={!isAdmin ? "Only an admin can change business type" : undefined}
+                      className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors ${
+                        selected
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                          : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300"
+                      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
+                      {t.label}
+                    </button>
+                  );
+                })}
               </div>
+              {!isAdmin && (
+                <p className="text-xs text-gray-400 mt-2">Business type is locked. Contact your administrator to change it.</p>
+              )}
+              {isAdmin && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">Changing the business type alters which features (recipes, floor management, kitchen, etc.) are available.</p>
+              )}
               {selectedType?.tableService && (
                 <p className="text-green-600 text-xs font-semibold mt-2">✓ Table service &amp; waiter pages enabled</p>
               )}

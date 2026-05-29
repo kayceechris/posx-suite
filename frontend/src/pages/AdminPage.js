@@ -8,6 +8,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
 import { useTheme } from "../context/ThemeContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import UsersSection from "../admin/UsersSection";
@@ -198,9 +199,29 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings", icon: Settings, expandable: true },
 ];
 
+// Top-level sections to hide based on business capability flags
+const SECTION_REQUIRES_CAP = {
+  floor:    "hasFloorManagement",
+  stores:   "hasIngredients",   // ingredient-based stores only
+};
+
+// Sub-items to hide based on business capability flags
+const SUB_ITEM_REQUIRES_CAP = {
+  "products.recipes":         "hasRecipes",
+  "floor.tables":             "hasTables",
+  "floor.bar-tabs":           "hasTabs",
+  "floor.reservations":       "hasReservations",
+  // Ingredient-only inventory pages
+  "stores.main-store":        "hasIngredients",
+  "stores.create-store":      "hasIngredients",
+  "inventory.requisitions":   "hasIngredients",
+  "inventory.waste":          "hasIngredients",  // ingredient waste — keep simple in retail
+};
+
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const { settings } = useBusiness();
+  const businessConfig = useBusinessConfig();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -217,9 +238,16 @@ export default function AdminPage() {
   const isPrivileged = user?.role === "admin" || user?.role === "manager";
   const userPerms = user?.permissions || [];
   const can = (perm) => !perm || isPrivileged || userPerms.includes(perm);
+  // Capability check: a feature is enabled if the business config flag is true (default true if undefined)
+  const hasCap = (capKey) => !capKey || businessConfig?.[capKey] !== false;
   const visibleSubs = (sectionId) =>
-    (EXPANDABLE[sectionId] || []).filter((sub) => can(SUB_ITEM_PERMISSION[`${sectionId}.${sub.id}`]));
-  const visibleNavItems = NAV_ITEMS.filter((item) => can(SECTION_PERMISSION[item.id]));
+    (EXPANDABLE[sectionId] || []).filter((sub) => {
+      const key = `${sectionId}.${sub.id}`;
+      return can(SUB_ITEM_PERMISSION[key]) && hasCap(SUB_ITEM_REQUIRES_CAP[key]);
+    });
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    can(SECTION_PERMISSION[item.id]) && hasCap(SECTION_REQUIRES_CAP[item.id])
+  );
 
   useEffect(() => {
     api.getDashboardAnalytics().then(setAnalytics).catch(console.error).finally(() => setAnalyticsLoading(false));

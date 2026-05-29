@@ -29,8 +29,17 @@ async def create_settings(settings_data: BusinessSettingsCreate):
 
 @router.put("/settings")
 async def update_settings(settings_data: dict, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["admin"]:
+    if current_user.role not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Only admins are allowed to change the business type — it switches feature flags
+    # across the whole app, so we lock it behind the highest privilege.
+    if "business_type" in settings_data and current_user.role != "admin":
+        existing = await db.settings.find_one({"id": "business_settings"}, {"_id": 0, "business_type": 1})
+        if existing and settings_data["business_type"] != existing.get("business_type"):
+            raise HTTPException(status_code=403, detail="Only an admin can change the business type")
+        # If unchanged, silently drop it from the payload so we don't write it
+        settings_data.pop("business_type", None)
 
     await db.settings.update_one(
         {"id": "business_settings"},

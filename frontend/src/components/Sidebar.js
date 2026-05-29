@@ -9,11 +9,13 @@ import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
 import { useInstallPWA } from "../hooks/useInstallPWA";
 import { useTheme } from "../context/ThemeContext";
+import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import { cn } from "../lib/utils";
 
 export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen = false, onMobileClose, sidebarMiddle }) {
   const { user, logout } = useAuth();
   const { settings } = useBusiness();
+  const businessConfig = useBusinessConfig();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [syncing, setSyncing] = React.useState(false);
@@ -55,9 +57,8 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
     });
   };
 
-  const hasTableSupport = ["restaurant", "nightclub", "bar", "cafe"].includes(
-    settings?.business_type
-  );
+  // Show the Tables/Tabs menu when the business has either tables or tabs
+  const hasTableSupport = businessConfig.hasTables || businessConfig.hasTabs;
 
   const navItems = [
     ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),

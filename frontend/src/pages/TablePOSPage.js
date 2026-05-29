@@ -392,7 +392,9 @@ export default function TablePOSPage() {
     service_mode: isBarTab ? "bar_tab" : "table_service",
   });
 
-  const hasWaiterModule = !settings?.service_mode || settings.service_mode !== "quick_service";
+  const hasWaiterModule =
+    (config.hasKitchen !== false)
+    && (!settings?.service_mode || settings.service_mode !== "quick_service");
 
   const isWaiter = user?.role === "waiter";
   const canPrintBill = cart.length > 0 && !isWaiter;

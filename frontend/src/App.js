@@ -50,7 +50,10 @@ function AppRoutes() {
     );
   }
 
-  const hasTableSupport = ["restaurant", "nightclub", "bar", "cafe"].includes(settings?.business_type);
+  // hasTableSupport drives whether root redirects to /tables or /pos, and whether /tables is accessible.
+  // Bar uses tabs (still routed through the Tables page), so any business with tables OR tabs counts.
+  const TABS_OR_TABLES = ["restaurant", "nightclub", "bar"];
+  const hasTableSupport = TABS_OR_TABLES.includes(settings?.business_type);
   const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
   const canAccessAdmin = user?.role === "admin" || user?.role === "manager" || user?.permissions?.some(p => adminPerms.includes(p));
   const defaultPath = canAccessAdmin ? "/admin" : hasTableSupport ? "/tables" : "/pos";

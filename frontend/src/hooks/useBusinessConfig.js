@@ -1,5 +1,27 @@
 import { useBusiness } from "../context/BusinessContext";
 
+// Business capability flags drive what features appear in the app.
+//
+//   hasTables          — table-service workflow (Tables page, table assignment)
+//   hasTabs            — bar-tab workflow (open/close tabs)
+//   hasKitchen         — "Send to Kitchen" button + kitchen tickets
+//   hasFloorManagement — Floor Management admin section (tables/bar-tabs/reservations)
+//   hasIngredients     — Main Store / Kitchen Store / Bar Store with raw ingredients
+//   hasRecipes         — Recipes view linking products → ingredients
+//   stockMode          — "ingredient": stock tracks ingredients (food/bev businesses)
+//                      — "product":    stock tracks finished products (retail/supermarket)
+//   hasReservations    — table reservations
+const FOOD_BEVERAGE_CAPS = {
+  hasTables: true,
+  hasTabs: false,
+  hasKitchen: true,
+  hasFloorManagement: true,
+  hasIngredients: true,
+  hasRecipes: true,
+  hasReservations: true,
+  stockMode: "ingredient",
+};
+
 const CONFIGS = {
   restaurant: {
     displayName: "Restaurant",
@@ -22,6 +44,7 @@ const CONFIGS = {
     emptyIcon: "ClipboardList",
     showTable: true,
     tabName: "Tab",
+    ...FOOD_BEVERAGE_CAPS,
   },
 
   bar: {
@@ -45,6 +68,10 @@ const CONFIGS = {
     emptyIcon: "GlassWater",
     showTable: false,
     tabName: "Tab",
+    ...FOOD_BEVERAGE_CAPS,
+    hasTables: false,
+    hasTabs: true,
+    hasFloorManagement: true,   // bar still uses floor mgmt for bar-tabs/reservations
   },
 
   nightclub: {
@@ -69,6 +96,8 @@ const CONFIGS = {
     emptyIcon: "PartyPopper",
     showTable: true,
     tabName: "VIP Tab",
+    ...FOOD_BEVERAGE_CAPS,
+    hasTabs: true,
   },
 
   cafe: {
@@ -92,9 +121,13 @@ const CONFIGS = {
     emptyIcon: "Coffee",
     showTable: false,
     tabName: "Order",
+    ...FOOD_BEVERAGE_CAPS,
+    hasTables: false,
+    hasFloorManagement: false,
+    hasReservations: false,
   },
 
-  // Fallback for supermarket / retail (not in the feature spec, but handled gracefully)
+  // Retail / supermarket — sell finished products, no kitchen, no tables
   supermarket: {
     displayName: "Supermarket",
     staffTitle: "Cashier",
@@ -113,6 +146,14 @@ const CONFIGS = {
     emptyIcon: "ShoppingBag",
     showTable: false,
     tabName: "Transaction",
+    hasTables: false,
+    hasTabs: false,
+    hasKitchen: false,
+    hasFloorManagement: false,
+    hasIngredients: false,
+    hasRecipes: false,
+    hasReservations: false,
+    stockMode: "product",
   },
 
   retail: {
@@ -133,6 +174,14 @@ const CONFIGS = {
     emptyIcon: "Tag",
     showTable: false,
     tabName: "Sale",
+    hasTables: false,
+    hasTabs: false,
+    hasKitchen: false,
+    hasFloorManagement: false,
+    hasIngredients: false,
+    hasRecipes: false,
+    hasReservations: false,
+    stockMode: "product",
   },
 };
 
