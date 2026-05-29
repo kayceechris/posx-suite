@@ -1753,6 +1753,8 @@ function ImageLibraryView() {
   const [uploadErr, setUploadErr] = useState("");
   const [syncing, setSyncing]     = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [fetching, setFetching]   = useState(false);
+  const [fetchResult, setFetchResult] = useState(null);
   const fileRef                   = useRef();
   const searchTimeout             = useRef(null);
 
@@ -1830,6 +1832,22 @@ function ImageLibraryView() {
     }
   };
 
+  const handleAutoFetch = async () => {
+    if (fetching) return;
+    if (!window.confirm("Search the web for images of every product that doesn't have one, and attach the top result automatically? This is best-effort — review results in the Products list afterwards.")) return;
+    setFetching(true);
+    setFetchResult(null);
+    try {
+      const res = await api.autoFetchProductImages({ only_missing: true });
+      setFetchResult(res);
+      load(1, search);
+    } catch (err) {
+      setFetchResult({ error: err.message || "Auto-fetch failed" });
+    } finally {
+      setFetching(false);
+    }
+  };
+
   return (
     <div>
       <SectionHeader
@@ -1837,8 +1855,17 @@ function ImageLibraryView() {
         icon={<GalleryThumbnails size={20} className="text-indigo-600" />}
         iconBg="bg-indigo-100"
         action={
-          <div className="flex items-center gap-2">
-            <button onClick={handleSyncFromProducts} disabled={syncing || uploading}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={handleAutoFetch} disabled={fetching || syncing || uploading}
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm font-semibold hover:bg-emerald-200 dark:hover:bg-emerald-900/50 disabled:opacity-50 transition-colors"
+              title="Search the web for images of products that don't have one, and attach automatically">
+              {fetching ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /> Fetching…
+                </span>
+              ) : "Find Images Online"}
+            </button>
+            <button onClick={handleSyncFromProducts} disabled={syncing || fetching || uploading}
               className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-xl text-sm font-semibold hover:bg-amber-200 dark:hover:bg-amber-900/50 disabled:opacity-50 transition-colors"
               title="Download external product images and add them to the library">
               {syncing ? (
@@ -1854,6 +1881,31 @@ function ImageLibraryView() {
           </div>
         }
       />
+
+      {fetchResult && (
+        <div className={`mb-4 p-4 rounded-2xl border-2 text-sm ${
+          fetchResult.error
+            ? "border-red-300 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+            : "border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300"
+        }`}>
+          {fetchResult.error ? (
+            <p className="font-bold">{fetchResult.error}</p>
+          ) : (
+            <>
+              <p className="font-bold mb-1">Online image fetch complete</p>
+              <p>
+                Scanned <strong>{fetchResult.scanned}</strong> · Attached <strong>{fetchResult.attached}</strong> · No result <strong>{fetchResult.no_result}</strong> · Download failed <strong>{fetchResult.download_failed}</strong>
+              </p>
+              <p className="text-xs opacity-80 mt-1">Results are best-effort. Review products in the catalog and replace anything that's wrong.</p>
+              {fetchResult.errors?.length > 0 && (
+                <ul className="mt-2 text-xs opacity-80 list-disc pl-4 space-y-0.5 max-h-32 overflow-y-auto">
+                  {fetchResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {syncResult && (
         <div className={`mb-4 p-4 rounded-2xl border-2 text-sm ${

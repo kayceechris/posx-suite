@@ -529,6 +529,9 @@ export const api = {
   // Sync product images to Image Library (downloads external URLs, stores in DB)
   syncProductImages: () => request("/api/admin/sync-product-images", { method: "POST" }),
 
+  // Auto-fetch images online for products missing one
+  autoFetchProductImages: (data = {}) => request("/api/admin/auto-fetch-product-images", { method: "POST", body: JSON.stringify(data) }),
+
   // Image library
   getImages: (page = 1, search = "") =>
     request(`/api/images?page=${page}&limit=24&q=${encodeURIComponent(search)}`),
