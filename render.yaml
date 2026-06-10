@@ -1,0 +1,36 @@
+# Render Blueprint — one-click deploy of POSx Suite
+# Usage: push to GitHub, then on Render dashboard click
+# "New" -> "Blueprint" and connect this repo. Render auto-creates both services.
+
+services:
+  - type: web
+    name: posx-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false   # Set in dashboard (MongoDB Atlas connection string)
+      - key: DB_NAME
+        value: posx_suite
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false   # e.g. https://posx-frontend.onrender.com
+
+  - type: web
+    name: posx-frontend
+    runtime: static
+    rootDir: frontend
+    plan: free
+    buildCommand: yarn install && yarn build
+    staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        sync: false   # e.g. https://posx-backend.onrender.com

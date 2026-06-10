@@ -1,0 +1,816 @@
+from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
+import uuid
+
+
+# ==================== USER MODELS ====================
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    pincode: str
+    role: str
+    role_id: Optional[str] = None
+    outlet_id: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    photo: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserCreate(BaseModel):
+    name: str
+    pincode: str
+    role: str
+    outlet_id: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    photo: Optional[str] = None
+
+
+class UserLogin(BaseModel):
+    pincode: str
+
+
+# ==================== OUTLET MODELS ====================
+
+class Outlet(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: str
+    address: str
+    phone: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OutletCreate(BaseModel):
+    name: str
+    type: str
+    address: str
+    phone: Optional[str] = None
+
+
+# ==================== GROUP (formerly Category) MODELS ====================
+
+class Category(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    color: str = "#3B82F6"
+    main_category: Optional[str] = None   # "food" | "drinks"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CategoryCreate(BaseModel):
+    name: str
+    color: Optional[str] = "#3B82F6"
+    main_category: Optional[str] = None   # "food" | "drinks"
+
+
+# ==================== PRODUCT MODELS ====================
+
+class TerminalPrice(BaseModel):
+    outlet_id: Optional[str] = None
+    terminal_id: Optional[str] = None
+    price: float
+    cost_price: float = 0.0
+
+
+class Product(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    category_id: str
+    brand_id: Optional[str] = None
+    unit_id: Optional[str] = None
+    outlet_id: Optional[str] = None
+    terminal_id: Optional[str] = None
+    cost_price: float = 0.0
+    markup_percentage: float = 0.0
+    price: float
+    barcode: Optional[str] = None
+    image: Optional[str] = None
+    description: Optional[str] = None
+    active: bool = True
+    terminal_prices: List[TerminalPrice] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProductCreate(BaseModel):
+    name: str
+    category_id: str
+    brand_id: Optional[str] = None
+    unit_id: Optional[str] = None
+    outlet_id: Optional[str] = None
+    terminal_id: Optional[str] = None
+    cost_price: float = 0.0
+    markup_percentage: float = 0.0
+    price: float
+    barcode: Optional[str] = None
+    image: Optional[str] = None
+    description: Optional[str] = None
+    terminal_prices: List[TerminalPrice] = Field(default_factory=list)
+
+
+# ==================== INGREDIENT MODELS ====================
+
+class Ingredient(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    unit: str = "pcs"           # default measurement unit: g, kg, ml, L, pcs, etc.
+    category: Optional[str] = None
+    cost_price: float = 0.0
+    active: bool = True
+    # Which store this ingredient natively belongs to. Used by Add Stock
+    # pickers to keep bar items out of the Main Store picker, kitchen
+    # items out of the bar picker, etc. None = no restriction (legacy
+    # default, behaves as 'any store').
+    home_store: Optional[str] = None  # 'main' | 'kitchen' | 'bar' | None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class IngredientCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str
+    unit: str = "pcs"
+    category: Optional[str] = None
+    cost_price: float = 0.0
+    active: bool = True
+    home_store: Optional[str] = None
+
+
+# ==================== STOCK MODELS ====================
+
+class Stock(BaseModel):
+    """
+    Polymorphic stock record:
+      - Food/beverage businesses (restaurant, bar, etc.) set `ingredient_id`
+        and track raw ingredients across Main/Kitchen/Bar stores.
+      - Retail/supermarket businesses set `product_id` and track finished
+        goods directly. Exactly one of the two MUST be set.
+    """
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
+    outlet_id: str
+    store: str = "main"
+    quantity: float
+    min_quantity: float = 10
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StockUpdate(BaseModel):
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
+    outlet_id: str
+    store: str = "main"
+    quantity: float
+    min_quantity: Optional[float] = 10
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+
+
+class StockTransfer(BaseModel):
+    """Transfer stock from one store to another (e.g. Main → Kitchen)."""
+    ingredient_id: Optional[str] = None
+    product_id: Optional[str] = None
+    outlet_id: str
+    from_store: str
+    to_store: str
+    quantity: float
+    notes: Optional[str] = None
+
+
+class StockMovement(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ingredient_id: str
+    from_store: Optional[str] = None
+    to_store: Optional[str] = None
+    outlet_id: Optional[str] = None
+    quantity: float
+    type: str                          # "in" | "out" | "transfer"
+    notes: Optional[str] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StockMovementCreate(BaseModel):
+    ingredient_id: str
+    from_store: Optional[str] = None
+    to_store: Optional[str] = None
+    outlet_id: Optional[str] = None
+    quantity: float
+    type: str
+    notes: Optional[str] = None
+
+
+# ==================== REQUISITION MODELS ====================
+
+class RequisitionItem(BaseModel):
+    # Either product_id OR ingredient_id is set, matching the polymorphic
+    # Stock model. product_name is kept as a denormalized display label so
+    # historical / fulfilled requisitions still read sensibly.
+    product_id: Optional[str] = None
+    ingredient_id: Optional[str] = None
+    product_name: str
+    quantity_requested: int
+    quantity_fulfilled: int = 0
+    unit_id: Optional[str] = None
+
+
+class Requisition(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outlet_id: str
+    from_store: str                  # "kitchen" | "bar"
+    to_store: str = "main"
+    items: List[RequisitionItem]
+    notes: Optional[str] = None
+    status: str = "pending"          # pending | approved | fulfilled | rejected
+    created_by: str
+    created_by_name: Optional[str] = None
+    fulfilled_by: Optional[str] = None
+    fulfilled_by_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    fulfilled_at: Optional[datetime] = None
+
+
+class RequisitionCreate(BaseModel):
+    outlet_id: str
+    from_store: str
+    items: List[RequisitionItem]
+    notes: Optional[str] = None
+
+
+# ==================== STORE MODELS ====================
+
+class Store(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    is_main: bool = False
+    color: str = "indigo"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StoreCreate(BaseModel):
+    name: str
+    color: Optional[str] = "indigo"
+
+
+# ==================== CUSTOMER MODELS ====================
+
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    total_orders: int = 0
+    total_spent: float = 0.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CustomerCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+# ==================== ORDER MODELS ====================
+
+class OrderItem(BaseModel):
+    product_id: str
+    product_name: str
+    quantity: int
+    price: float
+    total: float
+
+
+class Order(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_number: str
+    outlet_id: str
+    terminal_id: Optional[str] = None
+    table_id: Optional[str] = None
+    table_number: Optional[str] = None
+    bar_tab_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    items: List[OrderItem]
+    subtotal: float
+    tax: float = 0.0
+    discount: float = 0.0
+    discount_reason: Optional[str] = None
+    total: float
+    payment_method: str
+    status: str = "held"
+    service_mode: str = "quick_service"
+    idempotency_key: Optional[str] = None
+    # Snapshot of what's been sent to the kitchen — used by TablePOS to
+    # compute deltas on subsequent Hold / Send-to-Kitchen clicks, so the
+    # kitchen never reprints items it already received.
+    kitchen_sent_items: Optional[List[OrderItem]] = None
+    created_by: str
+    created_by_name: Optional[str] = None
+    created_by_role: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OrderCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    outlet_id: str
+    terminal_id: Optional[str] = None
+    table_id: Optional[str] = None
+    table_number: Optional[str] = None
+    bar_tab_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    items: List[OrderItem]
+    subtotal: float
+    tax: float = 0.0
+    discount: float = 0.0
+    discount_reason: Optional[str] = None
+    total: float
+    payment_method: str
+    status: str = "held"
+    service_mode: str = "quick_service"
+    # Optional client-supplied id used to swallow duplicate POSTs caused by
+    # a network retry, an offline-queue replay, or a rage-click that
+    # slipped past the modal's in-flight guard. The backend stores this on
+    # the created order; subsequent POSTs with the same key return the
+    # existing order instead of creating a duplicate.
+    idempotency_key: Optional[str] = None
+    # See Order.kitchen_sent_items — snapshot of last kitchen print
+    kitchen_sent_items: Optional[List[OrderItem]] = None
+
+
+# ==================== TABLE MODELS ====================
+
+class Table(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    number: str
+    outlet_id: str
+    floor_id: Optional[str] = None
+    status: str = "available"
+    waiter_id: Optional[str] = None
+    waiter_name: Optional[str] = None
+    current_order_id: Optional[str] = None
+    seats: int = 4
+    merged_into: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TableCreate(BaseModel):
+    number: str
+    outlet_id: str
+    floor_id: Optional[str] = None
+    seats: int = 4
+
+
+class TableTransferRequest(BaseModel):
+    new_waiter_id: str
+
+
+# ==================== FLOOR MODELS ====================
+
+class Floor(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    outlet_id: str
+    sort_order: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FloorCreate(BaseModel):
+    name: str
+    outlet_id: str
+    sort_order: int = 0
+
+
+# ==================== BAR TAB MODELS ====================
+
+class BarTab(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    number: str
+    outlet_id: str
+    tab_type: str = "regular"
+    status: str = "available"
+    current_order_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class BarTabCreate(BaseModel):
+    number: str
+    outlet_id: str
+    tab_type: str = "regular"
+
+
+# ==================== PAYMENT TYPE MODELS ====================
+
+class PaymentType(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: str
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PaymentTypeCreate(BaseModel):
+    name: str
+    type: str
+
+
+# ==================== CURRENCY MODELS ====================
+
+class Currency(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str
+    symbol: str
+    name: str
+    exchange_rate: float = 1.0
+    is_default: bool = False
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CurrencyCreate(BaseModel):
+    code: str
+    symbol: str
+    name: str
+    exchange_rate: float = 1.0
+    is_default: bool = False
+
+
+# ==================== PRINTER MODELS ====================
+
+class Printer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    mode: str
+    type: str
+    ip_address: Optional[str] = None
+    port: Optional[int] = None
+    outlet_id: str
+    terminal_id: Optional[str] = None
+    windows_printer_name: Optional[str] = None
+    printer_group_ids: List[str] = []
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PrinterCreate(BaseModel):
+    name: str
+    mode: str
+    type: str
+    ip_address: Optional[str] = None
+    port: Optional[int] = None
+    outlet_id: str
+    terminal_id: Optional[str] = None
+    windows_printer_name: Optional[str] = None
+    printer_group_ids: List[str] = []
+
+
+# ==================== SPLIT BILL MODELS ====================
+
+class SplitBill(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    original_order_id: str
+    split_number: int
+    amount: float
+    payment_method: str
+    paid: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SplitBillCreate(BaseModel):
+    original_order_id: str
+    splits: List[Dict[str, float]]
+
+
+# ==================== ROLE & PERMISSION MODELS ====================
+
+class Permission(BaseModel):
+    resource: str
+    actions: List[str]
+
+
+class Role(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    permissions: List[Permission]
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleCreate(BaseModel):
+    name: str
+    permissions: List[Permission]
+
+
+# ==================== BUSINESS SETTINGS MODELS ====================
+
+class BusinessSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = "business_settings"
+    business_type: str
+    business_name: str
+    service_mode: str = "quick_service"
+    default_currency: str = "USD"
+    default_payment_type: str = "cash"
+    company_logo: Optional[str] = None
+    company_address: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    tax_id: Optional[str] = None
+    receipt_header: Optional[str] = None
+    receipt_footer: Optional[str] = None
+    setup_completed: bool = False
+    tax_enabled: bool = False
+    tax_mode: str = "exclusive"  # "inclusive" | "exclusive"
+    # Shift schedule used by the Shift Report. 24h "HH:MM" strings.
+    # Four shifts arranged around the clock — each shift starts at its
+    # listed time and ends when the next one begins. The Night shift wraps
+    # past midnight back to morning_start.
+    morning_start:   str = "06:00"
+    afternoon_start: str = "12:00"
+    evening_start:   str = "17:00"
+    night_start:     str = "22:00"
+
+
+class BusinessSettingsCreate(BaseModel):
+    business_type: str
+    business_name: str
+    service_mode: str = "both"
+    company_logo: Optional[str] = None
+    company_address: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    tax_id: Optional[str] = None
+    receipt_header: Optional[str] = None
+    receipt_footer: Optional[str] = None
+
+
+# ==================== SUPPLIER MODELS ====================
+
+class Supplier(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SupplierCreate(BaseModel):
+    name: str
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+
+# ==================== EXPENSE MODELS ====================
+
+class Expense(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category: str
+    description: str
+    amount: float
+    date: str
+    supplier_id: Optional[str] = None
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ExpenseCreate(BaseModel):
+    category: str
+    description: str
+    amount: float
+    date: str
+    supplier_id: Optional[str] = None
+
+
+# ==================== PURCHASE ORDER MODELS ====================
+
+class PurchaseOrderItem(BaseModel):
+    product_id: Optional[str] = None
+    description: str
+    quantity: float
+    unit: str = "pcs"
+    unit_cost: float
+    total: float = 0.0
+
+
+class PurchaseOrder(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    po_number: str = ""
+    supplier_id: str
+    type: str = "external"
+    outlet_id: Optional[str] = None
+    items: List[PurchaseOrderItem] = []
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total: float = 0.0
+    status: str = "draft"
+    notes: Optional[str] = None
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: str
+    type: str = "external"
+    outlet_id: Optional[str] = None
+    status: str = "pending"
+    items: List[PurchaseOrderItem]
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total: float = 0.0
+    notes: Optional[str] = None
+
+
+# ==================== PERIPHERAL MODELS ====================
+
+class Peripheral(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: str
+    connection: str = "usb"
+    ip_address: Optional[str] = None
+    port: Optional[int] = None
+    outlet_id: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PeripheralCreate(BaseModel):
+    name: str
+    type: str
+    connection: str = "usb"
+    ip_address: Optional[str] = None
+    port: Optional[int] = None
+    outlet_id: Optional[str] = None
+
+
+# ==================== DISPLAY MODELS ====================
+
+class DisplayUpdate(BaseModel):
+    terminal_id: str = "default"
+    business_name: Optional[str] = None
+    company_logo: Optional[str] = None
+    items: List[Dict[str, Any]] = []
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total: float = 0.0
+    status: str = "idle"
+    message: Optional[str] = None
+
+
+# ==================== ACCOUNTING MODELS ====================
+
+class Deposit(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category: str
+    description: str
+    amount: float
+    date: str
+    payment_method: str = "cash"
+    reference: Optional[str] = None
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DepositCreate(BaseModel):
+    category: str
+    description: str
+    amount: float
+    date: str
+    payment_method: str = "cash"
+    reference: Optional[str] = None
+
+
+class AccountCategory(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: str  # "expense" | "deposit"
+    color: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AccountCategoryCreate(BaseModel):
+    name: str
+    type: str
+    color: Optional[str] = None
+
+
+class Transfer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    from_account: str
+    to_account: str
+    amount: float
+    description: Optional[str] = None
+    date: str
+    reference: Optional[str] = None
+    created_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TransferCreate(BaseModel):
+    from_account: str
+    to_account: str
+    amount: float
+    description: Optional[str] = None
+    date: str
+    reference: Optional[str] = None
+
+
+# ==================== REGISTRATION MODELS ====================
+
+class RegisterAdmin(BaseModel):
+    name: str
+    pincode: str
+    business_name: str
+    business_type: str = "restaurant"
+
+
+# ==================== WASTE / SPOILAGE MODELS ====================
+
+class WasteEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    outlet_id: str
+    quantity: int
+    reason: str  # spoilage | damage | theft | expired | other
+    notes: Optional[str] = None
+    recorded_by: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class WasteEntryCreate(BaseModel):
+    product_id: str
+    outlet_id: str
+    quantity: int
+    reason: str
+    notes: Optional[str] = None
+
+
+# ==================== RESERVATION MODELS ====================
+
+class Reservation(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    table_id: str
+    table_number: str
+    outlet_id: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int = 2
+    date: str                   # YYYY-MM-DD
+    time: str                   # HH:MM (24h)
+    duration: int = 90          # minutes
+    notes: Optional[str] = None
+    status: str = "confirmed"   # confirmed | seated | cancelled | no_show
+    created_by: str
+    created_by_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ReservationCreate(BaseModel):
+    table_id: str
+    table_number: str
+    outlet_id: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: int = 2
+    date: str
+    time: str
+    duration: int = 90
+    notes: Optional[str] = None
