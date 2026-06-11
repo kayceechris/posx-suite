@@ -57,6 +57,7 @@ const PERMISSION_MODULES = [
       { id: "edit_order",              label: "Edit Order" },
       { id: "delete_order",            label: "Delete Order" },
       { id: "void_order",              label: "Void Order" },
+      { id: "view_void_orders",        label: "View Void Order Records" },
       { id: "apply_discount",          label: "Apply Discount" },
       { id: "process_payment",         label: "Process Payment" },
       { id: "delete_held_order_items", label: "Delete Held Order Items" },

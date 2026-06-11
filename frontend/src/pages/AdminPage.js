@@ -20,6 +20,7 @@ const ProductsSection      = lazy(() => import("../admin/ProductsSection"));
 const InventorySection     = lazy(() => import("../admin/InventorySection"));
 const CustomersSection     = lazy(() => import("../admin/CustomersSection"));
 const OrdersSection        = lazy(() => import("../admin/OrdersSection"));
+const VoidOrdersSection    = lazy(() => import("../admin/VoidOrdersSection"));
 const ReportsSection       = lazy(() => import("../admin/ReportsSection"));
 const AccountsSection      = lazy(() => import("../admin/AccountsSection"));
 const TablesSection        = lazy(() => import("../admin/TablesSection"));
@@ -47,6 +48,7 @@ const ADMIN_CHUNK_IMPORTS = [
   () => import("../admin/RequisitionsSection"),
   () => import("../admin/SettingsSection"),
   () => import("../admin/PurchasesSection"),
+  () => import("../admin/VoidOrdersSection"),
 ];
 function prefetchAdminChunks() {
   const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 800));
@@ -77,6 +79,10 @@ const EXPANDABLE = {
     { id: "units", label: "Units" }, { id: "recipes", label: "Recipes" },
     { id: "print-labels", label: "Print Labels" }, { id: "import", label: "Import Products" },
     { id: "image-library", label: "Image Library" },
+  ],
+  orders: [
+    { id: "all-orders",   label: "All Orders" },
+    { id: "void-orders",  label: "Void Orders" },
   ],
   reports: [
     { id: "sales",         label: "Sales" },
@@ -192,6 +198,9 @@ const SUB_ITEM_PERMISSION = {
   "floor.reservations":         "view_reservations",
   // ── Outlets ─────────────────────────────────────────────────────────────────
   "outlets.terminals":          "manage_terminals",
+  // ── Orders ──────────────────────────────────────────────────────────────────
+  "orders.all-orders":          "view_orders",
+  "orders.void-orders":         "view_void_orders",
   // ── Reports ─────────────────────────────────────────────────────────────────
   "reports.sales":              "view_sales_report",
   "reports.cost":               "view_financial_report",
@@ -236,7 +245,7 @@ const NAV_ITEMS = [
   { id: "stores", label: "Store Management", icon: Store, expandable: true },
   { id: "purchases", label: "Purchases", icon: ShoppingBag, expandable: true },
   { id: "customers", label: "Customers", icon: UserCircle },
-  { id: "orders", label: "Orders", icon: ClipboardList },
+  { id: "orders", label: "Orders", icon: ClipboardList, expandable: true },
   { id: "reports", label: "Reports", icon: BarChart2, expandable: true },
   { id: "accounts", label: "Accounts", icon: BookOpen, expandable: true },
   { id: "floor", label: "Floor Management", icon: LayoutGrid, expandable: true },
@@ -270,7 +279,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [expandedSection, setExpandedSection] = useState(null);
-  const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", stores: "main-store", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard" });
+  const [subViews, setSubViews] = useState({ users: "list", outlets: "outlets", products: "all-products", reports: "sales", inventory: "stock", stores: "main-store", purchases: "pending", floor: "tables", settings: "company", accounts: "dashboard", orders: "all-orders" });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef(null);
@@ -596,7 +605,8 @@ export default function AdminPage() {
               {activeSection === "inventory" && subViews.inventory === "requisitions" && <RequisitionsSection />}
               {activeSection === "stores" && <InventorySection view={subViews.stores === "create-store" ? "stores" : subViews.stores} />}
               {activeSection === "customers" && <CustomersSection />}
-              {activeSection === "orders" && <OrdersSection />}
+              {activeSection === "orders" && subViews.orders !== "void-orders" && <OrdersSection />}
+              {activeSection === "orders" && subViews.orders === "void-orders" && <VoidOrdersSection />}
               {activeSection === "reports" && <ReportsSection view={subViews.reports} />}
               {activeSection === "accounts" && <AccountsSection view={subViews.accounts} onViewChange={(v) => handleSubClick("accounts", v)} />}
               {activeSection === "floor" && subViews.floor === "tables" && <TablesSection />}

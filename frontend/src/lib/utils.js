@@ -103,7 +103,7 @@ const PERMISSION_IMPLIES = {
     "view_accounts", "view_accounts_dashboard",
   ],
   view_all_orders: [
-    "view_orders",
+    "view_orders", "view_void_orders",
   ],
   process_payment: [
     "view_orders", "use_pos",
