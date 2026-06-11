@@ -261,13 +261,14 @@ async def get_payment_report(start_date: Optional[str] = None, end_date: Optiona
             for method, amount in _parse_split_payment(pm, total):
                 key = method.lower()
                 if key not in buckets:
-                    buckets[key] = {"method": method, "count": 0, "total": 0.0}
+                    buckets[key] = {"method": method, "count": 0, "total": 0.0, "split_count": 0}
                 buckets[key]["count"] += 1
                 buckets[key]["total"] += amount
+                buckets[key]["split_count"] += 1
         else:
             key = pm.lower()
             if key not in buckets:
-                buckets[key] = {"method": pm, "count": 0, "total": 0.0}
+                buckets[key] = {"method": pm, "count": 0, "total": 0.0, "split_count": 0}
             buckets[key]["count"] += 1
             buckets[key]["total"] += total
 
