@@ -792,17 +792,6 @@ export default function POSPage() {
 
           {/* Category pills */}
           <div className="px-4 py-2.5 flex gap-2 overflow-x-auto scrollbar-hide border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-            <button
-              onClick={() => setActiveCategory("all")}
-              className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
-                activeCategory === "all"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-              )}
-            >
-              All
-            </button>
             {visibleCategories.map((cat) => (
               <button
                 key={cat.id}

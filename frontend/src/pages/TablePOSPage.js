@@ -1630,16 +1630,6 @@ export default function TablePOSPage() {
 
             {/* Category pills */}
             <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
-              <button
-                onClick={() => setActiveCategory("all")}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
-                  activeCategory === "all"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                )}>
-                All
-              </button>
               {visibleCategories.map((cat) => (
                 <button key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
