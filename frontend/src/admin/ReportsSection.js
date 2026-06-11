@@ -730,17 +730,20 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
   );
 }
 
-// Parse a split payment method string like "cash ₦5,000.00 + card ₦2,000.00"
-// into an array of { method, amount } components. Returns null for non-split strings.
+// Parse "Card ₦5,000.00 + Cash ₦1,000.00" into [{method,amount}, ...].
+// Returns null for plain (non-split) method strings.
 function parseSplitComponents(methodStr) {
   if (!methodStr || !methodStr.includes(" + ")) return null;
   const parts = methodStr.split(" + ");
   const components = [];
   for (const part of parts) {
-    const symIdx = part.search(/[₦$€£¥]/);
-    if (symIdx === -1) continue;
-    const method = part.slice(0, symIdx).trim();
-    const amount = parseFloat(part.slice(symIdx + 1).replace(/,/g, "")) || 0;
+    // The format is "{method name} {currencySymbol}{digits}".
+    // Find "space followed by a non-letter/non-space char" — that's the boundary.
+    const spaceSymMatch = part.search(/\s[^A-Za-z\s]/);
+    if (spaceSymMatch === -1) continue;
+    const method = part.slice(0, spaceSymMatch).trim();
+    // +2 skips the space and the single-char currency symbol
+    const amount = parseFloat(part.slice(spaceSymMatch + 2).replace(/,/g, "")) || 0;
     if (method && amount > 0) components.push({ method, amount });
   }
   return components.length > 0 ? components : null;

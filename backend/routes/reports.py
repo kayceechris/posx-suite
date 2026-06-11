@@ -1,4 +1,3 @@
-import re as _re
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import date, timedelta
@@ -221,16 +220,20 @@ async def get_staff_report(start_date: Optional[str] = None, end_date: Optional[
 
 def _parse_split_payment(method_str: str, order_total: float):
     """Parse 'Card ₦88,000.00 + Bank Transfer ₦77,000.00' into [(method, amount), ...].
-    Distributes order_total proportionally when parsed amounts don't match exactly."""
+    Format: '{method name} {currencySymbol}{digits}' joined with ' + '.
+    Finds the boundary using a space before a non-letter character."""
+    import re as _re_local
     parts = method_str.split(" + ")
     components = []
     for part in parts:
-        m = _re.search(r'[₦$€£¥]', part)
+        # Find 'space + non-letter' to locate the currency symbol boundary
+        m = _re_local.search(r'\s[^A-Za-z\s]', part)
         if not m:
             continue
         method = part[:m.start()].strip()
         try:
-            amount = float(part[m.end():].replace(',', ''))
+            # +2 skips the space and the single-char currency symbol
+            amount = float(part[m.start() + 2:].replace(',', ''))
         except ValueError:
             amount = 0.0
         if method and amount > 0:
