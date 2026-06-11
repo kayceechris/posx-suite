@@ -73,6 +73,9 @@ function divider(char = "-", len = 32) {
   return char.repeat(len);
 }
 
+// Cache logo bytes so re-fetching the remote URL on every print is avoided.
+const _logoCache = new Map();
+
 // Convert a logo image URL into ESC/POS raster bytes (GS v 0). The image is
 // fetched as a blob (CORS-safe, never taints the canvas), drawn onto a
 // canvas sized to the paper width, alpha-blended onto white, then dithered
@@ -81,6 +84,8 @@ function divider(char = "-", len = 32) {
 // image fails to load — a missing logo must never break a print.
 async function loadLogoBytes(logoUrl, paper80mm = true) {
   if (!logoUrl) return [];
+  const cacheKey = `${logoUrl}::${paper80mm}`;
+  if (_logoCache.has(cacheKey)) return _logoCache.get(cacheKey);
 
   // Load the bitmap. Fetching as a blob → object URL means the resulting
   // <img> is treated as same-origin, so getImageData works even on cross-
@@ -192,6 +197,7 @@ async function loadLogoBytes(logoUrl, paper80mm = true) {
     }
     bytes.push(0x0A);                       // feed line
     bytes.push(0x1B, 0x61, 0x00);          // ESC a 0 — left
+    _logoCache.set(cacheKey, bytes);
     return bytes;
   } catch (e) {
     console.warn("[printService] logo render failed:", e?.message);

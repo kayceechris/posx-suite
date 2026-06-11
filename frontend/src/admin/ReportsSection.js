@@ -719,7 +719,8 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
                           {isSplit ? (
                             <>
                               <p className="font-semibold text-orange-500 dark:text-orange-400 text-sm whitespace-nowrap">{formatCurrency(amt)}</p>
-                              <p className="text-[10px] text-gray-400 line-through">{formatCurrency(o.total)}</p>
+                              <p className="text-[10px] text-gray-400 line-through whitespace-nowrap">{formatCurrency(o.total)}</p>
+                              <p className="text-[10px] text-orange-400/70 dark:text-orange-300/50 whitespace-nowrap">{parseSplitComponents(o.payment_method)?.map(c => c.method).join(" + ")}</p>
                             </>
                           ) : (
                             <p className="font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(o.total)}</p>
@@ -765,6 +766,7 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
                                 <div>
                                   <p className="font-semibold text-orange-500 dark:text-orange-400">{formatCurrency(amt)}</p>
                                   <p className="text-[10px] text-gray-400 line-through">{formatCurrency(o.total)}</p>
+                                  <p className="text-[10px] text-orange-400/70 dark:text-orange-300/50">{parseSplitComponents(o.payment_method)?.map(c => c.method).join(" + ")}</p>
                                 </div>
                               ) : (
                                 <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(o.total)}</span>
