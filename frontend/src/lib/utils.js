@@ -113,22 +113,12 @@ const PERMISSION_IMPLIES = {
   ],
 };
 
-// Permissions automatically granted to every cashier (no explicit assignment needed).
-const CASHIER_DEFAULT_PERMISSIONS = [
-  "view_sales_report",
-  "view_staff_report",
-  "view_payment_report",
-  "view_product_report",
-  "view_daily_summary",
-];
-
 // True when the user holds `perm` directly OR an umbrella permission that
 // implies it. Use this in every UI gate that checks a single permission.
 export function userHasPermission(user, perm) {
   if (!perm) return true;
   if (!user) return false;
   if (user.role === "admin" || user.role === "manager") return true;
-  if (user.role === "cashier" && CASHIER_DEFAULT_PERMISSIONS.includes(perm)) return true;
   const perms = user.permissions || [];
   if (perms.includes(perm)) return true;
   for (const [umbrella, implies] of Object.entries(PERMISSION_IMPLIES)) {

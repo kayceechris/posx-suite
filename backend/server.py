@@ -97,6 +97,55 @@ async def _ensure_indexes_on_startup():
 
 
 @app.on_event("startup")
+async def _ensure_default_user_types():
+    """Create built-in user types (Cashier, Waiter) if they don't exist yet.
+    Never overwrites a type the admin has already customised. Runs before the
+    permission-sync hook so the new types are picked up on the same startup."""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    DEFAULT_TYPES = [
+        {
+            "name": "Cashier",
+            "permissions": [
+                # POS operations
+                "process_sales", "hold_orders", "view_all_orders",
+                "apply_discounts", "recall_order", "delete_held_order_items",
+                "split_bill", "reprint_kitchen_ticket", "view_customers",
+                # Reports
+                "view_sales_report", "view_staff_report", "view_payment_report",
+                "view_product_report", "view_daily_summary",
+            ],
+        },
+        {
+            "name": "Waiter",
+            "permissions": [
+                "process_sales", "hold_orders", "recall_order",
+                "view_all_orders", "manage_tables", "transfer_tables",
+                "move_order", "print_bill", "view_customers",
+            ],
+        },
+    ]
+    try:
+        for t in DEFAULT_TYPES:
+            exists = await db.user_types.find_one(
+                {"name": {"$regex": f"^{t['name']}$", "$options": "i"}},
+                {"_id": 0, "id": 1},
+            )
+            if not exists:
+                doc = {
+                    "id": str(_uuid.uuid4()),
+                    "name": t["name"],
+                    "permissions": t["permissions"],
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                await db.user_types.insert_one(doc)
+                logger.info(f"Created default user type: {t['name']}")
+    except Exception as e:
+        logger.warning(f"Default user types setup skipped: {e}")
+
+
+@app.on_event("startup")
 async def _sync_user_permissions_from_types():
     """Backfill: ensure every user's permissions match the current state of
     their assigned user-type. Without this, edits the admin made to a
