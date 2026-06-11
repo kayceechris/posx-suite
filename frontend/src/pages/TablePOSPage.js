@@ -254,8 +254,8 @@ function PaymentModal({ total, onClose, onConfirm, onSplit, paymentTypes, custom
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden max-h-[95vh] overflow-y-auto">
-        <div className={`p-5 text-white text-center ${isCredit ? "bg-amber-500" : "bg-emerald-500"}`}>
+      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[95vh]">
+        <div className={`p-5 text-white text-center flex-shrink-0 ${isCredit ? "bg-amber-500" : "bg-emerald-500"}`}>
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/75 mb-1">
             {splitMode ? "Paying Now" : "Total Amount"}
           </p>
@@ -272,7 +272,7 @@ function PaymentModal({ total, onClose, onConfirm, onSplit, paymentTypes, custom
             </p>
           )}
         </div>
-        <div className="p-5 space-y-3">
+        <div className="p-5 space-y-3 overflow-y-auto flex-1">
           {/* Split toggle */}
           {canSplit && cart.length > 0 && (
             <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
@@ -556,6 +556,9 @@ function PaymentModal({ total, onClose, onConfirm, onSplit, paymentTypes, custom
             );
           })()}
 
+        </div>
+        {/* Pinned footer — always visible, never scrolled off screen */}
+        <div className="px-5 pb-5 pt-3 space-y-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-700/60">
           <button
             onClick={() => {
               if (!canConfirm) return;

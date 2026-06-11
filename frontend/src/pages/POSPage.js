@@ -53,9 +53,9 @@ function PaymentModal({ total, onClose, onConfirm, paymentTypes, customerName, o
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden max-h-[95vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[95vh]">
         {/* Total header */}
-        <div className={`p-5 text-white text-center ${isCredit ? "bg-amber-500" : "bg-emerald-500"}`}>
+        <div className={`p-5 text-white text-center flex-shrink-0 ${isCredit ? "bg-amber-500" : "bg-emerald-500"}`}>
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/75 mb-1">Total Amount</p>
           <p className="text-4xl font-black tabular-nums">{formatCurrency(dueAmount)}</p>
           {discountOn && discountAmt > 0 && (
@@ -66,7 +66,7 @@ function PaymentModal({ total, onClose, onConfirm, paymentTypes, customerName, o
           )}
         </div>
 
-        <div className="p-5 space-y-3">
+        <div className="p-5 space-y-3 overflow-y-auto flex-1">
           {/* Payment methods — visual button row */}
           <div>
             <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5">
@@ -224,7 +224,9 @@ function PaymentModal({ total, onClose, onConfirm, paymentTypes, customerName, o
             );
           })()}
 
-          {/* Confirm */}
+        </div>
+        {/* Pinned footer — always visible, never scrolled off screen */}
+        <div className="px-5 pb-5 pt-3 space-y-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-700/60">
           <button
             onClick={() => {
               if (!canConfirm) return;
