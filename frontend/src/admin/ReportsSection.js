@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Calendar, ChevronDown, ChevronRight, X, BarChart2, Tag, Layers, Percent, ClipboardList, Clock, Receipt, LayoutGrid, Printer, FileText } from "lucide-react";
 import { api } from "../lib/api";
 import { cn, formatCurrency, dedupePendingOrders, dedupeOrders } from "../lib/utils";
@@ -730,6 +730,22 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
   );
 }
 
+// Parse a split payment method string like "cash ₦5,000.00 + card ₦2,000.00"
+// into an array of { method, amount } components. Returns null for non-split strings.
+function parseSplitComponents(methodStr) {
+  if (!methodStr || !methodStr.includes(" + ")) return null;
+  const parts = methodStr.split(" + ");
+  const components = [];
+  for (const part of parts) {
+    const symIdx = part.search(/[₦$€£¥]/);
+    if (symIdx === -1) continue;
+    const method = part.slice(0, symIdx).trim();
+    const amount = parseFloat(part.slice(symIdx + 1).replace(/,/g, "")) || 0;
+    if (method && amount > 0) components.push({ method, amount });
+  }
+  return components.length > 0 ? components : null;
+}
+
 function PaymentsTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -744,6 +760,34 @@ function PaymentsTab() {
   }, []);
 
   useEffect(() => { load(monthStart(), today()); }, []);
+
+  // Merge split-payment entries into their component methods so "cash ₦X + card ₦Y"
+  // contributes to the Cash and Card totals rather than appearing as a separate card.
+  const mergedMethods = useMemo(() => {
+    if (!data?.methods) return [];
+    const map = new Map();
+    const add = (key, method, count, total) => {
+      if (!map.has(key)) map.set(key, { method, count: 0, total: 0 });
+      const e = map.get(key);
+      e.count += count;
+      e.total += total;
+    };
+    for (const m of data.methods) {
+      const components = parseSplitComponents(m.method);
+      if (components) {
+        const componentSum = components.reduce((s, c) => s + c.amount, 0);
+        if (componentSum > 0) {
+          for (const { method, amount } of components) {
+            add(method.toLowerCase(), method, m.count, (amount / componentSum) * m.total);
+          }
+        }
+      } else {
+        const key = (m.method || "unknown").toLowerCase();
+        add(key, m.method || "Unknown", m.count, m.total);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [data]);
 
   const METHOD_COLORS = [
     "border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-700",
@@ -762,17 +806,17 @@ function PaymentsTab() {
             <ExportBtn
               onCSV={() => downloadCSV("payment_methods",
                 ["Method", "Total", "Transactions"],
-                (data.methods || []).map((m) => [m.method || "Unknown", m.total, m.count]))}
+                mergedMethods.map((m) => [m.method || "Unknown", m.total, m.count]))}
               onPrint={() => printReport({
                 title: "Payment Methods Report",
                 subtitle: `${dateRange.start} to ${dateRange.end}`,
                 headers: ["Method", "Total", "Transactions"],
-                rows: (data.methods || []).map((m) => [m.method || "Unknown", formatCurrency(m.total), m.count]),
+                rows: mergedMethods.map((m) => [m.method || "Unknown", formatCurrency(m.total), m.count]),
               })}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-            {(data.methods || []).map((m, i) => (
+            {mergedMethods.map((m, i) => (
               <button key={i} onClick={() => setSelectedMethod(m.method)}
                 className={cn(
                   "text-left rounded-2xl border-2 p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5",
@@ -784,11 +828,11 @@ function PaymentsTab() {
                 <p className="text-xs text-gray-500 dark:text-gray-300">{m.count} transaction{m.count !== 1 ? "s" : ""}</p>
               </button>
             ))}
-            {(data.methods || []).length === 0 && (
+            {mergedMethods.length === 0 && (
               <p className="col-span-3 py-10 text-center text-gray-400 text-sm">No payment data for this period.</p>
             )}
           </div>
-          {(data.methods || []).length > 0 && (
+          {mergedMethods.length > 0 && (
             <p className="text-xs text-gray-400 mb-2">Tap a payment method card to view its orders</p>
           )}
         </>

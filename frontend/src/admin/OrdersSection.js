@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Eye, Trash2, X, ShoppingBag, Calendar, ClipboardList, Ban, Search, Printer, RotateCcw } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Eye, Trash2, X, ShoppingBag, Calendar, ClipboardList, Ban, Search, Printer, RotateCcw, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { cn, formatCurrency, dedupePendingOrders, dedupeOrders, userHasPermission } from "../lib/utils";
@@ -218,6 +218,66 @@ function OrderDetailModal({ order, outlets, terminals, onClose, onVoid, onDelete
   );
 }
 
+function VoidReasonModal({ order, onConfirm, onClose }) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const textareaRef = useRef(null);
+
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) return;
+    setLoading(true);
+    try { await onConfirm(order, reason.trim()); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="w-9 h-9 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+            <AlertTriangle size={18} className="text-red-500" />
+          </div>
+          <div>
+            <h3 className="font-black text-gray-900 dark:text-white text-base">Void Order</h3>
+            <p className="text-xs text-gray-400">{order.order_number} · {formatCurrency(order.total)}</p>
+          </div>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            This action cannot be undone. Please provide a reason for voiding this order.
+          </p>
+          <div>
+            <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1.5">
+              Void Reason <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              ref={textareaRef}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Customer cancelled, Wrong order, Duplicate entry..."
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-red-400 resize-none"
+            />
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={!reason.trim() || loading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Ban size={15} />}
+            Void Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersSection() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
@@ -229,6 +289,7 @@ export default function OrdersSection() {
   const [orderSearch, setOrderSearch] = useState("");
   const [waiterSearch, setWaiterSearch] = useState("");
   const [viewOrder, setViewOrder] = useState(null);
+  const [voidTarget, setVoidTarget] = useState(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -276,9 +337,10 @@ export default function OrdersSection() {
     ? terminals.filter((t) => t.outlet_id === outletFilter)
     : terminals;
 
-  const handleVoid = async (order) => {
-    if (!window.confirm(`Void order ${order.order_number}? This cannot be undone.`)) return;
-    try { await api.voidOrder(order.id); setViewOrder(null); load(); }
+  const handleVoid = (order) => { setVoidTarget(order); };
+
+  const handleVoidConfirm = async (order, reason) => {
+    try { await api.voidOrder(order.id, reason); setVoidTarget(null); setViewOrder(null); load(); }
     catch (err) { alert(err.message); }
   };
 
@@ -532,6 +594,13 @@ export default function OrdersSection() {
           onVoid={handleVoid}
           onDelete={handleDelete}
           onRecall={handleRecall}
+        />
+      )}
+      {voidTarget && (
+        <VoidReasonModal
+          order={voidTarget}
+          onConfirm={handleVoidConfirm}
+          onClose={() => setVoidTarget(null)}
         />
       )}
     </div>

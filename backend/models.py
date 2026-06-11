@@ -316,6 +316,7 @@ class Order(BaseModel):
     status: str = "held"
     service_mode: str = "quick_service"
     idempotency_key: Optional[str] = None
+    void_reason: Optional[str] = None
     # Snapshot of what's been sent to the kitchen — used by TablePOS to
     # compute deltas on subsequent Hold / Send-to-Kitchen clicks, so the
     # kitchen never reprints items it already received.

@@ -133,8 +133,8 @@ export const api = {
     request(`/api/orders/${id}/complete?payment_method=${encodeURIComponent(paymentMethod)}`, { method: "PUT" }),
   updateOrder: (id, data) =>
     request(`/api/orders/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  voidOrder: (id) =>
-    request(`/api/orders/${id}`, { method: "PUT", body: JSON.stringify({ status: "voided" }) }),
+  voidOrder: (id, reason = "") =>
+    request(`/api/orders/${id}`, { method: "PUT", body: JSON.stringify({ status: "voided", void_reason: reason || null }) }),
   deleteOrder: (id) =>
     request(`/api/orders/${id}`, { method: "DELETE" }),
   recallOrder: (id) =>

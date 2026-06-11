@@ -87,6 +87,14 @@ function VoidDetailModal({ order, outlets, terminals, onClose, onDelete }) {
             </div>
           </div>
 
+          {/* Void Reason */}
+          {order.void_reason && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-xl p-4">
+              <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider mb-1">Void Reason</p>
+              <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap">{order.void_reason}</p>
+            </div>
+          )}
+
           {/* Totals */}
           <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 space-y-1.5 text-sm">
             {[
@@ -300,6 +308,7 @@ export default function VoidOrdersSection() {
                   <th className="text-center px-3 sm:px-4 py-3 hidden sm:table-cell">Items</th>
                   <th className="text-right px-3 sm:px-4 py-3">Total</th>
                   <th className="text-center px-3 sm:px-4 py-3 hidden sm:table-cell">Payment</th>
+                  <th className="text-left px-3 sm:px-4 py-3 hidden xl:table-cell">Void Reason</th>
                   <th className="text-center px-3 sm:px-4 py-3">View</th>
                 </tr>
               </thead>
@@ -331,6 +340,11 @@ export default function VoidOrdersSection() {
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 hidden xl:table-cell max-w-[200px]">
+                      {o.void_reason
+                        ? <span className="text-xs text-gray-500 dark:text-gray-400 italic line-clamp-2">{o.void_reason}</span>
+                        : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
                     </td>
                     <td className="px-3 sm:px-4 py-3 text-center">
                       <button onClick={() => setViewOrder(o)}
