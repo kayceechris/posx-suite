@@ -823,7 +823,7 @@ export default function POSPage() {
                 <p className="text-sm mt-1 text-gray-400">Add products in Admin → Products</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                 {filtered.map((product) => (
                   <button
                     key={product.id}
@@ -841,11 +841,11 @@ export default function POSPage() {
                         <ShoppingCart size={22} className="text-gray-300 dark:text-gray-500" />
                       </div>
                     )}
-                    <div className="p-2.5">
+                    <div className="p-3">
                       <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2">
                         {product.name}
                       </p>
-                      <p className="font-black text-sm mt-0.5" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>
+                      <p className="font-black text-base mt-1" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>
                         {formatCurrency(priceForOutlet(product, selectedOutlet))}
                       </p>
                     </div>

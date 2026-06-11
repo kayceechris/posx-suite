@@ -1657,7 +1657,7 @@ export default function TablePOSPage() {
                   <p className="font-semibold">No products found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.map((product) => (
                     <button
                       key={product.id}
@@ -1665,15 +1665,15 @@ export default function TablePOSPage() {
                       className="bg-white dark:bg-gray-700 border-2 border-gray-100 dark:border-gray-600 rounded-2xl overflow-hidden hover:border-blue-300 hover:shadow-md transition-all text-left group"
                     >
                       {product.image ? (
-                        <img src={api.getImageUrl(product.image)} alt={product.name} className="w-full aspect-[4/3] object-cover" />
+                        <img src={api.getImageUrl(product.image)} alt={product.name} className="w-full aspect-square object-cover" />
                       ) : (
-                        <div className="w-full aspect-[4/3] bg-gradient-to-br from-gray-100 dark:from-gray-600 to-gray-200 dark:to-gray-700 flex items-center justify-center">
-                          <ShoppingCart size={24} className="text-gray-300 dark:text-gray-500" />
+                        <div className="w-full aspect-square bg-gradient-to-br from-gray-100 dark:from-gray-600 to-gray-200 dark:to-gray-700 flex items-center justify-center">
+                          <ShoppingCart size={32} className="text-gray-300 dark:text-gray-500" />
                         </div>
                       )}
-                      <div className="p-2.5">
-                        <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight truncate">{product.name}</p>
-                        <p className="font-black text-sm mt-0.5" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>{formatCurrency(priceForOutlet(product, entity?.outlet_id || selectedOutlet))}</p>
+                      <div className="p-3">
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2">{product.name}</p>
+                        <p className="font-black text-base mt-1" style={{ color: categories.find(c => c.id === product.category_id)?.color || config.accent }}>{formatCurrency(priceForOutlet(product, entity?.outlet_id || selectedOutlet))}</p>
                       </div>
                     </button>
                   ))}

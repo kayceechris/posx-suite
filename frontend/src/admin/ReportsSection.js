@@ -627,12 +627,32 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
     setLoading(true);
     api.getOrders({ start_date: dateRange.start, end_date: dateRange.end })
       .then((all) => {
-        const matching = all.filter((o) => (o.payment_method || "").toLowerCase() === method.toLowerCase());
+        const key = method.toLowerCase();
+        const matching = all.filter((o) => {
+          const pm = (o.payment_method || "").toLowerCase();
+          if (pm === key) return true;
+          // Also include split-payment orders where this method is a component
+          if (pm.includes(" + ")) {
+            const parts = parseSplitComponents(o.payment_method);
+            return parts?.some((c) => c.method.toLowerCase() === key);
+          }
+          return false;
+        });
         setOrders(dedupeOrders(dedupePendingOrders(matching)));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [method, dateRange]);
+
+  // For a split order, return the amount this specific method contributed.
+  const splitAmount = (o) => {
+    const parts = parseSplitComponents(o.payment_method);
+    if (!parts) return null;
+    const comp = parts.find((c) => c.method.toLowerCase() === method.toLowerCase());
+    if (!comp) return null;
+    const sum = parts.reduce((s, c) => s + c.amount, 0);
+    return sum > 0 ? (comp.amount / sum) * (o.total || 0) : null;
+  };
 
   return (
     <>
@@ -678,21 +698,37 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
               <>
                 {/* Mobile cards */}
                 <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-                  {orders.map((o) => (
-                    <div key={o.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      onClick={() => setSelectedOrder(o)}>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-blue-600 text-sm">{o.order_number}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {new Date(o.created_at).toLocaleDateString()} · {o.customer_name || "Walk-in"}
-                        </p>
+                  {orders.map((o) => {
+                    const amt = splitAmount(o);
+                    const isSplit = amt !== null;
+                    return (
+                      <div key={o.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        onClick={() => setSelectedOrder(o)}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-blue-600 text-sm">{o.order_number}</p>
+                            {isSplit && (
+                              <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 text-[10px] font-bold rounded-full uppercase">Split</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(o.created_at).toLocaleDateString()} · {o.customer_name || "Walk-in"}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          {isSplit ? (
+                            <>
+                              <p className="font-semibold text-orange-500 dark:text-orange-400 text-sm whitespace-nowrap">{formatCurrency(amt)}</p>
+                              <p className="text-[10px] text-gray-400 line-through">{formatCurrency(o.total)}</p>
+                            </>
+                          ) : (
+                            <p className="font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(o.total)}</p>
+                          )}
+                          <p className="text-xs text-gray-400">{o.items?.length ?? 0} items</p>
+                        </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="font-semibold text-green-600 dark:text-green-400 text-sm whitespace-nowrap">{formatCurrency(o.total)}</p>
-                        <p className="text-xs text-gray-400">{o.items?.length ?? 0} items</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
@@ -707,16 +743,36 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {orders.map((o) => (
-                        <tr key={o.id} className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
-                          onClick={() => setSelectedOrder(o)}>
-                          <td className="px-4 py-3 font-semibold text-blue-600 text-sm">{o.order_number}</td>
-                          <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">{new Date(o.created_at).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in"}</td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
-                          <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400 text-sm text-right whitespace-nowrap">{formatCurrency(o.total)}</td>
-                        </tr>
-                      ))}
+                      {orders.map((o) => {
+                        const amt = splitAmount(o);
+                        const isSplit = amt !== null;
+                        return (
+                          <tr key={o.id} className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                            onClick={() => setSelectedOrder(o)}>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-blue-600">{o.order_number}</span>
+                                {isSplit && (
+                                  <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 text-[10px] font-bold rounded-full uppercase">Split</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm whitespace-nowrap">{new Date(o.created_at).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm">{o.customer_name || "Walk-in"}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-sm text-right">{o.items?.length ?? 0}</td>
+                            <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
+                              {isSplit ? (
+                                <div>
+                                  <p className="font-semibold text-orange-500 dark:text-orange-400">{formatCurrency(amt)}</p>
+                                  <p className="text-[10px] text-gray-400 line-through">{formatCurrency(o.total)}</p>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(o.total)}</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
