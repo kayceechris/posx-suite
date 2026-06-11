@@ -1,3 +1,4 @@
+import re as _re
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import date, timedelta
@@ -218,6 +219,30 @@ async def get_staff_report(start_date: Optional[str] = None, end_date: Optional[
     return {"staff": sorted(staff_sales.values(), key=lambda x: x["revenue"], reverse=True)}
 
 
+def _parse_split_payment(method_str: str, order_total: float):
+    """Parse 'Card ₦88,000.00 + Bank Transfer ₦77,000.00' into [(method, amount), ...].
+    Distributes order_total proportionally when parsed amounts don't match exactly."""
+    parts = method_str.split(" + ")
+    components = []
+    for part in parts:
+        m = _re.search(r'[₦$€£¥]', part)
+        if not m:
+            continue
+        method = part[:m.start()].strip()
+        try:
+            amount = float(part[m.end():].replace(',', ''))
+        except ValueError:
+            amount = 0.0
+        if method and amount > 0:
+            components.append((method, amount))
+    if not components:
+        return [(method_str, order_total)]
+    component_sum = sum(a for _, a in components)
+    if component_sum <= 0:
+        return [(method_str, order_total)]
+    return [(meth, (amt / component_sum) * order_total) for meth, amt in components]
+
+
 @router.get("/reports/payment-methods")
 async def get_payment_report(start_date: Optional[str] = None, end_date: Optional[str] = None, current_user: User = Depends(get_current_user)):
     if not has_perm(current_user, "view_payment_report", "view_sales_report"):
@@ -227,9 +252,27 @@ async def get_payment_report(start_date: Optional[str] = None, end_date: Optiona
     if dr:
         query["created_at"] = dr
 
-    pipeline = [{"$match": query}, {"$group": {"_id": "$payment_method", "count": {"$sum": 1}, "total": {"$sum": "$total"}}}]
-    result = await db.orders.aggregate(pipeline).to_list(100)
-    return {"methods": [{"method": r["_id"], "count": r["count"], "total": r["total"]} for r in result]}
+    orders = await db.orders.find(query, {"payment_method": 1, "total": 1}).to_list(None)
+    buckets: dict = {}
+    for order in orders:
+        pm = (order.get("payment_method") or "unknown").strip()
+        total = float(order.get("total") or 0)
+        if " + " in pm:
+            for method, amount in _parse_split_payment(pm, total):
+                key = method.lower()
+                if key not in buckets:
+                    buckets[key] = {"method": method, "count": 0, "total": 0.0}
+                buckets[key]["count"] += 1
+                buckets[key]["total"] += amount
+        else:
+            key = pm.lower()
+            if key not in buckets:
+                buckets[key] = {"method": pm, "count": 0, "total": 0.0}
+            buckets[key]["count"] += 1
+            buckets[key]["total"] += total
+
+    methods = sorted(buckets.values(), key=lambda x: x["total"], reverse=True)
+    return {"methods": methods}
 
 
 @router.get("/reports/sales-by-item")
