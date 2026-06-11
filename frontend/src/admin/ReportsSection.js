@@ -732,18 +732,20 @@ function PaymentOrdersPanel({ method, dateRange, onClose }) {
 
 // Parse "Card ₦5,000.00 + Cash ₦1,000.00" into [{method,amount}, ...].
 // Returns null for plain (non-split) method strings.
+// Strategy: split on " + ", then for each part find the LAST space —
+// everything before it is the method name, everything after is the
+// currency string (e.g. "₦88,000.00"). Strip the first char (currency
+// symbol) and parse the rest as the amount. No regex needed.
 function parseSplitComponents(methodStr) {
   if (!methodStr || !methodStr.includes(" + ")) return null;
   const parts = methodStr.split(" + ");
   const components = [];
   for (const part of parts) {
-    // The format is "{method name} {currencySymbol}{digits}".
-    // Find "space followed by a non-letter/non-space char" — that's the boundary.
-    const spaceSymMatch = part.search(/\s[^A-Za-z\s]/);
-    if (spaceSymMatch === -1) continue;
-    const method = part.slice(0, spaceSymMatch).trim();
-    // +2 skips the space and the single-char currency symbol
-    const amount = parseFloat(part.slice(spaceSymMatch + 2).replace(/,/g, "")) || 0;
+    const lastSpace = part.lastIndexOf(" ");
+    if (lastSpace <= 0) continue;
+    const method = part.slice(0, lastSpace).trim();
+    // Drop the leading currency symbol then strip commas before parsing
+    const amount = parseFloat(part.slice(lastSpace + 2).replace(/,/g, "")) || 0;
     if (method && amount > 0) components.push({ method, amount });
   }
   return components.length > 0 ? components : null;

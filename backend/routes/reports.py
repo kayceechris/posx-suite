@@ -220,21 +220,18 @@ async def get_staff_report(start_date: Optional[str] = None, end_date: Optional[
 
 def _parse_split_payment(method_str: str, order_total: float):
     """Parse 'Card ₦88,000.00 + Bank Transfer ₦77,000.00' into [(method, amount), ...].
-    Format: '{method name} {currencySymbol}{digits}' joined with ' + '.
-    Finds the boundary using a space before a non-letter character."""
-    import re as _re_local
+    Uses lastIndexOf(' ') to split method name from currency string — no regex."""
     parts = method_str.split(" + ")
     components = []
     for part in parts:
-        # Find 'space + non-letter' to locate the currency symbol boundary
-        m = _re_local.search(r'\s[^A-Za-z\s]', part)
-        if not m:
+        last_space = part.rfind(" ")
+        if last_space <= 0:
             continue
-        method = part[:m.start()].strip()
+        method = part[:last_space].strip()
+        # Skip the currency symbol (first char after last space) then parse digits
         try:
-            # +2 skips the space and the single-char currency symbol
-            amount = float(part[m.start() + 2:].replace(',', ''))
-        except ValueError:
+            amount = float(part[last_space + 2:].replace(",", ""))
+        except (ValueError, IndexError):
             amount = 0.0
         if method and amount > 0:
             components.append((method, amount))
