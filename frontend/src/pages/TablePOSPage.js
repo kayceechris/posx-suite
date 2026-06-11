@@ -1606,7 +1606,7 @@ export default function TablePOSPage() {
             </div>
 
             {/* Food / Drinks top tabs */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+            <div className="px-4 pt-3 pb-1 flex gap-2 bg-white dark:bg-gray-800 flex-shrink-0">
               {[
                 { key: "food", label: "Food" },
                 { key: "drinks", label: "Drinks" },
@@ -1615,10 +1615,10 @@ export default function TablePOSPage() {
                   key={key}
                   onClick={() => { setActiveTab(key); setActiveCategory("all"); }}
                   className={cn(
-                    "flex-1 py-2.5 text-sm font-bold transition-all border-b-2",
+                    "px-5 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
                     activeTab === key
-                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                   )}
                 >
                   {label}
