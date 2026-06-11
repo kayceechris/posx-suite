@@ -763,14 +763,16 @@ function PaymentsTab() {
 
   // Merge split-payment entries into their component methods so "cash ₦X + card ₦Y"
   // contributes to the Cash and Card totals rather than appearing as a separate card.
+  // splitCount tracks how many split-bill orders contributed so we can badge the card.
   const mergedMethods = useMemo(() => {
     if (!data?.methods) return [];
     const map = new Map();
-    const add = (key, method, count, total) => {
-      if (!map.has(key)) map.set(key, { method, count: 0, total: 0 });
+    const add = (key, method, count, total, splitCount) => {
+      if (!map.has(key)) map.set(key, { method, count: 0, total: 0, splitCount: 0 });
       const e = map.get(key);
       e.count += count;
       e.total += total;
+      e.splitCount += splitCount;
     };
     for (const m of data.methods) {
       const components = parseSplitComponents(m.method);
@@ -778,12 +780,12 @@ function PaymentsTab() {
         const componentSum = components.reduce((s, c) => s + c.amount, 0);
         if (componentSum > 0) {
           for (const { method, amount } of components) {
-            add(method.toLowerCase(), method, m.count, (amount / componentSum) * m.total);
+            add(method.toLowerCase(), method, m.count, (amount / componentSum) * m.total, m.count);
           }
         }
       } else {
         const key = (m.method || "unknown").toLowerCase();
-        add(key, m.method || "Unknown", m.count, m.total);
+        add(key, m.method || "Unknown", m.count, m.total, 0);
       }
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
@@ -823,7 +825,14 @@ function PaymentsTab() {
                   METHOD_COLORS[i % METHOD_COLORS.length]
                 )}
               >
-                <p className="font-semibold text-gray-700 dark:text-gray-100 capitalize mb-2">{m.method || "Unknown"}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="font-semibold text-gray-700 dark:text-gray-100 capitalize">{m.method || "Unknown"}</p>
+                  {m.splitCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 text-[10px] font-bold rounded-full uppercase tracking-wide whitespace-nowrap">
+                      Split Bill ×{m.splitCount}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 mb-1 truncate">{formatCurrency(m.total)}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-300">{m.count} transaction{m.count !== 1 ? "s" : ""}</p>
               </button>
