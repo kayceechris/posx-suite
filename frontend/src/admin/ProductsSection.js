@@ -881,6 +881,14 @@ function BulkPriceModal({ products, outlets, terminals, onClose, onApplied }) {
   );
 }
 
+// ─── Emoji picker data ────────────────────────────────────────────────────────
+const EMOJI_GROUPS = [
+  { label: "Food",    emojis: ["🍕","🍔","🌮","🌯","🥗","🍜","🍝","🍱","🥩","🍗","🍖","🦐","🦞","🦀","🐟","🍣","🥘","🫕","🥣","🍳","🥞","🧇","🥓","🍞","🥐","🧆","🥙","🫔","🌭","🥪"] },
+  { label: "Snacks",  emojis: ["🍿","🥜","🌰","🍪","🎂","🍰","🧁","🍩","🍦","🍨","🍧","🍫","🍬","🍭","🍡","🧁","🫙","🥧","🍮","🍯"] },
+  { label: "Drinks",  emojis: ["🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🥤","🧃","☕","🍵","🧋","🍶","🥛","💧","🫖","🧊","🍾","🫗"] },
+  { label: "General", emojis: ["📦","🎁","⭐","🌟","💎","🔥","✨","🎉","🏆","🎯","🛒","💰","🏷️","🎪","🍴","🥢","🫙","🧂","🌶️","🧄"] },
+];
+
 // ─── Groups View ──────────────────────────────────────────────────────────────
 const MC_LABELS = { food: "Food", drinks: "Drinks" };
 const MC_COLORS = {
@@ -896,6 +904,7 @@ function GroupsView() {
   const [form, setForm] = useState({ name: "", color: "#3B82F6", main_category: "", icon: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -903,9 +912,9 @@ function GroupsView() {
   };
   useEffect(() => { load(); }, []);
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6", main_category: "", icon: "" }); setError(""); setModal(true); };
-  const openEdit = (g) => { setEditing(g); setForm({ name: g.name, color: g.color || "#3B82F6", main_category: g.main_category || "", icon: g.icon || "" }); setError(""); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); };
+  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6", main_category: "", icon: "" }); setError(""); setShowEmojiPicker(false); setModal(true); };
+  const openEdit = (g) => { setEditing(g); setForm({ name: g.name, color: g.color || "#3B82F6", main_category: g.main_category || "", icon: g.icon || "" }); setError(""); setShowEmojiPicker(false); setModal(true); };
+  const closeModal = () => { setModal(false); setEditing(null); setShowEmojiPicker(false); };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError("");
@@ -1038,15 +1047,44 @@ function GroupsView() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Tab Icon (emoji)</label>
-              <div className="flex items-center gap-2">
-                <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                  placeholder="e.g. 🍕 📦 🍹 🥩"
-                  maxLength={4}
-                  className="w-24 px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xl text-center focus:outline-none focus:border-blue-500" />
-                <span className="text-xs text-gray-400">Optional — shown on the POS menu tab</span>
-              </div>
+              <button type="button"
+                onClick={() => setShowEmojiPicker((v) => !v)}
+                className="flex items-center gap-3 w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 rounded-xl text-left hover:border-blue-400 transition-colors">
+                <span className="text-2xl w-8 text-center leading-none">{form.icon || "➕"}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 flex-1">
+                  {form.icon ? "Change icon" : "Pick an emoji for the POS tab"}
+                </span>
+                {form.icon && (
+                  <span role="button" onClick={(e) => { e.stopPropagation(); setForm({ ...form, icon: "" }); }}
+                    className="text-xs text-gray-400 hover:text-red-500 px-1.5 py-0.5 rounded-lg hover:bg-red-50 transition-colors">
+                    Clear
+                  </span>
+                )}
+              </button>
+
+              {showEmojiPicker && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-2xl shadow-2xl z-50 p-3 max-h-60 overflow-y-auto">
+                  {EMOJI_GROUPS.map(({ label, emojis }) => (
+                    <div key={label} className="mb-3 last:mb-0">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+                      <div className="flex flex-wrap gap-0.5">
+                        {emojis.map((e) => (
+                          <button key={e} type="button"
+                            onClick={() => { setForm({ ...form, icon: e }); setShowEmojiPicker(false); }}
+                            className={cn(
+                              "text-xl p-1.5 rounded-lg transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30",
+                              form.icon === e ? "bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400" : ""
+                            )}>
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
