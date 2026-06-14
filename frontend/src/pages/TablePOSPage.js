@@ -892,7 +892,11 @@ export default function TablePOSPage() {
 
   const TAB_EMOJI = { food: "🍽", drinks: "🥤" };
   const mainTabs = [...new Set(categories.filter((c) => c.main_category).map((c) => c.main_category))]
-    .map((mc) => ({ key: mc, label: `${TAB_EMOJI[mc] ? TAB_EMOJI[mc] + " " : ""}${mc.charAt(0).toUpperCase() + mc.slice(1)}` }));
+    .map((mc) => {
+      const groupIcon = categories.find((c) => c.main_category === mc && c.icon)?.icon;
+      const emoji = groupIcon || TAB_EMOJI[mc] || "";
+      return { key: mc, label: `${emoji ? emoji + " " : ""}${mc.charAt(0).toUpperCase() + mc.slice(1)}` };
+    });
 
   const visibleCategories = categories.filter((cat) =>
     cat.main_category === activeTab

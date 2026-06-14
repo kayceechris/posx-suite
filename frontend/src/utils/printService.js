@@ -311,8 +311,8 @@ function buildReceiptBytes(data) {
   add(...CMD.ALIGN_LEFT);
   if (showCustomer  && tableName) line(`Table  : ${tableName}`);
   if (showReference && orderNo)   line(`Order  : ${orderNo}`);
-  if (showSeller    && waiter)    line(`Waiter : ${waiter}`);
-  if (showSeller    && cashier)   line(`Cashier: ${cashier}`);
+  if (waiter)  line(`Waiter : ${waiter}`);
+  if (cashier) line(`Cashier: ${cashier}`);
   if (showDate) {
     // Use the ORIGINAL order datetime when reprinting so the receipt
     // still reflects when the sale actually happened.
@@ -700,8 +700,8 @@ function receiptToHtml(data) {
     <div class="divider"></div>
     ${showCustomer  && tableName ? `<div>Table  : ${tableName}</div>` : ""}
     ${showReference && orderNo   ? `<div>Order  : ${orderNo}</div>` : ""}
-    ${showSeller    && waiter    ? `<div>Waiter : ${waiter}</div>` : ""}
-    ${showSeller    && cashier   ? `<div>Cashier: ${cashier}</div>` : ""}
+    ${waiter  ? `<div>Waiter : ${waiter}</div>`  : ""}
+    ${cashier ? `<div>Cashier: ${cashier}</div>` : ""}
     ${showDate                   ? `<div>Date   : ${orderDate ? new Date(orderDate).toLocaleString() : new Date().toLocaleString()}</div>` : ""}
     <div class="divider"></div>
     <table width="100%">

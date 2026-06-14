@@ -60,14 +60,16 @@ class Category(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     color: str = "#3B82F6"
-    main_category: Optional[str] = None   # "food" | "drinks"
+    main_category: Optional[str] = None
+    icon: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CategoryCreate(BaseModel):
     name: str
     color: Optional[str] = "#3B82F6"
-    main_category: Optional[str] = None   # "food" | "drinks"
+    main_category: Optional[str] = None
+    icon: Optional[str] = None
 
 
 # ==================== PRODUCT MODELS ====================

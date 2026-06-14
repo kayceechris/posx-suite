@@ -893,7 +893,7 @@ function GroupsView() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", color: "#3B82F6", main_category: "" });
+  const [form, setForm] = useState({ name: "", color: "#3B82F6", main_category: "", icon: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -903,8 +903,8 @@ function GroupsView() {
   };
   useEffect(() => { load(); }, []);
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6", main_category: "" }); setError(""); setModal(true); };
-  const openEdit = (g) => { setEditing(g); setForm({ name: g.name, color: g.color || "#3B82F6", main_category: g.main_category || "" }); setError(""); setModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ name: "", color: "#3B82F6", main_category: "", icon: "" }); setError(""); setModal(true); };
+  const openEdit = (g) => { setEditing(g); setForm({ name: g.name, color: g.color || "#3B82F6", main_category: g.main_category || "", icon: g.icon || "" }); setError(""); setModal(true); };
   const closeModal = () => { setModal(false); setEditing(null); };
 
   const handleSubmit = async (e) => {
@@ -1036,6 +1036,17 @@ function GroupsView() {
                 placeholder="Or type a custom tab name (e.g. Packages, Cocktails…)"
                 className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Tab Icon (emoji)</label>
+              <div className="flex items-center gap-2">
+                <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                  placeholder="e.g. 🍕 📦 🍹 🥩"
+                  maxLength={4}
+                  className="w-24 px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-xl text-center focus:outline-none focus:border-blue-500" />
+                <span className="text-xs text-gray-400">Optional — shown on the POS menu tab</span>
+              </div>
             </div>
 
             <div>
