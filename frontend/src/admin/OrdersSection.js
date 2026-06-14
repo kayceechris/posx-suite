@@ -288,6 +288,8 @@ export default function OrdersSection() {
   const [terminalFilter, setTerminalFilter] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [waiterSearch, setWaiterSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [viewOrder, setViewOrder] = useState(null);
   const [voidTarget, setVoidTarget] = useState(null);
   const [page, setPage] = useState(1);
@@ -312,6 +314,8 @@ export default function OrdersSection() {
     if (terminalFilter && o.terminal_id !== terminalFilter) return false;
     if (orderSearch && !(o.order_number || "").toLowerCase().includes(orderSearch.toLowerCase())) return false;
     if (waiterSearch && !(o.created_by_name || "").toLowerCase().includes(waiterSearch.toLowerCase())) return false;
+    if (dateFrom && new Date(o.created_at) < new Date(dateFrom)) return false;
+    if (dateTo && new Date(o.created_at) > new Date(dateTo + "T23:59:59")) return false;
     return true;
   });
 
@@ -455,6 +459,16 @@ export default function OrdersSection() {
               placeholder="Search by name"
               className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]" />
           </div>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">From</label>
+          <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+            className="py-2 px-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]" />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">To</label>
+          <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+            className="py-2 px-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 focus:outline-none focus:border-blue-500 sm:min-w-[140px]" />
         </div>
         <div className="col-span-2 sm:col-span-1 sm:ml-auto text-sm text-gray-400 font-medium self-end pb-0.5 text-right">
           {filtered.length} order{filtered.length !== 1 ? "s" : ""}{totalPages > 1 ? ` · page ${safePage}/${totalPages}` : ""}
