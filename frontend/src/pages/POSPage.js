@@ -466,9 +466,17 @@ export default function POSPage() {
         setOutlets(outs);
         setPaymentTypes(ptypes);
         setAssignedPrinters(assignedPrinters);
-        // Keep printer cache fresh so printService works without opening Terminal Settings
         if (assignedPrinters.length > 0) {
           localStorage.setItem("pos_saved_printers", JSON.stringify(assignedPrinters));
+        }
+        if (terms.length > 0 && !localStorage.getItem("pos_terminal")) {
+          setSelectedTerminal(terms[0].id);
+          localStorage.setItem("pos_terminal", terms[0].id);
+        }
+        if (outs.length > 0 && !localStorage.getItem("pos_outlet")) {
+          const main = outs.find((o) => o.name.toLowerCase().includes("main restaurant")) || outs[0];
+          setSelectedOutlet(main.id);
+          localStorage.setItem("pos_outlet", main.id);
         }
       } catch {
         showToast("Failed to load data", "error");
@@ -545,6 +553,10 @@ export default function POSPage() {
       }
     } catch {}
   }, [cart, subtotal, customerName]);
+
+  const TAB_EMOJI = { food: "🍽", drinks: "🥤" };
+  const mainTabs = [...new Set(categories.filter((c) => c.main_category).map((c) => c.main_category))]
+    .map((mc) => ({ key: mc, label: `${TAB_EMOJI[mc] ? TAB_EMOJI[mc] + " " : ""}${mc.charAt(0).toUpperCase() + mc.slice(1)}` }));
 
   const visibleCategories = categories.filter((cat) =>
     activeTab === "all" || cat.main_category === activeTab
@@ -769,28 +781,27 @@ export default function POSPage() {
             </button>
           </div>
 
-          {/* Food / Drinks top tabs */}
-          <div className="px-4 py-3 bg-white dark:bg-gray-800 flex-shrink-0">
-            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-2xl p-1">
-              {[
-                { key: "food", label: "🍽 Food" },
-                { key: "drinks", label: "🥤 Drinks" },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => { setActiveTab(key); setActiveCategory("all"); }}
-                  className={cn(
-                    "flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200",
-                    activeTab === key
-                      ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+          {/* Main category tabs — dynamic from category data */}
+          {mainTabs.length > 0 && (
+            <div className="px-4 py-3 bg-white dark:bg-gray-800 flex-shrink-0">
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-2xl p-1 gap-0.5 overflow-x-auto scrollbar-hide">
+                {mainTabs.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setActiveTab(key); setActiveCategory("all"); }}
+                    className={cn(
+                      "flex-1 min-w-fit px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap",
+                      activeTab === key
+                        ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Category pills */}
           <div className="px-4 py-2.5 flex gap-2 overflow-x-auto scrollbar-hide border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">

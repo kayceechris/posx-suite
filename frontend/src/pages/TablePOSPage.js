@@ -642,8 +642,9 @@ export default function TablePOSPage() {
   const billInFlightRef = useRef(false);
 
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("food"); // "food" | "drinks"
+  const [activeTab, setActiveTab] = useState("food");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [currentOrderNumber, setCurrentOrderNumber] = useState("");
   const [selectedTerminal, setSelectedTerminal] = useState(
     () => localStorage.getItem("pos_terminal") || ""
   );
@@ -685,7 +686,17 @@ export default function TablePOSPage() {
         setTerminals(terms);
         setOutlets(outs);
         setPaymentTypes(ptypes);
-        if (terms.length > 0) setSelectedTerminal(terms[0].id);
+        // Auto-select terminal/outlet on first login (if nothing saved yet).
+        // Prefer "Main Restaurant" outlet; fall back to the first one found.
+        if (terms.length > 0 && !localStorage.getItem("pos_terminal")) {
+          setSelectedTerminal(terms[0].id);
+          localStorage.setItem("pos_terminal", terms[0].id);
+        }
+        if (outs.length > 0 && !localStorage.getItem("pos_outlet")) {
+          const main = outs.find((o) => o.name.toLowerCase().includes("main restaurant")) || outs[0];
+          setSelectedOutlet(main.id);
+          localStorage.setItem("pos_outlet", main.id);
+        }
 
         // Auth guard: waiter/cashier can only access their own occupied
         // table. The TABLE's waiter_id can drift (denormalized), so we
@@ -773,6 +784,7 @@ export default function TablePOSPage() {
             }
           }
           if (existingOrder?.customer_name) setCustomerName(existingOrder.customer_name);
+          if (existingOrder?.order_number) setCurrentOrderNumber(existingOrder.order_number);
         }
         setEntity(entityData || null);
 
@@ -827,6 +839,7 @@ export default function TablePOSPage() {
   };
 
   const changeQty = (productId, delta) => {
+    if (isWaiter && kitchenSentItems.some((s) => s.product_id === productId)) return;
     setCart((prev) => {
       const next = prev.map((i) =>
         i.product_id === productId
@@ -876,6 +889,10 @@ export default function TablePOSPage() {
   const mergedTotal = mergedOrders.reduce((s, o) => s + (o.total || 0), 0);
   const combinedTotal = total + mergedTotal;
   const isMerged = mergedTables.length > 0;
+
+  const TAB_EMOJI = { food: "🍽", drinks: "🥤" };
+  const mainTabs = [...new Set(categories.filter((c) => c.main_category).map((c) => c.main_category))]
+    .map((mc) => ({ key: mc, label: `${TAB_EMOJI[mc] ? TAB_EMOJI[mc] + " " : ""}${mc.charAt(0).toUpperCase() + mc.slice(1)}` }));
 
   const visibleCategories = categories.filter((cat) =>
     cat.main_category === activeTab
@@ -967,7 +984,7 @@ export default function TablePOSPage() {
       phone: settings?.company_phone || settings?.phone || "",
       logoUrl: settings?.company_logo || settings?.logo_url || "",
       tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
-      orderNo: entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
+      orderNo: currentOrderNumber || entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
       // Waiter on bill — always show someone. Prefer the table's assigned
       // waiter (set when a waiter picks up the table), fall back to staff_name
       // (older field), finally fall back to the current operator so the bill
@@ -1012,7 +1029,7 @@ export default function TablePOSPage() {
       phone: settings?.company_phone || settings?.phone || "",
       logoUrl: settings?.company_logo || settings?.logo_url || "",
       tableName,
-      orderNo: entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
+      orderNo: currentOrderNumber || entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
       // Always show someone on the bill / receipt — see handlePrintBill
       // comment. The table's assigned waiter is preferred; fall back to
       // the current operator so the row never prints blank.
@@ -1608,28 +1625,27 @@ export default function TablePOSPage() {
               </div>
             </div>
 
-            {/* Food / Drinks top tabs */}
-            <div className="px-4 py-3 bg-white dark:bg-gray-800 flex-shrink-0">
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-2xl p-1">
-                {[
-                  { key: "food", label: "🍽 Food" },
-                  { key: "drinks", label: "🥤 Drinks" },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => { setActiveTab(key); setActiveCategory("all"); }}
-                    className={cn(
-                      "flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200",
-                      activeTab === key
-                        ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {/* Main category tabs — dynamic from category data */}
+            {mainTabs.length > 0 && (
+              <div className="px-4 py-3 bg-white dark:bg-gray-800 flex-shrink-0">
+                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-2xl p-1 gap-0.5 overflow-x-auto scrollbar-hide">
+                  {mainTabs.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setActiveTab(key); setActiveCategory("all"); }}
+                      className={cn(
+                        "flex-1 min-w-fit px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap",
+                        activeTab === key
+                          ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Category pills */}
             <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide flex-shrink-0 border-b border-gray-100 dark:border-gray-700">
@@ -1715,15 +1731,21 @@ export default function TablePOSPage() {
                         <p className="text-xs text-gray-400">{formatCurrency(item.price)} each</p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button onClick={() => changeQty(item.product_id, -1)}
-                          className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
-                          <Minus size={12} className="text-gray-600 dark:text-gray-300" />
-                        </button>
-                        <span className="w-5 text-center font-bold text-sm dark:text-white">{item.quantity}</span>
-                        <button onClick={() => changeQty(item.product_id, 1)}
-                          className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
-                          <Plus size={12} className="text-gray-600 dark:text-gray-300" />
-                        </button>
+                        {isWaiter && kitchenSentItems.some((s) => s.product_id === item.product_id) ? (
+                          <span className="text-[10px] text-orange-400 font-bold px-2 py-0.5 bg-orange-50 dark:bg-orange-900/30 rounded-full">Sent</span>
+                        ) : (
+                          <>
+                            <button onClick={() => changeQty(item.product_id, -1)}
+                              className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+                              <Minus size={12} className="text-gray-600 dark:text-gray-300" />
+                            </button>
+                            <span className="w-5 text-center font-bold text-sm dark:text-white">{item.quantity}</span>
+                            <button onClick={() => changeQty(item.product_id, 1)}
+                              className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+                              <Plus size={12} className="text-gray-600 dark:text-gray-300" />
+                            </button>
+                          </>
+                        )}
                       </div>
                       <p className="text-sm font-black text-gray-900 dark:text-white w-16 text-right flex-shrink-0">{formatCurrency(item.total)}</p>
                       {canModify && (
@@ -1889,13 +1911,19 @@ export default function TablePOSPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <button onClick={() => changeQty(item.product_id, -1)} className="w-9 h-9 rounded-xl bg-red-500 hover:bg-red-600 active:scale-95 flex items-center justify-center transition-all shadow-sm">
-                          <Minus size={14} className="text-white" />
-                        </button>
-                        <span className="font-black text-lg text-gray-900 dark:text-white w-6 text-center tabular-nums">{item.quantity}</span>
-                        <button onClick={() => changeQty(item.product_id, 1)} className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 flex items-center justify-center transition-all shadow-sm">
-                          <Plus size={14} className="text-white" />
-                        </button>
+                        {isWaiter && kitchenSentItems.some((s) => s.product_id === item.product_id) ? (
+                          <span className="text-xs text-orange-500 font-bold px-3 py-1.5 bg-orange-50 dark:bg-orange-900/30 rounded-xl">Sent to kitchen</span>
+                        ) : (
+                          <>
+                            <button onClick={() => changeQty(item.product_id, -1)} className="w-9 h-9 rounded-xl bg-red-500 hover:bg-red-600 active:scale-95 flex items-center justify-center transition-all shadow-sm">
+                              <Minus size={14} className="text-white" />
+                            </button>
+                            <span className="font-black text-lg text-gray-900 dark:text-white w-6 text-center tabular-nums">{item.quantity}</span>
+                            <button onClick={() => changeQty(item.product_id, 1)} className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 flex items-center justify-center transition-all shadow-sm">
+                              <Plus size={14} className="text-white" />
+                            </button>
+                          </>
+                        )}
                       </div>
                       <p className="font-black text-blue-600 dark:text-blue-400 text-lg tabular-nums">{formatCurrency(item.total)}</p>
                     </div>

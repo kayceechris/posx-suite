@@ -245,7 +245,7 @@ async def get_orders(
     if order_number:
         query["order_number"] = {"$regex": order_number, "$options": "i"}
 
-    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
     return orders
 
 

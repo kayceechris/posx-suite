@@ -154,10 +154,10 @@ function AllProductsView({ autoOpen }) {
             <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)}
               className="flex-1 sm:flex-none px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500">
               <option value="">All groups</option>
-              {["food", "drinks"].map((mc) => {
+              {[...new Set(groups.map((g) => g.main_category).filter(Boolean))].map((mc) => {
                 const opts = groups.filter((g) => g.main_category === mc);
                 return opts.length > 0 ? (
-                  <optgroup key={mc} label={mc === "food" ? "Food" : "Drinks"}>
+                  <optgroup key={mc} label={mc.charAt(0).toUpperCase() + mc.slice(1)}>
                     {opts.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </optgroup>
                 ) : null;
@@ -186,7 +186,7 @@ function AllProductsView({ autoOpen }) {
                 !filterGroup ? "bg-gray-900 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200")}>
               All
             </button>
-            {["food", "drinks", null].flatMap((mc) =>
+            {[...[...new Set(groups.map((g) => g.main_category).filter(Boolean))], null].flatMap((mc) =>
               groups.filter((g) => (mc ? g.main_category === mc : !g.main_category)).map((g) => (
                 <button key={g.id} onClick={() => setFilterGroup(g.id === filterGroup ? "" : g.id)}
                   className={cn("px-4 py-1.5 rounded-full text-sm font-semibold transition-colors text-white")}
@@ -495,10 +495,10 @@ function ProductModal({ mode, product, groups, brands, units, outlets, terminals
           <label className={label}>Group</label>
           <select required value={form.category_id} onChange={(e) => f("category_id", e.target.value)} className={input}>
             <option value="">Select group…</option>
-            {["food", "drinks"].map((mc) => {
+            {[...new Set(groups.map((g) => g.main_category).filter(Boolean))].map((mc) => {
               const opts = groups.filter((g) => g.main_category === mc);
               return opts.length > 0 ? (
-                <optgroup key={mc} label={mc === "food" ? "Food" : "Drinks"}>
+                <optgroup key={mc} label={mc.charAt(0).toUpperCase() + mc.slice(1)}>
                   {opts.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </optgroup>
               ) : null;
@@ -923,10 +923,8 @@ function GroupsView() {
     catch (err) { alert(err.message); }
   };
 
-  // Split groups by main_category for display
-  const foodGroups   = groups.filter((g) => g.main_category === "food");
-  const drinksGroups = groups.filter((g) => g.main_category === "drinks");
-  const otherGroups  = groups.filter((g) => !g.main_category);
+  const uniqueMCs  = [...new Set(groups.map((g) => g.main_category).filter(Boolean))];
+  const otherGroups = groups.filter((g) => !g.main_category);
 
   const GroupCard = ({ g }) => {
     const mc = MC_COLORS[g.main_category] || null;
@@ -984,26 +982,17 @@ function GroupsView() {
         }
       />
 
-      {/* Two main categories banner */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[
-          { mc: "food",   label: "Food → Kitchen Store",   icon: <UtensilsCrossed size={18} className="text-orange-500" />, bg: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800", count: foodGroups.length },
-          { mc: "drinks", label: "Drinks → Bar Store",     icon: <ChefHat size={18} className="text-blue-500" />,          bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",       count: drinksGroups.length },
-        ].map(({ mc, label, icon, bg, count }) => (
-          <div key={mc} className={cn("rounded-2xl border-2 p-4 flex items-center gap-3", bg)}>
-            <div className="w-9 h-9 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm flex-shrink-0">{icon}</div>
-            <div>
-              <p className="font-bold text-gray-900 dark:text-white text-sm">{label}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{count} group{count !== 1 ? "s" : ""}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {loading ? <Spinner /> : (
         <>
-          <Section label="Food Groups" icon={<UtensilsCrossed size={13} className="text-orange-500" />} items={foodGroups} />
-          <Section label="Drinks Groups" icon={<ChefHat size={13} className="text-blue-500" />} items={drinksGroups} />
+          {uniqueMCs.map((mc) => {
+            const mcGroups = groups.filter((g) => g.main_category === mc);
+            const icon = mc === "food"
+              ? <UtensilsCrossed size={13} className="text-orange-500" />
+              : mc === "drinks"
+              ? <ChefHat size={13} className="text-blue-500" />
+              : <Tag size={13} className="text-purple-500" />;
+            return <Section key={mc} label={`${mc.charAt(0).toUpperCase() + mc.slice(1)} Groups`} icon={icon} items={mcGroups} />;
+          })}
           {otherGroups.length > 0 && <Section label="Other" icon={<Tag size={13} className="text-gray-400" />} items={otherGroups} />}
           {groups.length === 0 && <p className="text-center text-gray-400 text-sm py-10">No groups yet — add one above</p>}
         </>
@@ -1022,7 +1011,7 @@ function GroupsView() {
             {/* Main Category picker */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Main Category</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 {[
                   { value: "food",   label: "Food",   sub: "→ Kitchen Store", icon: <UtensilsCrossed size={16} />, active: "border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300" },
                   { value: "drinks", label: "Drinks", sub: "→ Bar Store",     icon: <ChefHat size={16} />,         active: "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" },
@@ -1041,6 +1030,12 @@ function GroupsView() {
                   </button>
                 ))}
               </div>
+              <input
+                value={["food","drinks"].includes(form.main_category) ? "" : (form.main_category || "")}
+                onChange={(e) => setForm({ ...form, main_category: e.target.value })}
+                placeholder="Or type a custom tab name (e.g. Packages, Cocktails…)"
+                className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500"
+              />
             </div>
 
             <div>
