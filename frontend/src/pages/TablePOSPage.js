@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft, CheckCircle2, ChevronDown, ChefHat, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X, GitMerge,
+  ArrowLeft, Bell, CheckCircle2, ChevronDown, ChefHat, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X, GitMerge,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -819,6 +819,25 @@ export default function TablePOSPage() {
     }).catch(() => {});
   }, [entityId, isBarTab]);
 
+  // Poll just for the KDS "food ready" flag while a waiter is sitting on
+  // this table — the load effect above only fetches the table once on
+  // mount, so without this the ready banner would never appear unless the
+  // page was reloaded. Merges only kitchen_status so it can't clobber any
+  // other locally-reconciled entity field (waiter name, merged order, etc).
+  useEffect(() => {
+    if (isBarTab || !entityId) return;
+    const poll = () => {
+      api.getTables()
+        .then((list) => {
+          const fresh = list.find((t) => t.id === entityId);
+          if (fresh) setEntity((prev) => prev ? { ...prev, kitchen_status: fresh.kitchen_status } : prev);
+        })
+        .catch(() => {});
+    };
+    const interval = setInterval(poll, 15000);
+    return () => clearInterval(interval);
+  }, [entityId, isBarTab]);
+
   const addToCart = (product) => {
     const unitPrice = priceForOutlet(product, entity?.outlet_id || selectedOutlet);
     setCart((prev) => {
@@ -1607,6 +1626,13 @@ export default function TablePOSPage() {
             </button>
           )}
         </header>
+
+        {entity?.kitchen_status === "ready" && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white text-sm font-bold flex-shrink-0 animate-pulse">
+            <Bell size={15} strokeWidth={2.5} />
+            Order ready — kitchen has finished cooking this order!
+          </div>
+        )}
 
         <div className="flex-1 flex overflow-hidden">
           {/* Product browser */}

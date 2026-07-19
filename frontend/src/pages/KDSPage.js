@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users,
+  ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users, AlertTriangle,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
@@ -8,6 +8,8 @@ import { api } from "../lib/api";
 import { cn, itemStation, userHasPermission } from "../lib/utils";
 
 const POLL_MS = 5000;
+// How long an order can sit in "Processing" before the card flags red.
+const PROCESSING_ALERT_MINUTES = 20;
 
 // How long an order has been sitting in the kitchen — used to color-code
 // cards so anything getting old stands out at a glance.
@@ -16,6 +18,12 @@ function orderAge(createdAt) {
   if (mins >= 15) return { mins, color: "text-red-600 dark:text-red-400", dot: "bg-red-500" };
   if (mins >= 7)  return { mins, color: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" };
   return { mins, color: "text-gray-400 dark:text-gray-500", dot: "bg-emerald-500" };
+}
+
+function minutesSince(ts) {
+  if (!ts) return null;
+  const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  return Number.isFinite(mins) ? Math.max(0, mins) : null;
 }
 
 const COLUMNS = [
@@ -28,17 +36,43 @@ function OrderCard({ order, items, column, onAdvance, onRevert, isActing }) {
   const age = orderAge(order.created_at);
   const label = order.table_number ? `Table ${order.table_number}` : (order.customer_name || order.order_number);
 
+  // Processing timer: how long this order has sat in "preparing", timed
+  // from when it entered that column (falls back to created_at for orders
+  // that moved to preparing before kitchen_status_at existed).
+  const procMins = column === "preparing" ? minutesSince(order.kitchen_status_at || order.created_at) : null;
+  const overdue = procMins !== null && procMins >= PROCESSING_ALERT_MINUTES;
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-100 dark:border-gray-700">
+    <div className={cn(
+      "bg-white dark:bg-gray-800 rounded-2xl border overflow-hidden flex flex-col transition-colors",
+      overdue
+        ? "border-red-500 dark:border-red-500 shadow-lg shadow-red-500/20"
+        : "border-gray-200 dark:border-gray-700 shadow-sm"
+    )}>
+      <div className={cn(
+        "flex items-center justify-between px-4 py-2.5 border-b",
+        overdue
+          ? "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"
+          : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-700"
+      )}>
         <div className="flex items-center gap-2 min-w-0">
-          <span className={cn("w-2 h-2 rounded-full flex-shrink-0", age.dot)} />
+          <span className={cn("w-2 h-2 rounded-full flex-shrink-0", overdue ? "bg-red-500 animate-pulse" : age.dot)} />
           <span className="font-bold text-gray-900 dark:text-white text-sm truncate">{label}</span>
         </div>
-        <span className={cn("flex items-center gap-1 text-xs font-bold flex-shrink-0", age.color)}>
-          <Clock size={11} />
-          {age.mins}m
-        </span>
+        {procMins !== null ? (
+          <span className={cn(
+            "flex items-center gap-1 text-xs font-bold flex-shrink-0",
+            overdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+          )}>
+            {overdue ? <AlertTriangle size={11} className="animate-pulse" /> : <Clock size={11} />}
+            {overdue ? `OVERDUE · ${procMins}m` : `${procMins}m`}
+          </span>
+        ) : (
+          <span className={cn("flex items-center gap-1 text-xs font-bold flex-shrink-0", age.color)}>
+            <Clock size={11} />
+            {age.mins}m
+          </span>
+        )}
       </div>
 
       <div className="px-4 py-3 flex-1 space-y-1">

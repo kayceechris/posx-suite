@@ -116,7 +116,7 @@ async def get_tables(outlet_id: Optional[str] = None, current_user: User = Depen
     if order_ids:
         async for o in db.orders.find(
             {"id": {"$in": order_ids}},
-            {"_id": 0, "id": 1, "created_by": 1, "status": 1},
+            {"_id": 0, "id": 1, "created_by": 1, "status": 1, "kitchen_status": 1},
         ):
             orders_by_id[o["id"]] = o
 
@@ -166,6 +166,14 @@ async def get_tables(outlet_id: Optional[str] = None, current_user: User = Depen
                 if t["id"] == f["id"]:
                     t.update(m)
                     break
+
+    # Denormalize the linked order's KDS progress onto each table (response
+    # only — never persisted on the table doc, kitchen_status belongs to the
+    # order). Lets the floor view / TablePOS show a "food ready" indicator
+    # without every screen having to fetch full order objects.
+    for table in tables:
+        order = orders_by_id.get(table.get("current_order_id"))
+        table["kitchen_status"] = order.get("kitchen_status") if order and order.get("status") == "sent_to_kitchen" else None
 
     return tables
 

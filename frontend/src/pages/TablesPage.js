@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2, GitMerge } from "lucide-react";
+import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2, GitMerge, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -220,9 +220,23 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
   // reservations too) — surface that link so staff can tell this occupied
   // table originated from a reservation rather than a walk-in.
   const seatedFromReservation = (status === "occupied" || status === "mine") && !!reservation;
+  // Kitchen marked this table's order ready on the KDS board — surface it
+  // here so the waiter notices without having to go check the board.
+  const orderReady = (status === "occupied" || status === "mine") && entity.kitchen_status === "ready";
 
   return (
-    <div className={cn("relative rounded-3xl border-2 p-5 flex flex-col items-center gap-2 transition-all duration-200 hover:shadow-lg w-full", s.card)}>
+    <div className={cn(
+      "relative rounded-3xl border-2 p-5 flex flex-col items-center gap-2 transition-all duration-200 hover:shadow-lg w-full",
+      orderReady ? "border-emerald-500 dark:border-emerald-400 shadow-lg shadow-emerald-500/30" : s.card
+    )}>
+      {orderReady && (
+        <span
+          title="Order ready — pick up from the kitchen!"
+          className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-black shadow-sm cursor-default animate-pulse"
+        >
+          <Bell size={11} strokeWidth={2.5} /> READY
+        </span>
+      )}
       {urgencyColor && (
         <span
           title={formatReservationDateTime(reservation.date, reservation.time)}

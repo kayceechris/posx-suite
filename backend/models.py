@@ -332,6 +332,9 @@ class Order(BaseModel):
     # KDS card movement never touches table occupancy or the Held Orders
     # list. Only meaningful while status == "sent_to_kitchen".
     kitchen_status: Optional[str] = None
+    # ISO timestamp of the last kitchen_status change — lets the KDS time
+    # how long an order has sat in "preparing" and flag it once it's overdue.
+    kitchen_status_at: Optional[str] = None
     created_by: str
     created_by_name: Optional[str] = None
     created_by_role: Optional[str] = None

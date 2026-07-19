@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from typing import List, Optional
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from database import db
 from models import User, Order, OrderCreate, SplitBill, SplitBillCreate
@@ -135,6 +135,7 @@ async def create_order(order_data: OrderCreate, background_tasks: BackgroundTask
     # sent to the kitchen (e.g. Quick Send skipping the held step).
     if order.status == "sent_to_kitchen":
         order.kitchen_status = "new"
+        order.kitchen_status_at = datetime.now(timezone.utc).isoformat()
 
     if order.status == "completed":
         await _deduct_stock_for_order(
@@ -327,6 +328,12 @@ async def update_order(order_id: str, order_data: dict, current_user: User = Dep
     # of the board again instead of staying buried in "Completed".
     if update_fields.get("status") == "sent_to_kitchen":
         update_fields["kitchen_status"] = "new"
+
+    # Stamp the moment kitchen_status changes (covers both the auto-reset
+    # above and an explicit KDS move) so the board can time how long an
+    # order has sat in "preparing".
+    if "kitchen_status" in update_fields:
+        update_fields["kitchen_status_at"] = datetime.now(timezone.utc).isoformat()
 
     await db.orders.update_one({"id": order_id}, {"$set": update_fields})
 
