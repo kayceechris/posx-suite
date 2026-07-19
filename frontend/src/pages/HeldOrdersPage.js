@@ -343,7 +343,7 @@ function OrderCard({ order, floorName = "", canSeeAll, canDelete, onDelete, onCo
           </p>
         )}
 
-        {(order.items || []).map((item, i) => (
+        {(order.items || []).slice(0, 4).map((item, i) => (
           <div key={i} className="flex justify-between text-sm">
             <span className="text-gray-700 dark:text-gray-300">
               {item.quantity}x {item.product_name || item.name}
@@ -353,6 +353,11 @@ function OrderCard({ order, floorName = "", canSeeAll, canDelete, onDelete, onCo
             </span>
           </div>
         ))}
+        {(order.items || []).length > 4 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 pt-0.5">
+            +{order.items.length - 4} more item{order.items.length - 4 !== 1 ? "s" : ""}
+          </p>
+        )}
       </div>
 
       <div className="px-4 pb-4">
