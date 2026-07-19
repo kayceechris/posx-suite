@@ -215,6 +215,11 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
   const urgencyColor = status === "reserved" && reservation
     ? RESERVATION_URGENCY_COLORS[reservationUrgency(reservation.date, reservation.time)]
     : null;
+  // A reservation that's been seated flips the table to occupied/mine, but the
+  // reservation record still comes through (reservationMap keeps "seated"
+  // reservations too) — surface that link so staff can tell this occupied
+  // table originated from a reservation rather than a walk-in.
+  const seatedFromReservation = (status === "occupied" || status === "mine") && !!reservation;
 
   return (
     <div className={cn("relative rounded-3xl border-2 p-5 flex flex-col items-center gap-2 transition-all duration-200 hover:shadow-lg w-full", s.card)}>
@@ -223,6 +228,14 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
           title={formatReservationDateTime(reservation.date, reservation.time)}
           className={cn("absolute top-3 right-3 w-2.5 h-2.5 rounded-full cursor-default", urgencyColor.dot)}
         />
+      )}
+      {seatedFromReservation && (
+        <span
+          title={`Seated from reservation: ${reservation.customer_name} · ${fmt12(reservation.time)}`}
+          className="absolute top-3 right-3 flex items-center justify-center w-5 h-5 rounded-full bg-purple-500 shadow-sm cursor-default"
+        >
+          <CalendarDays size={11} strokeWidth={2.5} className="text-white" />
+        </span>
       )}
       {/* Clickable top area */}
       <button onClick={() => onClick(entity)} className="w-full flex flex-col items-center gap-2 active:scale-95">
@@ -257,11 +270,12 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
         )}
 
         {(status === "occupied" || status === "mine") && (
-          <span className={`text-[11px] font-bold truncate max-w-full px-2 py-0.5 rounded-full ${
+          <span className={`flex items-center gap-1 text-[11px] font-bold truncate max-w-full px-2 py-0.5 rounded-full ${
             status === "mine"
               ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300"
               : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300"
           }`}>
+            {seatedFromReservation && <CalendarDays size={10} className="shrink-0" />}
             {ownerName || (status === "mine" ? "You" : "Occupied")}
           </span>
         )}
