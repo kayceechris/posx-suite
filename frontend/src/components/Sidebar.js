@@ -64,7 +64,7 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
     ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),
     { label: "Held Orders", icon: ClipboardList, path: "/held-orders" },
     ...(hasTableSupport ? [{ label: "Tables", icon: Monitor, path: "/tables" }] : []),
-    ...(userHasPermission(user, "view_kds") && settings?.kds_enabled
+    ...((userHasPermission(user, "view_kds_kitchen") || userHasPermission(user, "view_kds_bar")) && settings?.kds_enabled
       ? [{ label: "Kitchen Display", icon: ChefHat, path: "/kds" }]
       : []),
     ...((() => {

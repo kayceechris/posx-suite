@@ -280,7 +280,7 @@ async def get_kitchen_orders(outlet_id: Optional[str] = None, current_user: User
     KDS board. Unlike /orders/held/list this is never scoped to the current
     user — kitchen staff need to see every waiter's tickets, not just their
     own. Sorted oldest-first (FIFO) to match how a kitchen queue is read."""
-    if not has_perm(current_user, "view_kds"):
+    if not has_perm(current_user, "view_kds_kitchen", "view_kds_bar"):
         raise HTTPException(status_code=403, detail="You don't have permission to view the kitchen display")
     query = {"status": "sent_to_kitchen"}
     if outlet_id:

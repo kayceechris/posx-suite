@@ -3,8 +3,9 @@ import {
   ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
-import { cn, itemStation } from "../lib/utils";
+import { cn, itemStation, userHasPermission } from "../lib/utils";
 
 const POLL_MS = 5000;
 
@@ -91,7 +92,13 @@ function OrderCard({ order, items, column, onAdvance, onRevert, isActing }) {
 }
 
 export default function KDSPage() {
-  const [station, setStation] = useState("kitchen"); // "kitchen" | "bar"
+  const { user } = useAuth();
+  // A Bar KDS user shouldn't see food tickets and vice versa — each holds
+  // only the sub-permission for their own station (admin/manager hold both
+  // via the role bypass in userHasPermission).
+  const canKitchen = userHasPermission(user, "view_kds_kitchen");
+  const canBar = userHasPermission(user, "view_kds_bar");
+  const [station, setStation] = useState(canKitchen ? "kitchen" : "bar"); // "kitchen" | "bar"
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -159,6 +166,7 @@ export default function KDSPage() {
         return ks === col.id;
       }),
   }));
+  const stationOrderCount = columns.reduce((s, c) => s + c.cards.length, 0);
 
   return (
     <div className="flex h-screen bg-[#111827] overflow-hidden">
@@ -173,32 +181,38 @@ export default function KDSPage() {
             >
               <Menu size={20} />
             </button>
-            <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-sm">
-              <ChefHat size={20} className="text-white" />
+            <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm", station === "bar" ? "bg-purple-500" : "bg-orange-500")}>
+              {station === "bar" ? <Wine size={20} className="text-white" /> : <ChefHat size={20} className="text-white" />}
             </div>
             <div>
-              <h1 className="font-black text-gray-900 dark:text-white text-lg tracking-tight">Kitchen Display</h1>
-              <p className="text-xs text-gray-400 mt-0.5">{orders.length} order{orders.length !== 1 ? "s" : ""} in the kitchen</p>
+              <h1 className="font-black text-gray-900 dark:text-white text-lg tracking-tight">
+                {canKitchen && canBar ? "Kitchen Display" : station === "bar" ? "Bar Display" : "Kitchen Display"}
+              </h1>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {stationOrderCount} order{stationOrderCount !== 1 ? "s" : ""} in {station === "bar" ? "the bar" : "the kitchen"}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
-              {[["kitchen", "Kitchen", ChefHat], ["bar", "Bar", Wine]].map(([id, lbl, Icon]) => (
-                <button
-                  key={id}
-                  onClick={() => setStation(id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
-                    station === id
-                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  )}
-                >
-                  <Icon size={14} /> {lbl}
-                </button>
-              ))}
-            </div>
+            {canKitchen && canBar && (
+              <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+                {[["kitchen", "Kitchen", ChefHat], ["bar", "Bar", Wine]].map(([id, lbl, Icon]) => (
+                  <button
+                    key={id}
+                    onClick={() => setStation(id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
+                      station === id
+                        ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    )}
+                  >
+                    <Icon size={14} /> {lbl}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => fetchOrders(true)}
               className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"

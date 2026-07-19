@@ -115,7 +115,8 @@ const PERMISSION_MODULES = [
   {
     id: "kds", label: "Kitchen Display",
     permissions: [
-      { id: "view_kds", label: "View Kitchen Display" },
+      { id: "view_kds_kitchen", label: "View Kitchen Display – Kitchen" },
+      { id: "view_kds_bar",     label: "View Kitchen Display – Bar" },
     ],
   },
   {
