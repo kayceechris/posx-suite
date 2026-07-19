@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users,
 } from "lucide-react";
@@ -107,11 +107,37 @@ export default function KDSPage() {
   const [actingId, setActingId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Orders we've just moved locally but the server hasn't echoed back yet.
+  // A poll's GET can be in flight when the user clicks a move button —
+  // if that request started before the PUT landed, it resolves with the
+  // pre-move status and would otherwise snap the card back for one tick
+  // before the next poll corrects it. Keep showing our own value for an
+  // order until a poll actually confirms it, instead of trusting every
+  // poll response blindly.
+  const pendingRef = useRef({});
+
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const data = await api.getKitchenOrders();
-      setOrders(data || []);
+      const pending = pendingRef.current;
+      const seenIds = new Set();
+      const merged = (data || []).map((o) => {
+        seenIds.add(o.id);
+        const wanted = pending[o.id];
+        if (wanted === undefined) return o;
+        if (wanted === o.kitchen_status) {
+          delete pending[o.id]; // server caught up — stop overriding
+          return o;
+        }
+        return { ...o, kitchen_status: wanted };
+      });
+      // Drop overrides for orders that left the board entirely (paid,
+      // voided, etc.) so pendingRef doesn't grow unbounded.
+      for (const id of Object.keys(pending)) {
+        if (!seenIds.has(id)) delete pending[id];
+      }
+      setOrders(merged);
     } catch {
       // Silent — a KDS screen shouldn't spam errors on a flaky poll; the
       // board just keeps showing the last-known state until the next tick.
@@ -138,11 +164,14 @@ export default function KDSPage() {
   const moveCard = async (order, kitchenStatus) => {
     setActingId(order.id);
     // Optimistic update — keeps the board responsive on a slow connection
-    // instead of waiting for the next poll to reflect the move.
+    // instead of waiting for the next poll to reflect the move. Recorded
+    // in pendingRef so an in-flight poll response can't undo it early.
+    pendingRef.current[order.id] = kitchenStatus;
     setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, kitchen_status: kitchenStatus } : o));
     try {
       await api.updateOrder(order.id, { kitchen_status: kitchenStatus });
     } catch {
+      delete pendingRef.current[order.id];
       fetchOrders(true);
     } finally {
       setActingId(null);
