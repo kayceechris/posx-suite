@@ -60,21 +60,28 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
   // Show the Tables/Tabs menu when the business has either tables or tabs
   const hasTableSupport = businessConfig.hasTables || businessConfig.hasTabs;
 
-  const navItems = [
-    ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),
-    { label: "Held Orders", icon: ClipboardList, path: "/held-orders" },
-    ...(hasTableSupport ? [{ label: "Tables", icon: Monitor, path: "/tables" }] : []),
-    ...((userHasPermission(user, "view_kds_kitchen") || userHasPermission(user, "view_kds_bar")) && settings?.kds_enabled
-      ? [{ label: "Kitchen Display", icon: ChefHat, path: "/kds" }]
-      : []),
-    ...((() => {
-      if (!user) return false;
-      if (user.role === "admin" || user.role === "manager") return true;
-      const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
-      return adminPerms.some(p => userHasPermission(user, p));
-    })() ? [{ label: "Admin", icon: LayoutDashboard, path: "/admin" }] : []),
-    ...extraItems,
-  ];
+  const canAccessKds = (userHasPermission(user, "view_kds_kitchen") || userHasPermission(user, "view_kds_bar")) && settings?.kds_enabled;
+  const canAccessAdmin = (() => {
+    if (!user) return false;
+    if (user.role === "admin" || user.role === "manager") return true;
+    const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
+    return adminPerms.some(p => userHasPermission(user, p));
+  })();
+  // A user whose only capability is the kitchen display (no broader
+  // operational/admin access) gets a stripped-down sidebar — just the
+  // board and Logout, nothing they can't actually use.
+  const isKdsOnly = canAccessKds && !canAccessAdmin;
+
+  const navItems = isKdsOnly
+    ? [{ label: "Kitchen Display", icon: ChefHat, path: "/kds" }]
+    : [
+        ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),
+        { label: "Held Orders", icon: ClipboardList, path: "/held-orders" },
+        ...(hasTableSupport ? [{ label: "Tables", icon: Monitor, path: "/tables" }] : []),
+        ...(canAccessKds ? [{ label: "Kitchen Display", icon: ChefHat, path: "/kds" }] : []),
+        ...(canAccessAdmin ? [{ label: "Admin", icon: LayoutDashboard, path: "/admin" }] : []),
+        ...extraItems,
+      ];
 
   const isActive = (path) => {
     if (path === "/pos") return pathname === "/pos";
@@ -226,6 +233,7 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
 
       {/* Bottom: sync + settings + user + logout */}
       <div className="px-2 py-4 border-t border-white/5 space-y-0.5">
+        {!isKdsOnly && (
         <button
           onClick={handleSync}
           disabled={syncing || !online}
@@ -253,8 +261,9 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
             <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />
           )}
         </button>
+        )}
 
-        {isInstallable && !isInstalled && (
+        {!isKdsOnly && isInstallable && !isInstalled && (
           <button
             onClick={handleInstall}
             title={collapsed ? "Install App" : undefined}
@@ -283,7 +292,7 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
           {!collapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
         </button>
 
-        {(["admin", "manager"].includes(user?.role) || user?.permissions?.length > 0) && (
+        {!isKdsOnly && (["admin", "manager"].includes(user?.role) || user?.permissions?.length > 0) && (
           <button
             onClick={onSettingsClick ?? (() => navigate("/admin"))}
             title={collapsed ? "Settings" : undefined}
