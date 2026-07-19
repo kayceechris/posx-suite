@@ -41,6 +41,38 @@ export function formatTime(dateStr) {
   });
 }
 
+// How urgent a reservation is relative to now, used to color-code
+// reservation cards / reserved-table tiles: "soon" = starting within the
+// next hour (or already started), "today" = later today, "future" = any
+// later date. Reused by ReservationsSection.js and TablesPage.js so the
+// color scale matches everywhere it appears.
+export function reservationUrgency(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return "future";
+  const resDt = new Date(`${dateStr}T${timeStr}:00`);
+  if (Number.isNaN(resDt.getTime())) return "future";
+  const now = new Date();
+  const diffMs = resDt - now;
+  if (diffMs <= 60 * 60 * 1000) return "soon";
+  const isToday = resDt.toDateString() === now.toDateString();
+  return isToday ? "today" : "future";
+}
+
+export const RESERVATION_URGENCY_COLORS = {
+  soon:   { dot: "bg-red-500",    text: "text-red-600 dark:text-red-400" },
+  today:  { dot: "bg-amber-500",  text: "text-amber-600 dark:text-amber-400" },
+  future: { dot: "bg-purple-400", text: "text-purple-600 dark:text-purple-400" },
+};
+
+export function formatReservationDateTime(dateStr, timeStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T${timeStr || "00:00"}:00`);
+  if (Number.isNaN(d.getTime())) return `${dateStr} ${timeStr || ""}`.trim();
+  const datePart = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  if (!timeStr) return datePart;
+  const timePart = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
 // Umbrella → fine-grained permission implications. The 'Add User' dialog
 // lists a short set of umbrella perms (manage_products, manage_users, …)
 // while the per-section gates check fine-grained perms (view_products,

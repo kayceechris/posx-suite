@@ -317,6 +317,9 @@ class Order(BaseModel):
     payment_method: str
     status: str = "held"
     service_mode: str = "quick_service"
+    # Set when this order is a reservation's pre-built draft (status
+    # "reservation_hold" until the reservation's date/time activates it).
+    reservation_id: Optional[str] = None
     idempotency_key: Optional[str] = None
     void_reason: Optional[str] = None
     # Snapshot of what's been sent to the kitchen — used by TablePOS to
@@ -347,6 +350,7 @@ class OrderCreate(BaseModel):
     payment_method: str
     status: str = "held"
     service_mode: str = "quick_service"
+    reservation_id: Optional[str] = None
     # Optional client-supplied id used to swallow duplicate POSTs caused by
     # a network retry, an offline-queue replay, or a rage-click that
     # slipped past the modal's in-flight guard. The backend stores this on
@@ -799,7 +803,18 @@ class Reservation(BaseModel):
     time: str                   # HH:MM (24h)
     duration: int = 90          # minutes
     notes: Optional[str] = None
-    status: str = "confirmed"   # confirmed | seated | cancelled | no_show
+    status: str = "confirmed"   # confirmed | seated | completed | cancelled | no_show
+    # Pre-built order for this reservation (status "reservation_hold" until
+    # activated). order_total/order_item_count are denormalized copies so
+    # the reservation list can render a summary chip without an extra
+    # fetch per card.
+    order_id: Optional[str] = None
+    order_total: Optional[float] = None
+    order_item_count: Optional[int] = None
+    # Stamped when the reservation is marked "seated" (manually, or
+    # automatically when its pre-built order activates).
+    waiter_id: Optional[str] = None
+    waiter_name: Optional[str] = None
     created_by: str
     created_by_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -142,7 +142,11 @@ async def create_order(order_data: OrderCreate, background_tasks: BackgroundTask
                 {"$inc": {"total_orders": 1, "total_spent": order.total}}
             )
 
-    if order.table_id:
+    if order.table_id and order.status != "reservation_hold":
+        # A reservation's pre-built draft (status "reservation_hold") must
+        # never touch table state at creation time — it only claims the
+        # table once activated (see lib/reservation_activation.py), so it
+        # doesn't occupy the table for the present day.
         is_active = order.status in ("held", "sent_to_kitchen")
         existing_table = await db.tables.find_one(
             {"id": order.table_id}, {"_id": 0, "waiter_id": 1, "waiter_name": 1, "current_order_id": 1}

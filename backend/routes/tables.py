@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from database import db
 from models import User, Table, TableCreate, TableTransferRequest
 from auth import get_current_user, has_perm
+from lib.reservation_activation import activate_reservation_order
 
 router = APIRouter(prefix="/api")
 
@@ -14,9 +15,11 @@ RESERVATION_LOCK_HOURS = 2  # lock tables this many hours before a reservation
 async def _sync_reservation_locks():
     """
     Auto-lock tables that have a confirmed reservation starting within the next
-    RESERVATION_LOCK_HOURS hours, and release tables whose reservation window
-    has fully expired.  Called on every GET /tables so no external scheduler
-    is needed.
+    RESERVATION_LOCK_HOURS hours, release tables whose reservation window has
+    fully expired, and — for reservations carrying a pre-built order — activate
+    that order (occupy the table, promote it to "held") the moment the
+    reservation's date/time actually arrives.  Called on every GET /tables so
+    no external scheduler is needed.
     """
     now = datetime.now()
     lock_cutoff = now + timedelta(hours=RESERVATION_LOCK_HOURS)
@@ -25,7 +28,8 @@ async def _sync_reservation_locks():
     # All confirmed reservations from today onwards
     confirmed = await db.reservations.find(
         {"status": "confirmed", "date": {"$gte": today}},
-        {"_id": 0, "table_id": 1, "date": 1, "time": 1, "duration": 1}
+        {"_id": 0, "id": 1, "table_id": 1, "date": 1, "time": 1, "duration": 1,
+         "order_id": 1, "waiter_id": 1, "waiter_name": 1}
     ).to_list(500)
 
     tables_to_lock = set()
@@ -40,6 +44,27 @@ async def _sync_reservation_locks():
         # Lock window: now ≤ reservation_start ≤ cutoff, and reservation hasn't ended yet
         if res_dt <= lock_cutoff and res_end > now:
             tables_to_lock.add(res["table_id"])
+
+        # Activation window: the reservation's actual start time has arrived
+        # (not just the 2-hour lookahead) and it hasn't ended yet. Only
+        # reservations with a pre-built order are affected — plain bookings
+        # keep behaving exactly as before (lock/unlock only).
+        if res_dt <= now < res_end and res.get("order_id"):
+            waiter_id = res.get("waiter_id") or None
+            waiter_name = res.get("waiter_name") or None
+            if not waiter_id:
+                order = await db.orders.find_one(
+                    {"id": res["order_id"]}, {"_id": 0, "created_by": 1, "created_by_name": 1}
+                )
+                if order:
+                    waiter_id = order.get("created_by")
+                    waiter_name = order.get("created_by_name")
+            activated = await activate_reservation_order(res, waiter_id, waiter_name)
+            if activated:
+                await db.reservations.update_one(
+                    {"id": res["id"]},
+                    {"$set": {"status": "seated", "waiter_id": waiter_id, "waiter_name": waiter_name}},
+                )
 
     # Lock available tables that enter the window
     for table_id in tables_to_lock:

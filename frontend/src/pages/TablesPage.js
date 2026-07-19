@@ -6,7 +6,10 @@ import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
-import { cn, sortByTableNumber, canManageAnyTable } from "../lib/utils";
+import {
+  cn, sortByTableNumber, canManageAnyTable,
+  reservationUrgency, RESERVATION_URGENCY_COLORS, formatReservationDateTime,
+} from "../lib/utils";
 
 // ─── Transfer Modal ───────────────────────────────────────────────────────────
 function TransferModal({ entityId, isBarTab, currentOwnerId, onClose, onTransferred }) {
@@ -209,8 +212,18 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
     status === "available" ? "Available" :
     status === "occupied" ? "Occupied" : "Reserved";
 
+  const urgencyColor = status === "reserved" && reservation
+    ? RESERVATION_URGENCY_COLORS[reservationUrgency(reservation.date, reservation.time)]
+    : null;
+
   return (
-    <div className={cn("rounded-3xl border-2 p-5 flex flex-col items-center gap-2 transition-all duration-200 hover:shadow-lg w-full", s.card)}>
+    <div className={cn("relative rounded-3xl border-2 p-5 flex flex-col items-center gap-2 transition-all duration-200 hover:shadow-lg w-full", s.card)}>
+      {urgencyColor && (
+        <span
+          title={formatReservationDateTime(reservation.date, reservation.time)}
+          className={cn("absolute top-3 right-3 w-2.5 h-2.5 rounded-full cursor-default", urgencyColor.dot)}
+        />
+      )}
       {/* Clickable top area */}
       <button onClick={() => onClick(entity)} className="w-full flex flex-col items-center gap-2 active:scale-95">
         <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm", s.icon)}>

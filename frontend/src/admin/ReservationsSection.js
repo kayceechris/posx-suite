@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  CalendarDays, ChevronDown, Clock, Phone, Mail, Users, Plus, Pencil,
-  Trash2, X, CheckCircle2, XCircle, UserCheck, AlertCircle, Search,
+  CalendarDays, ChevronDown, ChevronUp, Clock, Phone, Mail, Users, Plus, Pencil,
+  Trash2, X, CheckCircle2, XCircle, UserCheck, AlertCircle, Search, ShoppingBag, Receipt,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { cn } from "../lib/utils";
+import { useAuth } from "../context/AuthContext";
+import { useBusiness } from "../context/BusinessContext";
+import {
+  cn, formatCurrency, userHasPermission, reservationUrgency,
+  RESERVATION_URGENCY_COLORS, formatReservationDateTime,
+} from "../lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -27,8 +32,161 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ─── Pre-order panel ──────────────────────────────────────────────────────────
+// Optional item picker embedded in the reservation modal. Builds a plain
+// cart of OrderItem-shaped rows ({product_id, product_name, quantity,
+// price, total}) that the modal turns into a "reservation_hold" order on
+// submit. Lazy-loads the catalog only once expanded, so reservations that
+// don't need a pre-order never pay for the fetch.
+function PreOrderPanel({ cart, setCart, outletId, expanded, onToggle }) {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!expanded || loaded || loading) return;
+    setLoading(true);
+    Promise.all([api.getProducts(), api.getCategories()])
+      .then(([p, c]) => {
+        setProducts((p || []).filter((x) => x.active !== false));
+        setCategories(c || []);
+        setLoaded(true);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [expanded, loaded, loading]);
+
+  const categoryName = (id) => categories.find((c) => c.id === id)?.name || "";
+
+  const filtered = products.filter((p) => {
+    if (outletId && p.outlet_id && p.outlet_id !== outletId) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return p.name.toLowerCase().includes(q) || categoryName(p.category_id).toLowerCase().includes(q);
+  });
+
+  const qtyFor = (productId) => cart.find((i) => i.product_id === productId)?.quantity || 0;
+
+  const addOne = (product) => {
+    setCart((prev) => {
+      const idx = prev.findIndex((i) => i.product_id === product.id);
+      if (idx === -1) {
+        return [...prev, { product_id: product.id, product_name: product.name, quantity: 1, price: product.price, total: product.price }];
+      }
+      const next = [...prev];
+      const qty = next[idx].quantity + 1;
+      next[idx] = { ...next[idx], quantity: qty, total: qty * next[idx].price };
+      return next;
+    });
+  };
+
+  const removeOne = (productId) => {
+    setCart((prev) => {
+      const idx = prev.findIndex((i) => i.product_id === productId);
+      if (idx === -1) return prev;
+      const qty = prev[idx].quantity - 1;
+      if (qty <= 0) return prev.filter((_, i) => i !== idx);
+      const next = [...prev];
+      next[idx] = { ...next[idx], quantity: qty, total: qty * next[idx].price };
+      return next;
+    });
+  };
+
+  const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+
+  return (
+    <div className="border-2 border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
+      <button type="button" onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-700/50 text-left">
+        <span className="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-gray-300">
+          <ShoppingBag size={14} className="text-purple-500" />
+          Pre-order (optional)
+          {cart.length > 0 && (
+            <span className="text-[11px] font-black px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300">
+              {cart.reduce((s, i) => s + i.quantity, 0)} item{cart.length !== 1 ? "s" : ""} · {formatCurrency(cartTotal)}
+            </span>
+          )}
+        </span>
+        {expanded ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="p-3 space-y-3 border-t-2 border-gray-200 dark:border-gray-600">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 -mt-1">
+            Build the order now — it stays on hold and won't occupy the table until the reservation's date and time arrive.
+          </p>
+
+          {cart.length > 0 && (
+            <div className="space-y-1.5">
+              {cart.map((item) => (
+                <div key={item.product_id} className="flex items-center justify-between gap-2 bg-purple-50 dark:bg-purple-900/10 rounded-lg px-2.5 py-1.5">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">{item.quantity}x {item.product_name}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300 tabular-nums">{formatCurrency(item.total)}</span>
+                    <button type="button" onClick={() => removeOne(item.product_id)}
+                      className="w-5 h-5 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                      <X size={11} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between text-xs font-black text-gray-700 dark:text-gray-200 pt-1 border-t border-gray-200 dark:border-gray-600">
+                <span>Total</span><span>{formatCurrency(cartTotal)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search menu…"
+              className="w-full pl-8 pr-2.5 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-xs bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-400 dark:placeholder-gray-500"
+            />
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {loading ? (
+              <p className="text-xs text-gray-400 text-center py-4">Loading menu…</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">{loaded ? "No items match" : "—"}</p>
+            ) : (
+              filtered.slice(0, 60).map((p) => {
+                const qty = qtyFor(p.id);
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">{p.name}</p>
+                      <p className="text-[10px] text-gray-400">{formatCurrency(p.price)}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {qty > 0 && (
+                        <>
+                          <button type="button" onClick={() => removeOne(p.id)}
+                            className="w-6 h-6 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 font-bold">−</button>
+                          <span className="w-4 text-center text-xs font-bold text-gray-700 dark:text-gray-200">{qty}</span>
+                        </>
+                      )}
+                      <button type="button" onClick={() => addOne(p)}
+                        className="w-6 h-6 flex items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 font-bold">+</button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Reservation Modal ────────────────────────────────────────────────────────
 function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
+  const { settings } = useBusiness();
   const isEdit = !!reservation;
   const defaultOutlet = outlets[0]?.id || "";
   const outletTables = (outletId) => tables.filter((t) => t.outlet_id === outletId);
@@ -48,6 +206,20 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Pre-order cart — prefilled from the reservation's existing draft order
+  // (if any) so re-opening the modal to edit doesn't lose it.
+  const [cart, setCart] = useState([]);
+  const [cartExpanded, setCartExpanded] = useState(!!reservation?.order_id);
+  useEffect(() => {
+    if (!reservation?.order_id) return;
+    let cancelled = false;
+    api.getOrder(reservation.order_id)
+      .then((o) => { if (!cancelled) setCart((o?.items || []).map((i) => ({ ...i }))); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredTables = outletTables(form.outlet_id);
 
@@ -71,11 +243,53 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
     if (!form.customer_name.trim()) { setError("Customer name is required"); return; }
     setSaving(true); setError("");
     try {
-      if (isEdit) {
-        await api.updateReservation(reservation.id, form);
+      const savedRes = isEdit
+        ? await api.updateReservation(reservation.id, form)
+        : await api.createReservation(form);
+
+      const existingOrderId = reservation?.order_id || null;
+      const cartSum = cart.reduce((s, i) => s + i.total, 0);
+      const itemCount = cart.reduce((s, i) => s + i.quantity, 0);
+      const taxRate = parseFloat(settings?.tax_rate || 0);
+      const taxMode = (settings?.tax_mode || "exclusive").toLowerCase();
+      const taxEnabled = settings?.tax_enabled !== false && taxRate > 0;
+      let cartSubtotal, cartTax, cartTotal;
+      if (!taxEnabled) {
+        cartSubtotal = cartSum; cartTax = 0; cartTotal = cartSum;
+      } else if (taxMode === "inclusive") {
+        cartTotal = cartSum; cartTax = cartSum * taxRate / (100 + taxRate); cartSubtotal = cartTotal - cartTax;
       } else {
-        await api.createReservation(form);
+        cartSubtotal = cartSum; cartTax = cartSum * taxRate / 100; cartTotal = cartSum + cartTax;
       }
+
+      if (cart.length > 0) {
+        if (existingOrderId) {
+          await api.updateOrder(existingOrderId, { items: cart, subtotal: cartSubtotal, tax: cartTax, total: cartTotal });
+          await api.updateReservation(savedRes.id, { order_total: cartTotal, order_item_count: itemCount });
+        } else {
+          const order = await api.createOrder({
+            outlet_id: form.outlet_id,
+            table_id: form.table_id,
+            table_number: form.table_number,
+            customer_name: form.customer_name,
+            items: cart,
+            subtotal: cartSubtotal,
+            tax: cartTax,
+            discount: 0,
+            total: cartTotal,
+            payment_method: "pending",
+            status: "reservation_hold",
+            service_mode: "table_service",
+            reservation_id: savedRes.id,
+          });
+          await api.updateReservation(savedRes.id, { order_id: order.id, order_total: cartTotal, order_item_count: itemCount });
+        }
+      } else if (existingOrderId) {
+        // Cart was emptied during an edit — void the stale draft.
+        await api.updateOrder(existingOrderId, { status: "voided", void_reason: "removed_from_reservation" });
+        await api.updateReservation(savedRes.id, { order_id: null, order_total: null, order_item_count: null });
+      }
+
       onSave();
     } catch (err) {
       setError(err.message || "Failed to save");
@@ -233,6 +447,15 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
             />
           </div>
 
+          {/* Pre-order */}
+          <PreOrderPanel
+            cart={cart}
+            setCart={setCart}
+            outletId={form.outlet_id}
+            expanded={cartExpanded}
+            onToggle={() => setCartExpanded((v) => !v)}
+          />
+
           {error && (
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-xl px-3 py-2.5 text-sm">
               <AlertCircle size={14} />
@@ -257,9 +480,13 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
 }
 
 // ─── Reservation Card ─────────────────────────────────────────────────────────
-function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
+function ReservationCard({ res, onEdit, onStatusChange, onDelete, canEdit, canDelete, canCancel }) {
   const meta = STATUS_META[res.status] || STATUS_META.confirmed;
   const isActive = res.status === "confirmed" || res.status === "seated";
+  const urgency = reservationUrgency(res.date, res.time);
+  const urgencyColor = RESERVATION_URGENCY_COLORS[urgency];
+  const dateLabel = formatReservationDateTime(res.date, res.time);
+  const hasPreOrder = !!res.order_id;
 
   return (
     <div className={cn(
@@ -272,6 +499,10 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
+            <span
+              title={dateLabel}
+              className={cn("w-2 h-2 rounded-full flex-shrink-0 cursor-default", urgencyColor.dot)}
+            />
             <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold", meta.color)}>
               <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
               {meta.label}
@@ -282,7 +513,7 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
           <p className="font-black text-gray-900 dark:text-white text-base leading-tight truncate">{res.customer_name}</p>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <span title={dateLabel} className={cn("flex items-center gap-1 text-xs font-medium", urgencyColor.text)}>
               <Clock size={11} />
               {fmt12(res.time)} · {res.duration >= 60 ? `${res.duration / 60}h${res.duration % 60 ? `${res.duration % 60}m` : ""}` : `${res.duration}m`}
             </span>
@@ -298,6 +529,17 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
             )}
           </div>
 
+          {hasPreOrder && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-purple-600 dark:text-purple-400">
+              <Receipt size={12} />
+              Pre-order: {res.order_item_count || 0} item{res.order_item_count === 1 ? "" : "s"} · {formatCurrency(res.order_total || 0)}
+            </div>
+          )}
+
+          {res.waiter_name && (
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Waiter: <span className="font-semibold text-gray-600 dark:text-gray-300">{res.waiter_name}</span></p>
+          )}
+
           {res.notes && (
             <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500 italic truncate">"{res.notes}"</p>
           )}
@@ -305,38 +547,42 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
 
         {/* Actions */}
         <div className="flex flex-col gap-1.5 flex-shrink-0">
-          <button onClick={() => onEdit(res)} title="Edit"
-            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-blue-600 hover:border-blue-300 transition-colors">
-            <Pencil size={13} />
-          </button>
-          {res.status === "confirmed" && (
-            <button onClick={() => onStatusChange(res.id, "seated")} title="Mark as Seated"
+          {canEdit && (
+            <button onClick={() => onEdit(res)} title="Edit"
+              className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-blue-600 hover:border-blue-300 transition-colors">
+              <Pencil size={13} />
+            </button>
+          )}
+          {canEdit && res.status === "confirmed" && (
+            <button onClick={() => onStatusChange(res.id, "seated")} title={hasPreOrder ? "Seat & Start Order" : "Mark as Seated"}
               className="w-8 h-8 flex items-center justify-center rounded-xl border border-green-200 dark:border-green-700 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
               <UserCheck size={13} />
             </button>
           )}
-          {res.status === "seated" && (
+          {canEdit && res.status === "seated" && (
             <button onClick={() => onStatusChange(res.id, "completed")} title="Mark as Completed"
               className="w-8 h-8 flex items-center justify-center rounded-xl border border-emerald-200 dark:border-emerald-700 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
               <CheckCircle2 size={13} />
             </button>
           )}
-          {isActive && (
+          {canCancel && isActive && (
             <button onClick={() => onStatusChange(res.id, "no_show")} title="Mark as No-show"
               className="w-8 h-8 flex items-center justify-center rounded-xl border border-orange-200 dark:border-orange-700 text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
               <XCircle size={13} />
             </button>
           )}
-          {isActive && (
+          {canCancel && isActive && (
             <button onClick={() => onStatusChange(res.id, "cancelled")} title="Cancel reservation"
               className="w-8 h-8 flex items-center justify-center rounded-xl border border-red-200 dark:border-red-700 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
               <X size={13} />
             </button>
           )}
-          <button onClick={() => onDelete(res)} title="Delete"
-            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 text-gray-300 hover:text-red-500 hover:border-red-300 transition-colors">
-            <Trash2 size={13} />
-          </button>
+          {canDelete && (
+            <button onClick={() => onDelete(res)} title="Delete"
+              className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 text-gray-300 hover:text-red-500 hover:border-red-300 transition-colors">
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -345,6 +591,12 @@ function ReservationCard({ res, onEdit, onStatusChange, onDelete }) {
 
 // ─── Main Section ─────────────────────────────────────────────────────────────
 export default function ReservationsSection() {
+  const { user } = useAuth();
+  const canCreate = userHasPermission(user, "create_reservation");
+  const canEdit   = userHasPermission(user, "edit_reservation");
+  const canDelete = userHasPermission(user, "delete_reservation");
+  const canCancel = userHasPermission(user, "cancel_reservation");
+
   const [reservations, setReservations] = useState([]);
   const [tables, setTables] = useState([]);
   const [outlets, setOutlets] = useState([]);
@@ -383,8 +635,8 @@ export default function ReservationsSection() {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await api.updateReservation(id, { status: newStatus });
-      setReservations((prev) => prev.map((r) => r.id === id ? { ...r, status: newStatus } : r));
+      const updated = await api.updateReservation(id, { status: newStatus });
+      setReservations((prev) => prev.map((r) => r.id === id ? updated : r));
     } catch (err) {
       alert(err.message);
     }
@@ -444,12 +696,14 @@ export default function ReservationsSection() {
             {filtered.length} booking{filtered.length !== 1 ? "s" : ""} · {totalGuests} guests expected
           </p>
         </div>
-        <button
-          onClick={() => setModal({ mode: "add" })}
-          className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-semibold text-sm hover:bg-purple-700 transition-colors"
-        >
-          <Plus size={16} /> New Reservation
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setModal({ mode: "add" })}
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-semibold text-sm hover:bg-purple-700 transition-colors"
+          >
+            <Plus size={16} /> New Reservation
+          </button>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -552,7 +806,7 @@ export default function ReservationsSection() {
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {search ? "Try a different search" :
              date ? <span>Try a different date or <button onClick={() => setDate("")} className="text-purple-500 underline">clear the date filter</button></span> :
-             "Create one with the button above"}
+             canCreate ? "Create one with the button above" : "No reservations yet"}
           </p>
         </div>
       ) : (
@@ -564,6 +818,9 @@ export default function ReservationsSection() {
               onEdit={(r) => setModal({ mode: "edit", reservation: r })}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canCancel={canCancel}
             />
           ))}
         </div>
