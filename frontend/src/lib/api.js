@@ -128,6 +128,8 @@ export const api = {
     return request(`/api/orders${qs ? `?${qs}` : ""}`);
   },
   getHeldOrders: () => request("/api/orders/held/list"),
+  getKitchenOrders: (outlet_id) =>
+    request(`/api/orders/kitchen/list${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),
   getOrder: (id) => request(`/api/orders/${id}`),
   completeOrder: (id, paymentMethod) =>
     request(`/api/orders/${id}/complete?payment_method=${encodeURIComponent(paymentMethod)}`, { method: "PUT" }),

@@ -326,6 +326,12 @@ class Order(BaseModel):
     # compute deltas on subsequent Hold / Send-to-Kitchen clicks, so the
     # kitchen never reprints items it already received.
     kitchen_sent_items: Optional[List[OrderItem]] = None
+    # KDS board progress — "new" | "preparing" | "ready". Deliberately
+    # separate from `status` (which stays "sent_to_kitchen" throughout
+    # kitchen prep and only becomes completed/voided via payment/void) so
+    # KDS card movement never touches table occupancy or the Held Orders
+    # list. Only meaningful while status == "sent_to_kitchen".
+    kitchen_status: Optional[str] = None
     created_by: str
     created_by_name: Optional[str] = None
     created_by_role: Optional[str] = None
@@ -550,6 +556,7 @@ class BusinessSettings(BaseModel):
     setup_completed: bool = False
     tax_enabled: bool = False
     tax_mode: str = "exclusive"  # "inclusive" | "exclusive"
+    kds_enabled: bool = False
     # Shift schedule used by the Shift Report. 24h "HH:MM" strings.
     # Four shifts arranged around the clock — each shift starts at its
     # listed time and ends when the next one begins. The Night shift wraps

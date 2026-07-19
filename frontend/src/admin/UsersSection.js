@@ -113,6 +113,12 @@ const PERMISSION_MODULES = [
     ],
   },
   {
+    id: "kds", label: "Kitchen Display",
+    permissions: [
+      { id: "view_kds", label: "View Kitchen Display" },
+    ],
+  },
+  {
     id: "customers", label: "Customers",
     permissions: [
       { id: "view_customers",        label: "View Customers" },

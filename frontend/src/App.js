@@ -15,6 +15,8 @@ import AdminPage from "./pages/AdminPage";
 import TablesPage from "./pages/TablesPage";
 import TablePOSPage from "./pages/TablePOSPage";
 import CustomerDisplayPage from "./pages/CustomerDisplayPage";
+import KDSPage from "./pages/KDSPage";
+import { userHasPermission } from "./lib/utils";
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -57,6 +59,7 @@ function AppRoutes() {
   const adminPerms = ["view_dashboard","view_users","view_outlets","view_products","view_inventory","view_stores","view_purchases","view_customers","view_orders","view_sales_report","view_accounts","view_tables","view_settings","manage_users","manage_products","approve_purchase"];
   const canAccessAdmin = user?.role === "admin" || user?.role === "manager" || user?.permissions?.some(p => adminPerms.includes(p));
   const defaultPath = canAccessAdmin ? "/admin" : hasTableSupport ? "/tables" : "/pos";
+  const canAccessKds = userHasPermission(user, "view_kds") && settings?.kds_enabled === true;
 
   return (
     <Routes>
@@ -66,6 +69,7 @@ function AppRoutes() {
       <Route path="/tables" element={hasTableSupport ? <TablesPage /> : <Navigate to="/pos" replace />} />
       <Route path="/table/:tableId" element={<TablePOSPage />} />
       <Route path="/bar-tab/:barTabId" element={<TablePOSPage />} />
+      <Route path="/kds" element={canAccessKds ? <KDSPage /> : <Navigate to={defaultPath} replace />} />
       <Route
         path="/admin"
         element={

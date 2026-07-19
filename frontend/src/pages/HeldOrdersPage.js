@@ -10,7 +10,7 @@ import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
-import { cn, formatCurrency, dedupePendingOrders, userHasPermission } from "../lib/utils";
+import { cn, formatCurrency, dedupePendingOrders, userHasPermission, itemStation } from "../lib/utils";
 import { printService, pickReprintPrinter } from "../utils/printService";
 import { offlineQueue } from "../utils/offlineQueue";
 
@@ -161,15 +161,6 @@ function printOrderBill(order, settings, showToast, floorName = "") {
     if (showToast) showToast(e.message, "error");
     else alert(e.message);
   });
-}
-
-// Classify a cart item as "kitchen" (food) or "bar" (drinks) by walking
-// product → category.main_category. Items the catalog has lost track of
-// default to "kitchen".
-function itemStation(item, productById, categoryById) {
-  const catId = item.category_id || productById.get(item.product_id)?.category_id || "";
-  const cat = categoryById.get(catId);
-  return (cat?.main_category || "food").toLowerCase() === "drinks" ? "bar" : "kitchen";
 }
 
 // Reprint a kitchen or bar ticket for a held order. Filters the order's

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  ClipboardList, Download, LayoutDashboard, LogOut, Moon, Monitor, PanelLeftClose, PanelLeftOpen,
+  ChefHat, ClipboardList, Download, LayoutDashboard, LogOut, Moon, Monitor, PanelLeftClose, PanelLeftOpen,
   RefreshCw, Settings, Share, ShoppingCart, Sun, X,
 } from "lucide-react";
 import { triggerSync } from "../serviceWorkerRegistration";
@@ -64,6 +64,9 @@ export default function Sidebar({ extraItems = [], onSettingsClick, mobileOpen =
     ...(!hasTableSupport ? [{ label: "POS", icon: ShoppingCart, path: "/pos" }] : []),
     { label: "Held Orders", icon: ClipboardList, path: "/held-orders" },
     ...(hasTableSupport ? [{ label: "Tables", icon: Monitor, path: "/tables" }] : []),
+    ...(userHasPermission(user, "view_kds") && settings?.kds_enabled
+      ? [{ label: "Kitchen Display", icon: ChefHat, path: "/kds" }]
+      : []),
     ...((() => {
       if (!user) return false;
       if (user.role === "admin" || user.role === "manager") return true;

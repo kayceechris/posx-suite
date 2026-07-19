@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from database import db
 from models import User, Order, OrderCreate, SplitBill, SplitBillCreate
-from auth import get_current_user
+from auth import get_current_user, has_perm
 from lib.email_service import send_new_order_email
 
 router = APIRouter(prefix="/api")
@@ -130,6 +130,11 @@ async def create_order(order_data: OrderCreate, background_tasks: BackgroundTask
         created_by_name=current_user.name,
         created_by_role=current_user.role,
     )
+
+    # KDS board progress starts fresh whenever an order is created already
+    # sent to the kitchen (e.g. Quick Send skipping the held step).
+    if order.status == "sent_to_kitchen":
+        order.kitchen_status = "new"
 
     if order.status == "completed":
         await _deduct_stock_for_order(
@@ -269,6 +274,21 @@ async def get_held_orders(current_user: User = Depends(get_current_user)):
     return orders
 
 
+@router.get("/orders/kitchen/list")
+async def get_kitchen_orders(outlet_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    """Orders actively in the kitchen (status == sent_to_kitchen), for the
+    KDS board. Unlike /orders/held/list this is never scoped to the current
+    user — kitchen staff need to see every waiter's tickets, not just their
+    own. Sorted oldest-first (FIFO) to match how a kitchen queue is read."""
+    if not has_perm(current_user, "view_kds"):
+        raise HTTPException(status_code=403, detail="You don't have permission to view the kitchen display")
+    query = {"status": "sent_to_kitchen"}
+    if outlet_id:
+        query["outlet_id"] = outlet_id
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", 1).to_list(500)
+    return orders
+
+
 @router.get("/orders/{order_id}")
 async def get_order(order_id: str, current_user: User = Depends(get_current_user)):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -299,6 +319,14 @@ async def update_order(order_id: str, order_data: dict, current_user: User = Dep
         has_perm = "delete_held_order_items" in (current_user.permissions or [])
         if not is_privileged and not has_perm:
             raise HTTPException(status_code=403, detail="You don't have permission to void held orders")
+
+    # The POS always re-declares status:"sent_to_kitchen" on every
+    # Send-to-Kitchen click — first send AND adding more items to an order
+    # already in the kitchen. Piggyback on that exact signal to reset the
+    # KDS board progress, so newly added items always surface at the front
+    # of the board again instead of staying buried in "Completed".
+    if update_fields.get("status") == "sent_to_kitchen":
+        update_fields["kitchen_status"] = "new"
 
     await db.orders.update_one({"id": order_id}, {"$set": update_fields})
 

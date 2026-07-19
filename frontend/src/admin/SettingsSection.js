@@ -67,6 +67,7 @@ function CompanySettings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [kdsEnabled, setKdsEnabled] = useState(false);
   const fileRef = useRef();
 
   useEffect(() => {
@@ -81,8 +82,15 @@ function CompanySettings() {
         tax_id: settings.tax_id || "",
       });
       setLogoPreview(settings.company_logo || settings.logo_url || "");
+      setKdsEnabled(settings.kds_enabled === true);
     }
   }, [settings]);
+
+  const toggleKds = () => {
+    const next = !kdsEnabled;
+    setKdsEnabled(next);
+    api.updateSettings({ kds_enabled: next }).then(refreshSettings).catch((err) => alert(err.message));
+  };
 
   const handleLogoChange = async (e) => {
     const file = e.target.files[0];
@@ -182,6 +190,18 @@ function CompanySettings() {
               {selectedType?.tableService && (
                 <p className="text-green-600 text-xs font-semibold mt-2">✓ Table service &amp; waiter pages enabled</p>
               )}
+            </div>
+
+            <div className="flex items-center justify-between border-2 border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
+              <div>
+                <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Kitchen Display System</p>
+                <p className="text-xs text-gray-400">Enable the 3-column kitchen board (New Order / Processing / Completed) for this business.</p>
+              </div>
+              <button type="button" onClick={toggleKds}>
+                {kdsEnabled
+                  ? <ToggleRight size={28} className="text-blue-600" />
+                  : <ToggleLeft size={28} className="text-gray-300" />}
+              </button>
             </div>
 
             <div>

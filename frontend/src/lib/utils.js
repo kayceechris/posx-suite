@@ -34,6 +34,17 @@ export function timeAgo(dateStr) {
   return date.toLocaleDateString();
 }
 
+// Classify a cart item as "kitchen" (food) or "bar" (drinks) by walking
+// product → category.main_category. Items the catalog has lost track of
+// default to "kitchen". Shared by HeldOrdersPage's reprint routing and the
+// KDS board's Kitchen/Bar tabs, so ticket printing and on-screen display
+// agree on which station an item belongs to.
+export function itemStation(item, productById, categoryById) {
+  const catId = item.category_id || productById.get(item.product_id)?.category_id || "";
+  const cat = categoryById.get(catId);
+  return (cat?.main_category || "food").toLowerCase() === "drinks" ? "bar" : "kitchen";
+}
+
 export function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], {
     hour: "2-digit",
