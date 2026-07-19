@@ -1,5 +1,5 @@
-const CACHE = "posx-v5";
-const API_CACHE = "posx-api-v5";
+const CACHE = "posx-v6";
+const API_CACHE = "posx-api-v6";
 
 // API GET endpoints to cache for offline access. Everything POSPage,
 // TablesPage and HeldOrdersPage need to render lives in this list.
@@ -52,9 +52,21 @@ self.addEventListener("activate", (e) => {
 // called after a successful mutation so a stale list (e.g. a floor that
 // was just deleted, a product that was just edited) doesn't keep coming
 // back from the SWR cache.
+//
+// A generation counter per prefix guards against a race: a GET issued
+// before the mutation may have a background revalidation fetch still in
+// flight (see the SWR handler below). If that stale fetch resolves after
+// this invalidation runs, it must not be allowed to write the pre-mutation
+// data back into the cache. Each background fetch captures the generation
+// at start and only writes if it hasn't been bumped since.
+const bustGenerations = new Map();
+
 async function invalidateCacheFor(pathname) {
   const matching = OFFLINE_API_PREFIXES.filter((p) => pathname.startsWith(p));
   if (!matching.length) return;
+  for (const p of matching) {
+    bustGenerations.set(p, (bustGenerations.get(p) || 0) + 1);
+  }
   const cache = await caches.open(API_CACHE);
   const keys = await cache.keys();
   await Promise.all(keys.filter((req) => {
@@ -107,12 +119,15 @@ self.addEventListener("fetch", (e) => {
     url.pathname.startsWith("/api/") &&
     OFFLINE_API_PREFIXES.some((p) => url.pathname.startsWith(p))
   ) {
+    const matchedPrefix = OFFLINE_API_PREFIXES.find((p) => url.pathname.startsWith(p));
+    const genAtStart = bustGenerations.get(matchedPrefix) || 0;
     e.respondWith(
       caches.open(API_CACHE).then(async (cache) => {
         const cached = await cache.match(request);
         const networkFetch = fetch(request.clone())
           .then((res) => {
-            if (res && res.ok) cache.put(request, res.clone()).catch(() => {});
+            const staleGeneration = (bustGenerations.get(matchedPrefix) || 0) !== genAtStart;
+            if (res && res.ok && !staleGeneration) cache.put(request, res.clone()).catch(() => {});
             return res;
           })
           .catch(() => null);
