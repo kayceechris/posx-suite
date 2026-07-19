@@ -66,7 +66,9 @@ function fmtCurrency(amount) {
   const raw = localStorage.getItem("pos_currency_symbol") || "N";
   const sym = raw.replace(/[^\x20-\x7E]/g, (c) => _CHAR_MAP[c] || '?');
   const n = Number(amount || 0);
-  return `${sym}${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
+  const decimals = n % 1 === 0 ? 0 : 2;
+  const formatted = n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return `${sym}${formatted}`;
 }
 
 function divider(char = "-", len = 32) {
