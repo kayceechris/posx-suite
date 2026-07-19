@@ -288,6 +288,21 @@ function OrderItemsPanel({ order, onClose }) {
   const { settings } = useBusiness();
   const [reprinting, setReprinting] = useState(false);
   const [reprintMsg, setReprintMsg] = useState("");
+  const [floorName, setFloorName] = useState("");
+
+  useEffect(() => {
+    if (!order.table_id) { setFloorName(""); return; }
+    let cancelled = false;
+    Promise.all([api.getTables(), api.getFloors().catch(() => [])])
+      .then(([tables, floors]) => {
+        if (cancelled) return;
+        const table = (tables || []).find((t) => t.id === order.table_id);
+        const floor = table ? (floors || []).find((f) => f.id === table.floor_id) : null;
+        setFloorName(floor?.name || "");
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [order.table_id]);
 
   const handleReprint = async () => {
     setReprinting(true);
@@ -306,6 +321,7 @@ function OrderItemsPanel({ order, onClose }) {
         phone: settings?.company_phone || settings?.phone || "",
         logoUrl: settings?.company_logo || settings?.logo_url || "",
         tableName: order.table_number ? `Table ${order.table_number}` : (order.customer_name || ""),
+        floorName,
         orderNo: order.order_number || order.id?.slice(-8)?.toUpperCase() || "",
         // Same fallback as OrdersSection — receipts must always show
         // SOMEONE on the seller line, even when waiter_name is empty.

@@ -217,6 +217,7 @@ function buildReceiptBytes(data) {
     phone = "",
     orderNo = "",
     tableName = "",
+    floorName = "",
     waiter = "",
     cashier = "",
     items = [],
@@ -312,6 +313,7 @@ function buildReceiptBytes(data) {
   // Order info
   add(...CMD.ALIGN_LEFT);
   if (showCustomer  && tableName) line(`Table  : ${tableName}`);
+  if (showCustomer  && floorName) line(`Floor  : ${floorName}`);
   if (showReference && orderNo)   line(`Order  : ${orderNo}`);
   if (waiter)  line(`Waiter : ${waiter}`);
   if (cashier) line(`Cashier: ${cashier}`);
@@ -633,6 +635,7 @@ function receiptToHtml(data) {
     phone = "",
     orderNo = "",
     tableName = "",
+    floorName = "",
     waiter = "",
     cashier = "",
     items = [],
@@ -701,6 +704,7 @@ function receiptToHtml(data) {
     ` : ""}
     <div class="divider"></div>
     ${showCustomer  && tableName ? `<div>Table  : ${tableName}</div>` : ""}
+    ${showCustomer  && floorName ? `<div>Floor  : ${floorName}</div>` : ""}
     ${showReference && orderNo   ? `<div>Order  : ${orderNo}</div>` : ""}
     ${waiter  ? `<div>Waiter : ${waiter}</div>`  : ""}
     ${cashier ? `<div>Cashier: ${cashier}</div>` : ""}

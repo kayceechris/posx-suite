@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
 import {
   cn, formatCurrency, userHasPermission, reservationUrgency,
-  RESERVATION_URGENCY_COLORS, formatReservationDateTime,
+  RESERVATION_URGENCY_COLORS, formatReservationDateTime, sortByTableNumber,
 } from "../lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -185,11 +185,12 @@ function PreOrderPanel({ cart, setCart, outletId, expanded, onToggle }) {
 }
 
 // ─── Reservation Modal ────────────────────────────────────────────────────────
-function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
+function ReservationModal({ reservation, tables, outlets, floors, onClose, onSave }) {
   const { settings } = useBusiness();
   const isEdit = !!reservation;
   const defaultOutlet = outlets[0]?.id || "";
   const outletTables = (outletId) => tables.filter((t) => t.outlet_id === outletId);
+  const floorName = (floorId) => floors.find((f) => f.id === floorId)?.name || "";
 
   const [form, setForm] = useState({
     table_id: reservation?.table_id || "",
@@ -222,6 +223,19 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
   }, []);
 
   const filteredTables = outletTables(form.outlet_id);
+  // Group by floor (VIP, Regular, Outside, …) so the dropdown reads the
+  // same way the Tables page's floor tabs do. Tables with no floor_id
+  // (or when floors haven't loaded) fall into an unlabeled group.
+  const tablesByFloor = sortByTableNumber(filteredTables).reduce((acc, t) => {
+    const key = t.floor_id || "";
+    (acc[key] = acc[key] || []).push(t);
+    return acc;
+  }, {});
+  const floorGroups = Object.keys(tablesByFloor).sort((a, b) => {
+    const an = a ? floorName(a) : "";
+    const bn = b ? floorName(b) : "";
+    return an.localeCompare(bn);
+  });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -338,9 +352,17 @@ function ReservationModal({ reservation, tables, outlets, onClose, onSave }) {
                   className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-purple-500 appearance-none"
                 >
                   <option value="">Select table…</option>
-                  {filteredTables.map((t) => (
-                    <option key={t.id} value={t.id}>Table {t.number} ({t.seats} seats)</option>
-                  ))}
+                  {floorGroups.map((floorId) => {
+                    const label = floorId ? floorName(floorId) || "Other" : "Other";
+                    const groupTables = tablesByFloor[floorId];
+                    return (
+                      <optgroup key={floorId || "none"} label={label}>
+                        {groupTables.map((t) => (
+                          <option key={t.id} value={t.id}>Table {t.number} ({t.seats} seats)</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -600,6 +622,7 @@ export default function ReservationsSection() {
   const [reservations, setReservations] = useState([]);
   const [tables, setTables] = useState([]);
   const [outlets, setOutlets] = useState([]);
+  const [floors, setFloors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(todayISO());
   const [selectedOutlet, setSelectedOutlet] = useState("");
@@ -616,14 +639,16 @@ export default function ReservationsSection() {
       const filters = {};
       if (date) filters.date = date;
       if (selectedOutlet) filters.outlet_id = selectedOutlet;
-      const [res, tbl, out] = await Promise.all([
+      const [res, tbl, out, flrs] = await Promise.all([
         api.getReservations(filters),
         api.getTables(),
         api.getOutlets(),
+        api.getFloors().catch(() => []),
       ]);
       setReservations(res);
       setTables(tbl);
       setOutlets(out);
+      setFloors(flrs || []);
     } catch (err) {
       setLoadError(err.message || "Failed to load reservations");
     } finally {
@@ -832,6 +857,7 @@ export default function ReservationsSection() {
           reservation={modal.mode === "edit" ? modal.reservation : null}
           tables={tables}
           outlets={outlets}
+          floors={floors}
           onClose={() => setModal(null)}
           onSave={handleSaved}
         />

@@ -127,7 +127,7 @@ function PaymentModal({ order, onClose, onConfirm }) {
   );
 }
 
-function printOrderBill(order, settings, showToast) {
+function printOrderBill(order, settings, showToast, floorName = "") {
   // Reprints always route through the designated reprint printer.
   let usbPrinter = pickReprintPrinter();
   if (!usbPrinter) {
@@ -142,6 +142,7 @@ function printOrderBill(order, settings, showToast) {
     phone: settings?.company_phone || settings?.phone || "",
     logoUrl: settings?.company_logo || settings?.logo_url || "",
     tableName: order.table_number ? `Table ${order.table_number}` : "",
+    floorName,
     orderNo: order.order_number || order.id?.slice(-8)?.toUpperCase() || "",
     waiter: order.waiter_name || order.served_by_name || "",
     cashier: order.cashier_name || "",
@@ -717,7 +718,7 @@ export default function HeldOrdersPage() {
                   onDelete={handleDelete}
                   onComplete={handleComplete}
                   onLoad={handleLoad}
-                  onPrint={(o) => printOrderBill(o, settings, showToast)}
+                  onPrint={(o) => printOrderBill(o, settings, showToast, o.table_id ? tableFloorById.get(o.table_id) || "" : "")}
                   onPrintKitchen={(o) => printStationTicket(o, "kitchen",
                     { products, categories, printerGroups, savedPrinters }, showToast)}
                   onPrintBar={(o) => printStationTicket(o, "bar",

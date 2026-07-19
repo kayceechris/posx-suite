@@ -29,6 +29,21 @@ function OrderDetailModal({ order, outlets, terminals, onClose, onVoid, onDelete
   const [reprinting, setReprinting] = useState(false);
   const [reprintMsg, setReprintMsg] = useState("");
   const [recalling, setRecalling] = useState(false);
+  const [floorName, setFloorName] = useState("");
+
+  useEffect(() => {
+    if (!order.table_id) { setFloorName(""); return; }
+    let cancelled = false;
+    Promise.all([api.getTables(), api.getFloors().catch(() => [])])
+      .then(([tables, floors]) => {
+        if (cancelled) return;
+        const table = (tables || []).find((t) => t.id === order.table_id);
+        const floor = table ? (floors || []).find((f) => f.id === table.floor_id) : null;
+        setFloorName(floor?.name || "");
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [order.table_id]);
 
   const canRecall =
     order.status === "completed" &&
@@ -53,6 +68,7 @@ function OrderDetailModal({ order, outlets, terminals, onClose, onVoid, onDelete
         phone: settings?.company_phone || settings?.phone || "",
         logoUrl: settings?.company_logo || settings?.logo_url || "",
         tableName: order.table_number ? `Table ${order.table_number}` : (order.customer_name || ""),
+        floorName,
         orderNo: order.order_number || order.id?.slice(-8)?.toUpperCase() || "",
         // Fall through to created_by_name (whoever rang the order up) when
         // there's no explicit waiter on the order — otherwise the receipt

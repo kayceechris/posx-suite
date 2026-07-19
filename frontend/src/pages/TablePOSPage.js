@@ -626,6 +626,7 @@ export default function TablePOSPage() {
   const [terminals, setTerminals] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [paymentTypes, setPaymentTypes] = useState([]);
+  const [floors, setFloors] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -673,12 +674,13 @@ export default function TablePOSPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [prods, cats, terms, outs, ptypes, entityData] = await Promise.all([
+        const [prods, cats, terms, outs, ptypes, flrs, entityData] = await Promise.all([
           api.getProducts(),
           api.getCategories(),
           api.getTerminals(),
           api.getOutlets(),
           api.getPaymentTypes().catch(() => []),
+          isBarTab ? Promise.resolve([]) : api.getFloors().catch(() => []),
           isBarTab ? api.getBarTabs().then((list) => list.find((b) => b.id === entityId)) : api.getTables().then((list) => list.find((t) => t.id === entityId)),
         ]);
         setProducts(prods.filter((p) => p.active !== false));
@@ -686,6 +688,7 @@ export default function TablePOSPage() {
         setTerminals(terms);
         setOutlets(outs);
         setPaymentTypes(ptypes);
+        setFloors(flrs || []);
         // Auto-select terminal/outlet on first login (if nothing saved yet).
         // Prefer "Main Restaurant" outlet; fall back to the first one found.
         if (terms.length > 0 && !localStorage.getItem("pos_terminal")) {
@@ -910,6 +913,7 @@ export default function TablePOSPage() {
   });
 
   const outlet = outlets[0] || null;
+  const floorName = !isBarTab ? (floors.find((f) => f.id === entity?.floor_id)?.name || "") : "";
 
   const buildOrderPayload = (status, paymentMethod, nameOverride, discountInfo, idempotencyKey) => {
     const discAmt = Math.min(Math.max(0, discountInfo?.amount || 0), total);
@@ -988,6 +992,7 @@ export default function TablePOSPage() {
       phone: settings?.company_phone || settings?.phone || "",
       logoUrl: settings?.company_logo || settings?.logo_url || "",
       tableName: `${isBarTab ? "Bar Tab" : "Table"} ${entity?.number || ""}`,
+      floorName,
       orderNo: currentOrderNumber || entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
       // Waiter on bill — always show someone. Prefer the table's assigned
       // waiter (set when a waiter picks up the table), fall back to staff_name
@@ -1033,6 +1038,7 @@ export default function TablePOSPage() {
       phone: settings?.company_phone || settings?.phone || "",
       logoUrl: settings?.company_logo || settings?.logo_url || "",
       tableName,
+      floorName,
       orderNo: currentOrderNumber || entity?.current_order_id?.slice(-8)?.toUpperCase() || "",
       // Always show someone on the bill / receipt — see handlePrintBill
       // comment. The table's assigned waiter is preferred; fall back to
