@@ -14,6 +14,21 @@ async def get_bar_tabs(outlet_id: Optional[str] = None, current_user: User = Dep
     if outlet_id:
         query["outlet_id"] = outlet_id
     tabs = await db.bar_tabs.find(query, {"_id": 0}).to_list(1000)
+
+    # Denormalize the linked order's KDS progress onto each tab (response
+    # only — never persisted) so the floor view / TablePOS can show a
+    # "food ready" indicator for bar tabs the same way tables already do.
+    order_ids = list({t.get("current_order_id") for t in tabs if t.get("current_order_id")})
+    orders_by_id = {}
+    if order_ids:
+        async for o in db.orders.find(
+            {"id": {"$in": order_ids}}, {"_id": 0, "id": 1, "status": 1, "kitchen_status": 1}
+        ):
+            orders_by_id[o["id"]] = o
+    for tab in tabs:
+        order = orders_by_id.get(tab.get("current_order_id"))
+        tab["kitchen_status"] = order.get("kitchen_status") if order and order.get("status") == "sent_to_kitchen" else None
+
     return tabs
 
 

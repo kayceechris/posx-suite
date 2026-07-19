@@ -820,14 +820,14 @@ export default function TablePOSPage() {
   }, [entityId, isBarTab]);
 
   // Poll just for the KDS "food ready" flag while a waiter is sitting on
-  // this table — the load effect above only fetches the table once on
+  // this table/bar tab — the load effect above only fetches it once on
   // mount, so without this the ready banner would never appear unless the
   // page was reloaded. Merges only kitchen_status so it can't clobber any
   // other locally-reconciled entity field (waiter name, merged order, etc).
   useEffect(() => {
-    if (isBarTab || !entityId) return;
+    if (!entityId) return;
     const poll = () => {
-      api.getTables()
+      (isBarTab ? api.getBarTabs() : api.getTables())
         .then((list) => {
           const fresh = list.find((t) => t.id === entityId);
           if (fresh) setEntity((prev) => prev ? { ...prev, kitchen_status: fresh.kitchen_status } : prev);

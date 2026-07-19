@@ -251,6 +251,8 @@ const ADD_USER_PERMISSIONS = {
     { id: "release_tables", label: "Release Tables" },
     { id: "print_bill", label: "Print Bill" },
     { id: "view_customers", label: "View Customers" },
+    { id: "view_kds_kitchen", label: "View Kitchen Display – Kitchen" },
+    { id: "view_kds_bar", label: "View Kitchen Display – Bar" },
   ],
 };
 
