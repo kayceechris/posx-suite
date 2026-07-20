@@ -72,11 +72,28 @@ async def release_bar_tab(tab_id: str, current_user: User = Depends(get_current_
     tab = await db.bar_tabs.find_one({"id": tab_id}, {"_id": 0})
     if not tab:
         raise HTTPException(status_code=404, detail="Bar tab not found")
-    # Delete all held/in-progress orders tied to this bar tab
-    await db.orders.delete_many({
-        "bar_tab_id": tab_id,
-        "status": {"$in": ["held", "sent_to_kitchen", "pending"]}
-    })
+    # Same split as release_table: an order the kitchen never saw is safe
+    # to hard-delete, but one that reached the kitchen (sent or already
+    # has kitchen_status) is soft-voided instead so it stays visible on
+    # the KDS board flagged as cancelled rather than silently vanishing.
+    candidates = await db.orders.find(
+        {"bar_tab_id": tab_id, "status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+        {"_id": 0, "id": 1, "status": 1, "kitchen_status": 1},
+    ).to_list(500)
+
+    reached_kitchen_ids = [
+        o["id"] for o in candidates
+        if o.get("status") == "sent_to_kitchen" or o.get("kitchen_status") is not None
+    ]
+    never_sent_ids = [o["id"] for o in candidates if o["id"] not in reached_kitchen_ids]
+
+    if reached_kitchen_ids:
+        await db.orders.update_many(
+            {"id": {"$in": reached_kitchen_ids}},
+            {"$set": {"status": "voided", "void_reason": "bar_tab_released"}},
+        )
+    if never_sent_ids:
+        await db.orders.delete_many({"id": {"$in": never_sent_ids}})
     await db.bar_tabs.update_one(
         {"id": tab_id},
         {"$set": {"status": "available", "staff_id": None, "staff_name": None, "current_order_id": None}}

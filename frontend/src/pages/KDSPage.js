@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users, AlertTriangle,
+  ChefHat, Wine, Clock, Menu, RefreshCw, ArrowRight, Undo2, CheckCircle2, Users, AlertTriangle, Trash2, Ban,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
@@ -34,9 +34,54 @@ const COLUMNS = [
   { id: "ready",     label: "Completed",  headerBg: "bg-emerald-50 dark:bg-emerald-900/20", headerText: "text-emerald-700 dark:text-emerald-400" },
 ];
 
-function OrderCard({ order, items, column, onAdvance, onRevert, isActing, now }) {
+const VOID_REASON_LABEL = {
+  table_released: "Table was released",
+  bar_tab_released: "Bar tab was released",
+};
+
+function OrderCard({ order, items, column, onAdvance, onRevert, onDismiss, isActing, now }) {
   const age = orderAge(order.created_at);
   const label = order.table_number ? `Table ${order.table_number}` : (order.customer_name || order.order_number);
+
+  // A cancelled order (table/bar tab released, or voided from Held Orders)
+  // still shows on the board so the kitchen notices instead of it just
+  // vanishing — but with everything else replaced by a plain acknowledge-
+  // and-remove action. Checked before any of the normal column logic.
+  const cancelled = order.status === "voided";
+  if (cancelled) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-red-400 dark:border-red-600 overflow-hidden flex flex-col shadow-lg shadow-red-500/10">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-100 dark:bg-red-900/40 border-b border-red-200 dark:border-red-800">
+          <Ban size={14} className="text-red-600 dark:text-red-400 flex-shrink-0" />
+          <span className="font-black text-red-700 dark:text-red-300 text-sm">CANCELLED</span>
+          <span className="text-xs text-red-500 dark:text-red-400 ml-auto truncate">
+            {VOID_REASON_LABEL[order.void_reason] || "Order voided"}
+          </span>
+        </div>
+        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+          <span className="font-bold text-gray-900 dark:text-white text-sm">{label}</span>
+        </div>
+        <div className="px-4 py-3 flex-1 space-y-1 opacity-60">
+          {items.map((item, i) => (
+            <div key={i} className="flex justify-between gap-2 text-sm line-through">
+              <span className="text-gray-500 dark:text-gray-400">
+                {item.quantity}x {item.product_name || item.name}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="px-3 pb-3">
+          <button
+            onClick={onDismiss}
+            disabled={isActing}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors"
+          >
+            <Trash2 size={14} /> Remove from Queue
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Processing timer: a literal 20:00 countdown from when this order
   // entered "preparing" (kitchen_status_at, falling back to created_at for
@@ -136,6 +181,16 @@ function OrderCard({ order, items, column, onAdvance, onRevert, isActing, now })
             <Undo2 size={15} />
           </button>
         )}
+        <button
+          onClick={() => {
+            if (window.confirm(`Remove ${label} from the KDS queue? This only hides it from the board — it won't touch the order or table.`)) onDismiss();
+          }}
+          disabled={isActing}
+          title="Remove from queue"
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 disabled:opacity-50 transition-colors flex-shrink-0"
+        >
+          <Trash2 size={15} />
+        </button>
         {column !== "ready" && (
           <button
             onClick={onAdvance}
@@ -263,6 +318,22 @@ export default function KDSPage() {
     }
   };
 
+  // Removes a card from the board only — doesn't touch the underlying
+  // order or table. For a cancelled (voided) order this is the
+  // acknowledge-and-clear action; for an active one it's a manual
+  // "get this off my screen" the kitchen can use for mistakes/test orders.
+  const dismissOrder = async (order) => {
+    setActingId(order.id);
+    setOrders((prev) => prev.filter((o) => o.id !== order.id));
+    try {
+      await api.updateOrder(order.id, { kds_dismissed: true });
+    } catch {
+      fetchOrders(true);
+    } finally {
+      setActingId(null);
+    }
+  };
+
   // Bucket orders per column, keeping only the items relevant to the active
   // station tab — mirrors how physical kitchen/bar tickets already split.
   const columns = COLUMNS.map((col) => ({
@@ -368,6 +439,7 @@ export default function KDSPage() {
                           isActing={actingId === order.id}
                           onAdvance={() => moveCard(order, col.id === "new" ? "preparing" : "ready")}
                           onRevert={() => moveCard(order, col.id === "ready" ? "preparing" : "new")}
+                          onDismiss={() => dismissOrder(order)}
                         />
                       ))
                     )}

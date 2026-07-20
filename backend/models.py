@@ -335,6 +335,12 @@ class Order(BaseModel):
     # ISO timestamp of the last kitchen_status change — lets the KDS time
     # how long an order has sat in "preparing" and flag it once it's overdue.
     kitchen_status_at: Optional[str] = None
+    # Set once kitchen staff dismiss a cancelled order's card from the KDS
+    # board (the Delete button). Independent of status/kitchen_status so a
+    # voided order that reached the kitchen can still be explicitly flagged
+    # as cancelled on the board until someone acknowledges it, instead of
+    # silently disappearing the moment it's voided.
+    kds_dismissed: Optional[bool] = None
     created_by: str
     created_by_name: Optional[str] = None
     created_by_role: Optional[str] = None

@@ -297,15 +297,26 @@ async def get_held_orders(current_user: User = Depends(get_current_user)):
 
 @router.get("/orders/kitchen/list")
 async def get_kitchen_orders(outlet_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
-    """Orders actively in the kitchen (status == sent_to_kitchen), for the
-    KDS board. Unlike /orders/held/list this is never scoped to the current
-    user — kitchen staff need to see every waiter's tickets, not just their
-    own. Sorted oldest-first (FIFO) to match how a kitchen queue is read."""
+    """Orders actively in the kitchen, for the KDS board. Unlike
+    /orders/held/list this is never scoped to the current user — kitchen
+    staff need to see every waiter's tickets, not just their own. Sorted
+    oldest-first (FIFO) to match how a kitchen queue is read.
+
+    Also includes orders that reached the kitchen and were then voided
+    (table/bar-tab released, or voided from Held Orders) but haven't been
+    dismissed yet — release_table/release_bar_tab soft-void these instead
+    of deleting them specifically so the board can flag them as cancelled
+    rather than the card just silently disappearing on the next poll."""
     if not has_perm(current_user, "view_kds_kitchen", "view_kds_bar"):
         raise HTTPException(status_code=403, detail="You don't have permission to view the kitchen display")
-    query = {"status": "sent_to_kitchen"}
+    query = {
+        "$or": [
+            {"status": "sent_to_kitchen"},
+            {"status": "voided", "kitchen_status": {"$ne": None}, "kds_dismissed": {"$ne": True}},
+        ]
+    }
     if outlet_id:
-        query["outlet_id"] = outlet_id
+        query = {"$and": [query, {"outlet_id": outlet_id}]}
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", 1).to_list(500)
     return orders
 

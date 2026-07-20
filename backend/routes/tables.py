@@ -346,20 +346,44 @@ async def release_table(table_id: str, current_user: User = Depends(get_current_
     if not is_privileged and not is_own_table:
         raise HTTPException(status_code=403, detail="You can only release tables assigned to you")
 
-    # Delete every order tied to this table that wasn't actually paid for.
-    # That covers held/sent_to_kitchen/pending status records AND any stray
-    # 'completed' order that still has payment_method='pending' (i.e. nobody
-    # paid for it — usually a leftover from a previous bug). Properly paid
-    # orders stay for sales history.
-    await db.orders.delete_many({
-        "table_id": table_id,
-        "$or": [
-            {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
-            {"payment_method": "pending"},
-            {"payment_method": {"$exists": False}},
-            {"payment_method": None},
-        ],
-    })
+    # Every order tied to this table that wasn't actually paid for. That
+    # covers held/sent_to_kitchen/pending status records AND any stray
+    # 'completed' order that still has payment_method='pending' (i.e.
+    # nobody paid for it — usually a leftover from a previous bug).
+    # Properly paid orders stay for sales history.
+    #
+    # Split by whether the kitchen ever saw it: one that never left "held"
+    # is safe to hard-delete outright. One that reached the kitchen (sent
+    # or already has kitchen_status) is soft-voided instead, so it stays
+    # visible on the KDS board flagged as cancelled — the card would
+    # otherwise just silently vanish on the next poll, which is exactly
+    # how a cook keeps preparing something nobody's paying for anymore.
+    candidates = await db.orders.find(
+        {
+            "table_id": table_id,
+            "$or": [
+                {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}},
+                {"payment_method": "pending"},
+                {"payment_method": {"$exists": False}},
+                {"payment_method": None},
+            ],
+        },
+        {"_id": 0, "id": 1, "status": 1, "kitchen_status": 1},
+    ).to_list(500)
+
+    reached_kitchen_ids = [
+        o["id"] for o in candidates
+        if o.get("status") == "sent_to_kitchen" or o.get("kitchen_status") is not None
+    ]
+    never_sent_ids = [o["id"] for o in candidates if o["id"] not in reached_kitchen_ids]
+
+    if reached_kitchen_ids:
+        await db.orders.update_many(
+            {"id": {"$in": reached_kitchen_ids}},
+            {"$set": {"status": "voided", "void_reason": "table_released"}},
+        )
+    if never_sent_ids:
+        await db.orders.delete_many({"id": {"$in": never_sent_ids}})
 
     await db.tables.update_one(
         {"id": table_id},
