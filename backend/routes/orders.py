@@ -166,6 +166,22 @@ async def create_order(order_data: OrderCreate, background_tasks: BackgroundTask
         if prev_oid and prev_oid != order.id:
             prev = await db.orders.find_one({"id": prev_oid}, {"_id": 0, "status": 1, "created_by": 1})
             prev_is_active = bool(prev and prev.get("status") in ("held", "sent_to_kitchen", "pending"))
+            # A table can only ever have ONE active order. Silently
+            # repointing current_order_id at a brand-new order when the
+            # table already has a genuinely active one from someone else
+            # orphans the real order — it stays held/sent_to_kitchen
+            # forever but nothing links to it from the table anymore, so
+            # it vanishes from the Tables page and (for other staff) Held
+            # Orders, only turning up later via the unfiltered Admin >
+            # Orders list. Reject instead — this only happens when the
+            # client's view of the table was stale (offline-sync race, a
+            # second device), and the merge/dedup block above already
+            # handles the legitimate 'same waiter, more items' case.
+            if is_active and prev_is_active and prev.get("created_by") != current_user.id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This table already has an active order from another staff member. Please reload the table.",
+                )
         set_doc = {
             "status": "occupied" if is_active else "available",
             "current_order_id": order.id if is_active else None,
@@ -268,7 +284,11 @@ async def get_held_orders(current_user: User = Depends(get_current_user)):
         (current_user.role == "cashier" and
          current_user.permissions and "view_all_orders" in current_user.permissions)
     )
-    query = {"status": {"$in": ["held", "sent_to_kitchen"]}}
+    # "pending" is treated as a third active-order state everywhere else in
+    # this file (kitchen_statuses, table reconciliation, void/split checks,
+    # etc.) — omitting it here silently hid any order that ended up at that
+    # status, findable only via the unfiltered Admin > Orders list.
+    query = {"status": {"$in": ["held", "sent_to_kitchen", "pending"]}}
     if not can_see_all:
         query["created_by"] = current_user.id
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
