@@ -10,7 +10,7 @@ import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
-import { cn, formatCurrency, dedupePendingOrders, userHasPermission, itemStation } from "../lib/utils";
+import { cn, formatCurrency, dedupePendingOrders, userHasPermission, itemStation, pickDefaultOutlet } from "../lib/utils";
 import { printService, pickReprintPrinter } from "../utils/printService";
 import { offlineQueue } from "../utils/offlineQueue";
 
@@ -564,6 +564,16 @@ export default function HeldOrdersPage() {
         setPrinterGroups(g || []);
         setTables(tbls || []);
         setFloors(flrs || []);
+        // Same shared pos_outlet default as POSPage/TablePOSPage/Tables —
+        // this page previously had no bootstrap either, so visiting Held
+        // Orders first could leave the key empty for every other page.
+        if (o.length > 0 && !localStorage.getItem("pos_outlet")) {
+          const main = pickDefaultOutlet(o);
+          if (main) {
+            setSelectedOutlet(main.id);
+            localStorage.setItem("pos_outlet", main.id);
+          }
+        }
       })
       .catch(console.error);
     try {

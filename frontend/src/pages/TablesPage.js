@@ -7,7 +7,7 @@ import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
 import {
-  cn, sortByTableNumber, canManageAnyTable,
+  cn, sortByTableNumber, canManageAnyTable, pickDefaultOutlet,
   reservationUrgency, RESERVATION_URGENCY_COLORS, formatReservationDateTime,
 } from "../lib/utils";
 
@@ -438,7 +438,20 @@ export default function TablesPage() {
   useEffect(() => {
     load();
     Promise.all([api.getTerminals(), api.getOutlets()])
-      .then(([t, o]) => { setTerminals(t); setOutlets(o); })
+      .then(([t, o]) => {
+        setTerminals(t); setOutlets(o);
+        // Bootstrap the shared pos_outlet default here too — this page
+        // previously had no default, so visiting /tables before ever
+        // opening the POS/table-order screens left selectedOutlet empty,
+        // which showed every outlet's tables merged together.
+        if (o.length > 0 && !localStorage.getItem("pos_outlet")) {
+          const main = pickDefaultOutlet(o);
+          if (main) {
+            setSelectedOutlet(main.id);
+            localStorage.setItem("pos_outlet", main.id);
+          }
+        }
+      })
       .catch(console.error);
     // Keep printer cache fresh so printService works without opening Terminal Settings
     api.getAssignedPrinters().then((printers) => {
@@ -499,10 +512,13 @@ export default function TablesPage() {
   const hasFloors = !isBarTabView && outletFloors.length > 0;
 
   // Tables across all outlets come back together — scope to the selected
-  // outlet so a multi-outlet business doesn't briefly show every outlet's
-  // tables side-by-side.
+  // outlet so a multi-outlet business doesn't show every outlet's tables
+  // side-by-side. Deliberately does NOT fall through for a table with a
+  // missing outlet_id — that used to let an untagged table bypass the
+  // filter and render on top of whichever outlet was actually selected
+  // (e.g. two same-named tables from different outlets appearing together).
   const allTables = (activeTab === "table" ? tables : barTabs)
-    .filter((t) => !selectedOutlet || !t.outlet_id || t.outlet_id === selectedOutlet);
+    .filter((t) => !selectedOutlet || t.outlet_id === selectedOutlet);
 
   // Derive the effective floor synchronously so we never paint the
   // unfiltered superset between floors loading and the activeFloorId

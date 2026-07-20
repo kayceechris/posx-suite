@@ -5,6 +5,17 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// Picks "Main Restaurant" (case-insensitive substring match) if present,
+// else the first outlet. Shared so every page that reads the pos_outlet
+// localStorage key bootstraps it the same way — previously only
+// POSPage.js/TablePOSPage.js had this default, so visiting Tables or
+// Held Orders first (neither had it) could leave the shared key empty,
+// making those pages show every outlet's tables/orders merged together.
+export function pickDefaultOutlet(outlets) {
+  if (!outlets || outlets.length === 0) return null;
+  return outlets.find((o) => (o.name || "").toLowerCase().includes("main restaurant")) || outlets[0];
+}
+
 let _currencySymbol = "₦";
 
 export function setCurrencySymbol(symbol) {

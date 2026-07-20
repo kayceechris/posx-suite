@@ -9,7 +9,7 @@ import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
 import TerminalSettingsModal from "../components/TerminalSettingsModal";
 import { api } from "../lib/api";
-import { cn, formatCurrency, sortByTableNumber, canManageAnyTable, userHasPermission } from "../lib/utils";
+import { cn, formatCurrency, sortByTableNumber, canManageAnyTable, userHasPermission, pickDefaultOutlet } from "../lib/utils";
 import { priceForOutlet } from "../lib/productPricing";
 import { printService } from "../utils/printService";
 import { useOffline } from "../context/OfflineContext";
@@ -697,9 +697,11 @@ export default function TablePOSPage() {
           localStorage.setItem("pos_terminal", terms[0].id);
         }
         if (outs.length > 0 && !localStorage.getItem("pos_outlet")) {
-          const main = outs.find((o) => o.name.toLowerCase().includes("main restaurant")) || outs[0];
-          setSelectedOutlet(main.id);
-          localStorage.setItem("pos_outlet", main.id);
+          const main = pickDefaultOutlet(outs);
+          if (main) {
+            setSelectedOutlet(main.id);
+            localStorage.setItem("pos_outlet", main.id);
+          }
         }
 
         // Auth guard: waiter/cashier can only access their own occupied
