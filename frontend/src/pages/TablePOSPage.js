@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, Bell, CheckCircle2, ChevronDown, ChefHat, Menu, Minus, Monitor, Plus, Printer, Search, ShoppingCart, Trash2, X, GitMerge,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusiness } from "../context/BusinessContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
@@ -615,6 +615,7 @@ export default function TablePOSPage() {
   const { settings } = useBusiness();
   const config = useBusinessConfig();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isOnline, queueOrder } = useOffline();
 
   const isBarTab = !!barTabId;
@@ -837,6 +838,30 @@ export default function TablePOSPage() {
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [entityId, isBarTab]);
+
+  // Cart handed off from OfflineBanner's "Reassign" action (a queued hold
+  // whose original table was already claimed by someone else) or from
+  // HeldOrdersPage — mirrors the same location.state.loadOrder pattern
+  // POSPage.js already uses for quick-service. Only pre-fills an empty
+  // cart so it can't clobber items already loaded from an existing order
+  // on this table.
+  useEffect(() => {
+    const incoming = location.state?.loadOrder;
+    if (!incoming || cart.length > 0) return;
+    const cartItems = (incoming.items || []).map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name || item.name,
+      category_id: item.category_id || "",
+      quantity: item.quantity,
+      price: item.price,
+      total: item.total,
+    }));
+    setCart(cartItems);
+    if (incoming.customer_name) setCustomerName(incoming.customer_name);
+    showToast(`${cartItems.length} item${cartItems.length !== 1 ? "s" : ""} loaded — review and send to kitchen`);
+    window.history.replaceState({}, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const addToCart = (product) => {
     const unitPrice = priceForOutlet(product, entity?.outlet_id || selectedOutlet);

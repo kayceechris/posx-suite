@@ -47,6 +47,26 @@ export const offlineQueue = {
     });
   },
 
+  // Merge `patch` into a queued item in place — used to mark a permanently
+  // rejected item (e.g. a 409 table conflict) as failed without losing its
+  // payload/label, so it stops being silently retried but stays visible
+  // for the user to Discard or Reassign.
+  async update(id, patch) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const existing = getReq.result;
+        if (existing) store.put({ ...existing, ...patch });
+      };
+      getReq.onerror = (e) => reject(e.target.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror    = (e) => reject(e.target.error);
+    });
+  },
+
   async count() {
     const db = await openDB();
     return new Promise((resolve, reject) => {

@@ -90,7 +90,14 @@ async function request(path, options = {}) {
       const text = await res.text().catch(() => "");
       if (text) detail = text;
     }
-    throw new Error(detail);
+    const err = new Error(detail);
+    // Set only when the server actually responded (as opposed to the
+    // network-failure branch above) — lets callers like the offline sync
+    // queue tell a permanent rejection (4xx) apart from "couldn't reach
+    // the server, try again later" without changing existing err.message
+    // usage anywhere else.
+    err.status = res.status;
+    throw err;
   }
 
   return res.json();

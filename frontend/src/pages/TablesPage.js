@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ArrowLeftRight, Menu, Monitor, RefreshCw, Unlock, LockKeyhole, CheckCircle2, CalendarDays, Users, Clock, Pin, Building2, GitMerge, Bell } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessConfig } from "../hooks/useBusinessConfig";
 import Sidebar from "../components/Sidebar";
@@ -350,6 +350,11 @@ export default function TablesPage() {
   const { user } = useAuth();
   const config = useBusinessConfig();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Cart handed off from OfflineBanner's "Reassign" action after a queued
+  // hold got rejected (its table was already claimed by someone else) —
+  // forwarded to whichever table the waiter picks next.
+  const reassignCart = location.state?.reassignCart || null;
 
   const [activeTab, setActiveTab] = useState("table");
   const [tables, setTables] = useState([]);
@@ -443,6 +448,14 @@ export default function TablesPage() {
     return () => clearInterval(interval);
   }, [load]);
 
+  useEffect(() => {
+    if (reassignCart) {
+      const n = (reassignCart.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
+      showToast(`Pick a table for the ${n} item${n !== 1 ? "s" : ""} that couldn't sync`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleEntityClick = (entity, isBarTab) => {
     const isPrivileged = canManageAnyTable(user);
     if (!isPrivileged && entity.status === "occupied") {
@@ -452,6 +465,12 @@ export default function TablesPage() {
         showToast(`This ${isBarTab ? "bar tab" : "table"} is assigned to ${ownerName || "another staff member"}`, "error");
         return;
       }
+    }
+    if (!isBarTab && reassignCart) {
+      navigate(`/table/${entity.id}`, {
+        state: { loadOrder: { items: reassignCart.items, customer_name: reassignCart.customer_name } },
+      });
+      return;
     }
     navigate(isBarTab ? `/bar-tab/${entity.id}` : `/table/${entity.id}`);
   };
