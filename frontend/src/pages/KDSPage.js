@@ -160,11 +160,15 @@ export default function KDSPage() {
         seenIds.add(o.id);
         const wanted = pending[o.id];
         if (wanted === undefined) return o;
-        if (wanted === o.kitchen_status) {
+        if (wanted.status === o.kitchen_status) {
           delete pending[o.id]; // server caught up — stop overriding
           return o;
         }
-        return { ...o, kitchen_status: wanted };
+        // Override both fields together — overriding just kitchen_status
+        // while leaving the server's (still-stale) kitchen_status_at in
+        // place would make the Processing timer flash back to its old
+        // elapsed time for this one poll tick.
+        return { ...o, kitchen_status: wanted.status, kitchen_status_at: wanted.at };
       });
       // Drop overrides for orders that left the board entirely (paid,
       // voided, etc.) so pendingRef doesn't grow unbounded.
@@ -200,8 +204,14 @@ export default function KDSPage() {
     // Optimistic update — keeps the board responsive on a slow connection
     // instead of waiting for the next poll to reflect the move. Recorded
     // in pendingRef so an in-flight poll response can't undo it early.
-    pendingRef.current[order.id] = kitchenStatus;
-    setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, kitchen_status: kitchenStatus } : o));
+    // kitchen_status_at is stamped locally too (matching what the backend
+    // will set) — otherwise the Processing timer keeps reading the OLD
+    // timestamp from when the order entered "New" until the next poll
+    // catches up, so a freshly-started card shows a stale elapsed time
+    // instead of starting at 0.
+    const movedAt = new Date().toISOString();
+    pendingRef.current[order.id] = { status: kitchenStatus, at: movedAt };
+    setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, kitchen_status: kitchenStatus, kitchen_status_at: movedAt } : o));
     try {
       await api.updateOrder(order.id, { kitchen_status: kitchenStatus });
     } catch {
