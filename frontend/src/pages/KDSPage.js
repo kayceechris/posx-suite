@@ -20,10 +20,12 @@ function orderAge(createdAt) {
   return { mins, color: "text-gray-400 dark:text-gray-500", dot: "bg-emerald-500" };
 }
 
-function minutesSince(ts) {
-  if (!ts) return null;
-  const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-  return Number.isFinite(mins) ? Math.max(0, mins) : null;
+// mm:ss, always positive — sign/"OVERDUE" framing is handled by the caller.
+function formatCountdown(ms) {
+  const totalSec = Math.round(Math.abs(ms) / 1000);
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  return `${mm}:${String(ss).padStart(2, "0")}`;
 }
 
 const COLUMNS = [
@@ -32,15 +34,20 @@ const COLUMNS = [
   { id: "ready",     label: "Completed",  headerBg: "bg-emerald-50 dark:bg-emerald-900/20", headerText: "text-emerald-700 dark:text-emerald-400" },
 ];
 
-function OrderCard({ order, items, column, onAdvance, onRevert, isActing }) {
+function OrderCard({ order, items, column, onAdvance, onRevert, isActing, now }) {
   const age = orderAge(order.created_at);
   const label = order.table_number ? `Table ${order.table_number}` : (order.customer_name || order.order_number);
 
-  // Processing timer: how long this order has sat in "preparing", timed
-  // from when it entered that column (falls back to created_at for orders
-  // that moved to preparing before kitchen_status_at existed).
-  const procMins = column === "preparing" ? minutesSince(order.kitchen_status_at || order.created_at) : null;
-  const overdue = procMins !== null && procMins >= PROCESSING_ALERT_MINUTES;
+  // Processing timer: a literal 20:00 countdown from when this order
+  // entered "preparing" (kitchen_status_at, falling back to created_at for
+  // orders that moved there before that field existed). Ticks every
+  // second off the shared `now` clock passed down from KDSPage rather
+  // than each card running its own interval.
+  const totalMs = PROCESSING_ALERT_MINUTES * 60000;
+  const startedAt = column === "preparing" ? new Date(order.kitchen_status_at || order.created_at).getTime() : null;
+  const remainingMs = startedAt !== null ? totalMs - Math.max(0, now - startedAt) : null;
+  const overdue = remainingMs !== null && remainingMs <= 0;
+  const pct = remainingMs !== null ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : null;
 
   return (
     <div className={cn(
@@ -59,21 +66,47 @@ function OrderCard({ order, items, column, onAdvance, onRevert, isActing }) {
           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", overdue ? "bg-red-500 animate-pulse" : age.dot)} />
           <span className="font-bold text-gray-900 dark:text-white text-sm truncate">{label}</span>
         </div>
-        {procMins !== null ? (
-          <span className={cn(
-            "flex items-center gap-1 text-xs font-bold flex-shrink-0",
-            overdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
-          )}>
-            {overdue ? <AlertTriangle size={11} className="animate-pulse" /> : <Clock size={11} />}
-            {overdue ? `OVERDUE · ${procMins}m` : `${procMins}m`}
-          </span>
-        ) : (
+        {remainingMs === null && (
           <span className={cn("flex items-center gap-1 text-xs font-bold flex-shrink-0", age.color)}>
             <Clock size={11} />
             {age.mins}m
           </span>
         )}
       </div>
+
+      {remainingMs !== null && (
+        <div className={cn(
+          "px-4 py-2.5 border-b",
+          overdue
+            ? "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"
+            : "bg-amber-50/60 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/40"
+        )}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className={cn(
+              "flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide",
+              overdue ? "text-red-600 dark:text-red-400" : "text-amber-700 dark:text-amber-400"
+            )}>
+              {overdue ? <AlertTriangle size={12} className="animate-pulse" /> : <Clock size={12} />}
+              {overdue ? "Overdue" : "Time left"}
+            </span>
+            <span className={cn(
+              "font-mono font-black text-lg tabular-nums leading-none",
+              overdue ? "text-red-600 dark:text-red-400" : "text-amber-700 dark:text-amber-400"
+            )}>
+              {overdue ? `+${formatCountdown(remainingMs)}` : formatCountdown(remainingMs)}
+            </span>
+          </div>
+          <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-[width] duration-1000 ease-linear",
+                overdue ? "bg-red-500 animate-pulse w-full" : pct < 25 ? "bg-red-400" : pct < 50 ? "bg-amber-400" : "bg-emerald-400"
+              )}
+              style={overdue ? undefined : { width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="px-4 py-3 flex-1 space-y-1">
         {items.map((item, i) => (
@@ -140,6 +173,14 @@ export default function KDSPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [actingId, setActingId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Ticks every second so Processing cards' 20:00 countdown actually
+  // counts down live, instead of only updating on the 5s data poll. One
+  // shared clock for every card rather than an interval per card.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   // Orders we've just moved locally but the server hasn't echoed back yet.
   // A poll's GET can be in flight when the user clicks a move button —
@@ -323,6 +364,7 @@ export default function KDSPage() {
                           order={order}
                           items={items}
                           column={col.id}
+                          now={now}
                           isActing={actingId === order.id}
                           onAdvance={() => moveCard(order, col.id === "new" ? "preparing" : "ready")}
                           onRevert={() => moveCard(order, col.id === "ready" ? "preparing" : "new")}
