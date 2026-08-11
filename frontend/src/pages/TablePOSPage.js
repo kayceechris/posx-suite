@@ -675,7 +675,7 @@ export default function TablePOSPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [prods, cats, terms, outs, ptypes, flrs, entityData] = await Promise.all([
+        const [prods, cats, terms, outs, ptypes, flrs, entityDataRaw] = await Promise.all([
           api.getProducts(),
           api.getCategories(),
           api.getTerminals(),
@@ -684,6 +684,10 @@ export default function TablePOSPage() {
           isBarTab ? Promise.resolve([]) : api.getFloors().catch(() => []),
           isBarTab ? api.getBarTabs().then((list) => list.find((b) => b.id === entityId)) : api.getTables().then((list) => list.find((t) => t.id === entityId)),
         ]);
+        // Mutable: the self-heal block below patches this in-memory when
+        // the table's denormalized waiter drifts from the order's owner
+        // (e.g. right after a transfer) — must not be `const`.
+        let entityData = entityDataRaw;
         setProducts(prods.filter((p) => p.active !== false));
         setCategories(cats);
         setTerminals(terms);
