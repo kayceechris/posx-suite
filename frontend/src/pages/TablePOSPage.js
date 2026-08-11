@@ -730,19 +730,23 @@ export default function TablePOSPage() {
             return;
           }
 
-          // Self-heal: if the table's denormalized waiter_name disagrees
-          // with the order's locked owner, patch entityData in-memory so
-          // the header shows the right name immediately (and we avoid
+          // Self-heal: if the table's denormalized waiter_id disagrees
+          // with the order's locked owner ID, patch entityData in-memory
+          // so the header shows the right name immediately (and we avoid
           // reading the wrong waiter into receipts / kitchen tickets).
-          if (existingOrder && !isBarTab) {
-            if (entityData.waiter_id !== existingOrder.created_by ||
-                entityData.waiter_name !== existingOrder.created_by_name) {
-              entityData = {
-                ...entityData,
-                waiter_id:   existingOrder.created_by,
-                waiter_name: existingOrder.created_by_name,
-              };
-            }
+          // Only the ID is a real drift signal — every transfer writes
+          // both table.waiter_name and order.created_by_name together,
+          // so if the IDs already match, a differing *name* string just
+          // means one side's name field is stale text (e.g. an order
+          // transferred before created_by_name started being synced);
+          // the table's name is the one that's always kept fresh, so
+          // leave it alone rather than overwriting it with stale text.
+          if (existingOrder && !isBarTab && entityData.waiter_id !== existingOrder.created_by) {
+            entityData = {
+              ...entityData,
+              waiter_id:   existingOrder.created_by,
+              waiter_name: existingOrder.created_by_name,
+            };
           }
 
           // Load the existing order into the cart
