@@ -1,5 +1,5 @@
-const CACHE = "posx-v6";
-const API_CACHE = "posx-api-v6";
+const CACHE = "posx-v7";
+const API_CACHE = "posx-api-v7";
 
 // API GET endpoints to cache for offline access. Everything POSPage,
 // TablesPage and HeldOrdersPage need to render lives in this list.
@@ -96,7 +96,14 @@ self.addEventListener("fetch", (e) => {
         // orphan tables; deleting a table can affect floors stats).
         const pathsToBust = new Set([url.pathname]);
         if (url.pathname.startsWith("/api/floors"))      pathsToBust.add("/api/tables");
-        if (url.pathname.startsWith("/api/tables"))      pathsToBust.add("/api/floors");
+        // Table/bar-tab actions (transfer, release, merge) can silently
+        // rewrite the linked ORDER's created_by/created_by_name server-
+        // side without the frontend ever issuing a matching /api/orders
+        // mutation — so the SWR-cached order response never gets busted
+        // on its own and keeps serving the pre-transfer owner name for
+        // several loads until the background revalidation happens to win.
+        if (url.pathname.startsWith("/api/tables"))      { pathsToBust.add("/api/floors"); pathsToBust.add("/api/orders"); }
+        if (url.pathname.startsWith("/api/bar-tabs"))    pathsToBust.add("/api/orders");
         if (url.pathname.startsWith("/api/outlets"))     { pathsToBust.add("/api/tables"); pathsToBust.add("/api/floors"); }
         if (url.pathname.startsWith("/api/products"))    pathsToBust.add("/api/groups");
         for (const p of pathsToBust) {
