@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Calendar, ChevronDown, ChevronRight, X, BarChart2, Tag, Layers, Percent, ClipboardList, Clock, Receipt, LayoutGrid, Printer, FileText } from "lucide-react";
 import { api } from "../lib/api";
-import { cn, formatCurrency, dedupePendingOrders, dedupeOrders } from "../lib/utils";
+import { cn, formatCurrency, dedupePendingOrders, dedupeOrders, localDateStr } from "../lib/utils";
 import ExportBtn from "../components/ExportBtn";
 import { downloadCSV, printReport } from "../lib/export";
 import { printService, pickReprintPrinter } from "../utils/printService";
@@ -21,8 +21,8 @@ const VIEW_LABELS = {
   floors:        "Floor Report",
 };
 
-function today() { return new Date().toISOString().split("T")[0]; }
-function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; }
+function today() { return localDateStr(); }
+function monthStart() { const d = new Date(); d.setDate(1); return localDateStr(d); }
 
 function Spinner() {
   return (

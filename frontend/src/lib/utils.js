@@ -16,6 +16,26 @@ export function pickDefaultOutlet(outlets) {
   return outlets.find((o) => (o.name || "").toLowerCase().includes("main restaurant")) || outlets[0];
 }
 
+// Business operating timezone — Nigeria doesn't observe DST, so this is a
+// safe fixed constant rather than a per-browser setting. Used to compute
+// "today"/report date defaults in the business's actual calendar day
+// instead of the viewing device's local zone or UTC.
+const BUSINESS_TIMEZONE = "Africa/Lagos";
+
+// YYYY-MM-DD for a given instant, as seen in the business's timezone.
+// Date.toISOString().split("T")[0] (the pattern this replaces) reads the
+// UTC calendar day instead — for the ~1 hour after local midnight (WAT is
+// UTC+1), that meant "today" on a report/date-range default still pointed
+// at yesterday's UTC date, making that morning's/previous day's sales look
+// like they hadn't "synced" yet when they were really just filtered out by
+// the wrong date.
+export function localDateStr(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(date);
+}
+
 let _currencySymbol = "₦";
 
 export function setCurrencySymbol(symbol) {

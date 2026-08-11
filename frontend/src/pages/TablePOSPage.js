@@ -1056,7 +1056,7 @@ export default function TablePOSPage() {
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
 
-  const handlePrintReceipt = (method, overrideItems, overrideTotal, overrideSubtotal, discountAmt = 0) => {
+  const handlePrintReceipt = (method, overrideItems, overrideTotal, overrideSubtotal, discountAmt = 0, orderDate = null) => {
     // Debounce — guard against a fast double-click sending the same
     // receipt to the printer twice. 1.5s is long enough to swallow a
     // rage-click but short enough that a deliberate reprint after the
@@ -1097,6 +1097,12 @@ export default function TablePOSPage() {
       discount: discountAmt || 0,
       total: finalTotal,
       paymentMethod: method,
+      // Real server-recorded timestamp when available (passed in by the
+      // caller right after the completion API call returns) — falls back
+      // to the printing device's local clock only if unavailable. Printing
+      // device clocks drift/get set wrong; the receipt is what staff and
+      // customers use to look a sale up later, so it needs the real date.
+      orderDate,
       layoutSettings: settings?.receipt_settings || {},
     }, { printer: usbPrinter }).catch((e) => showToast(e.message, "error"));
   };
@@ -1457,10 +1463,11 @@ export default function TablePOSPage() {
       } finally { setSubmitting(false); }
       return;
     }
+    let completedOrder = null;
     try {
       // Complete this table's order — update existing if there is one, else create
       if (existingOrderId) {
-        await api.updateOrder(existingOrderId, {
+        completedOrder = await api.updateOrder(existingOrderId, {
           status: "completed",
           payment_method: method,
           items: cart,
@@ -1471,7 +1478,7 @@ export default function TablePOSPage() {
           ...(discountInfo?.reason ? { discount_reason: discountInfo.reason } : {}),
         });
       } else {
-        await api.createOrder(buildOrderPayload("completed", method, name, discountInfo, idempotencyKey));
+        completedOrder = await api.createOrder(buildOrderPayload("completed", method, name, discountInfo, idempotencyKey));
       }
 
       // Complete and unmerge all merged tables
@@ -1494,9 +1501,9 @@ export default function TablePOSPage() {
           ...cart.map((i) => ({ name: i.product_name, quantity: i.quantity, price: i.price, total: i.total })),
           ...mergedOrders.flatMap((o) => (o.items || []).map((i) => ({ name: i.product_name || i.name, quantity: i.quantity, price: i.price, total: i.total }))),
         ];
-        handlePrintReceipt(method, allItems, combinedTotal, undefined, discAmt);
+        handlePrintReceipt(method, allItems, combinedTotal, undefined, discAmt, completedOrder?.created_at);
       } else {
-        handlePrintReceipt(method, undefined, undefined, undefined, discAmt);
+        handlePrintReceipt(method, undefined, undefined, undefined, discAmt, completedOrder?.created_at);
       }
 
       showToast(method === "credit" ? "Credit sale recorded!" : `Order completed via ${method}!`);
@@ -1539,6 +1546,8 @@ export default function TablePOSPage() {
           paid_items.map((p) => ({ name: p.product_name, quantity: p.quantity, price: p.price })),
           result?.paid_order?.total || paidTotal,
           paidSubtotal,
+          0,
+          result?.paid_order?.created_at,
         );
       } catch { /* non-fatal */ }
       if (result?.remaining_order?.items?.length) {

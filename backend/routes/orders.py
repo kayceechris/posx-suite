@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from typing import List, Optional
 from datetime import date, datetime, timedelta, timezone
 
-from database import db
+from database import db, next_order_number
 from models import User, Order, OrderCreate, SplitBill, SplitBillCreate
 from auth import get_current_user, has_perm
 from lib.email_service import send_new_order_email
@@ -120,8 +120,7 @@ async def create_order(order_data: OrderCreate, background_tasks: BackgroundTask
                 merged_doc = await db.orders.find_one({"id": existing_oid}, {"_id": 0})
                 return Order(**merged_doc)
 
-    count = await db.orders.count_documents({})
-    order_number = f"ORD{count + 1:06d}"
+    order_number = await next_order_number()
 
     order = Order(
         **order_data.model_dump(),
@@ -707,8 +706,7 @@ async def split_items(order_id: str, payload: dict, current_user: User = Depends
     paid_total = paid_subtotal + paid_tax - paid_disc
 
     # Build the new completed order — keep the original waiter as creator.
-    count = await db.orders.count_documents({})
-    order_number = f"ORD{count + 1:06d}"
+    order_number = await next_order_number()
     paid_order = {
         "id":              __import__("uuid").uuid4().hex,
         "order_number":    order_number,

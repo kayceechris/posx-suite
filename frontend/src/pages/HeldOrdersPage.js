@@ -156,6 +156,10 @@ function printOrderBill(order, settings, showToast, floorName = "") {
     discount: order.discount || 0,
     total: order.total || 0,
     docType: "BILL",
+    // The order object here is the real record, already carrying its real
+    // server created_at — use it instead of letting printReceipt fall back
+    // to the printing device's local clock (which can drift/be set wrong).
+    orderDate: order.created_at,
     layoutSettings: settings?.bill_settings || {},
   }, { printer: usbPrinter }).catch((e) => {
     if (showToast) showToast(e.message, "error");

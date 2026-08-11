@@ -6,13 +6,13 @@ import {
   BarChart2, CreditCard, Activity, Users, Target, Globe, Scale, Landmark, Eye,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { cn, formatCurrency } from "../lib/utils";
+import { cn, formatCurrency, localDateStr } from "../lib/utils";
 import ExportBtn from "../components/ExportBtn";
 import { downloadCSV, printReport } from "../lib/export";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function today() { return new Date().toISOString().split("T")[0]; }
-function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; }
+function today() { return localDateStr(); }
+function monthStart() { const d = new Date(); d.setDate(1); return localDateStr(d); }
 function fmtDate(s) { return new Date(s).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }); }
 
 const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800";

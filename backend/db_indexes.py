@@ -23,6 +23,22 @@ async def ensure_indexes(db):
         sparse=True,
         name="orders_idempotency_key_sparse",
     )
+    # Backstop for next_order_number()'s atomic counter (database.py) —
+    # order_number used to be generated via count_documents()+1, which two
+    # concurrent completions could race and both mint identically, silently
+    # dropping one from any list that dedupes by order_number. Own
+    # try/except: if any pre-existing duplicate order_number already made
+    # it into the database before this fix, index creation fails safely
+    # here without blocking every OTHER index below it in this function.
+    try:
+        await db.orders.create_index(
+            [("order_number", ASCENDING)],
+            unique=True,
+            sparse=True,
+            name="orders_order_number_unique",
+        )
+    except Exception as e:
+        print(f"orders_order_number_unique index skipped (likely pre-existing duplicates): {e}")
 
     # ── Stock: lookups are always (subject_id, outlet, store) ───────────────
     await db.stock.create_index([("ingredient_id", ASCENDING), ("outlet_id", ASCENDING), ("store", ASCENDING)])
