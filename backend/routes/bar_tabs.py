@@ -116,6 +116,17 @@ async def transfer_bar_tab(tab_id: str, transfer_data: dict, current_user: User 
         {"id": tab_id},
         {"$set": {"staff_id": new_staff_id, "staff_name": new_staff["name"]}}
     )
+    # Unlike the tab itself, an order's created_by is otherwise locked from
+    # generic updates (see update_order's _LOCKED fields) — a transfer is a
+    # deliberate exception. Without this, the linked order's owner never
+    # actually changes, so the new staff member fails TablePOSPage's
+    # ownership check (which trusts the ORDER's created_by, not the tab's
+    # denormalized staff_id) even with perfectly fresh data.
+    if tab.get("current_order_id"):
+        await db.orders.update_one(
+            {"id": tab["current_order_id"]},
+            {"$set": {"created_by": new_staff_id, "created_by_name": new_staff["name"]}}
+        )
     return await db.bar_tabs.find_one({"id": tab_id}, {"_id": 0})
 
 

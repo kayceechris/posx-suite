@@ -138,7 +138,13 @@ async def get_tables(outlet_id: Optional[str] = None, current_user: User = Depen
     for table in tables:
         order_id = table.get("current_order_id")
         if not order_id:
-            if table.get("waiter_id") or table.get("waiter_name"):
+            # Only clear a ghost waiter on an AVAILABLE table — a table
+            # that's "occupied" via claim_table (or freshly transferred)
+            # legitimately has a waiter assigned before any order exists
+            # yet (a waiter can seat a guest and claim the table before
+            # ringing anything up). Wiping waiter_id here unconditionally
+            # used to erase that assignment on the very next poll.
+            if table.get("status") != "occupied" and (table.get("waiter_id") or table.get("waiter_name")):
                 m = {"waiter_id": None, "waiter_name": None}
                 updates.append(({"id": table["id"]}, {"$set": m}, m))
             continue
@@ -258,7 +264,7 @@ async def transfer_table(table_id: str, transfer_data: TableTransferRequest, cur
     if table.get("current_order_id"):
         await db.orders.update_one(
             {"id": table["current_order_id"]},
-            {"$set": {"created_by": new_waiter_id}}
+            {"$set": {"created_by": new_waiter_id, "created_by_name": new_waiter["name"]}}
         )
 
     updated = await db.tables.find_one({"id": table_id}, {"_id": 0})

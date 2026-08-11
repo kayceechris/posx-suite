@@ -470,15 +470,16 @@ export default function TablesPage() {
   }, []);
 
   const handleEntityClick = (entity, isBarTab) => {
-    const isPrivileged = canManageAnyTable(user);
-    if (!isPrivileged && entity.status === "occupied") {
-      const ownerKey = isBarTab ? "staff_id" : "waiter_id";
-      if (entity[ownerKey] !== user?.id) {
-        const ownerName = isBarTab ? entity.staff_name : entity.waiter_name;
-        showToast(`This ${isBarTab ? "bar tab" : "table"} is assigned to ${ownerName || "another staff member"}`, "error");
-        return;
-      }
-    }
+    // No client-side ownership block here on purpose — `entity` can be up
+    // to 30s stale (this page's poll interval). A table just transferred
+    // to the current user would still show the OLD waiter_id from before
+    // the transfer for up to that whole window, incorrectly refusing to
+    // even navigate ("failed to load the table" after a transfer). The
+    // authoritative check already happens on the destination page
+    // (TablePOSPage.js's load effect), which re-fetches the table and its
+    // order fresh and redirects back if the current user genuinely isn't
+    // the owner — so this is enforced correctly either way, just without
+    // the stale false-positive.
     if (!isBarTab && reassignCart) {
       navigate(`/table/${entity.id}`, {
         state: { loadOrder: { items: reassignCart.items, customer_name: reassignCart.customer_name } },
