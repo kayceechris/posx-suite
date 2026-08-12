@@ -153,6 +153,7 @@ export const api = {
 
   // Users
   getUsers: () => request("/api/users"),
+  getWaiters: () => request("/api/users/waiters"),
   getUserTypes: () => request("/api/user-types"),
   createUserType: (data) => request("/api/user-types", { method: "POST", body: JSON.stringify(data) }),
   updateUserType: (id, data) => request(`/api/user-types/${id}`, { method: "PUT", body: JSON.stringify(data) }),

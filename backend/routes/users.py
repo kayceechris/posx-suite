@@ -65,9 +65,9 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
 
 @router.get("/users/waiters")
 async def get_waiters(current_user: User = Depends(get_current_user)):
-    """Get all active waiters and cashiers for transfer selection"""
+    """Get all active waiters/cashiers/managers for transfer selection"""
     waiters = await db.users.find(
-        {"role": {"$in": ["waiter", "cashier"]}, "active": True},
+        {"role": {"$in": ["waiter", "cashier", "manager"]}, "active": True},
         {"_id": 0, "id": 1, "name": 1, "role": 1, "outlet_id": 1}
     ).to_list(1000)
     return waiters

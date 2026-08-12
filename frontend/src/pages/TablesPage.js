@@ -20,8 +20,8 @@ function TransferModal({ entityId, isBarTab, currentOwnerId, onClose, onTransfer
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.getUsers()
-      .then((list) => setUsers(list.filter((u) => u.active && u.id !== currentOwnerId)))
+    api.getWaiters()
+      .then((list) => setUsers(list.filter((u) => u.id !== currentOwnerId)))
       .catch(() => setError("Could not load users"))
       .finally(() => setLoading(false));
   }, [currentOwnerId]);
@@ -194,9 +194,9 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
   // can act on other waiters' tables without role-level admin rights.
   const isPrivileged = canManageAnyTable({ role: userRole, permissions: userPermissions });
   const canRelease = isPrivileged || (status === "mine" && (userPermissions?.includes("release_tables") || userPermissions?.includes("manage_tables")));
-  const canTransfer = isPrivileged || (status === "mine" && userPermissions?.includes("transfer_tables"));
+  const canTransfer = isPrivileged || userPermissions?.includes("transfer_tables");
   const canMerge = !isBarTab && (status === "mine" || (isPrivileged && status === "occupied")) && !entity.merged_into;
-  const showActions = (status === "mine" || (isPrivileged && status === "occupied")) && (canRelease || canTransfer || canMerge);
+  const showActions = (status === "mine" || status === "occupied") && (canRelease || canTransfer || canMerge);
 
   const styles = {
     available: { card: "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 hover:shadow-green-100", icon: "bg-green-500", label: "text-green-700 dark:text-green-400" },

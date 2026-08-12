@@ -22,10 +22,8 @@ function TransferModal({ tableId, currentWaiterId, onClose, onTransferred }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.getUsers()
-      .then((list) => setUsers(
-        list.filter((u) => u.active && u.id !== currentWaiterId && ["waiter", "cashier", "manager"].includes(u.role))
-      ))
+    api.getWaiters()
+      .then((list) => setUsers(list.filter((u) => u.id !== currentWaiterId)))
       .catch(() => setError("Could not load users"))
       .finally(() => setLoading(false));
   }, [currentWaiterId]);
@@ -1657,7 +1655,7 @@ export default function TablePOSPage() {
               </p>
             </div>
           </div>
-          {!isBarTab && user?.role !== "waiter" && (
+          {!isBarTab && canManageAnyTable(user) && (
             <button onClick={() => setShowTransfer(true)}
               className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-bold hover:bg-violet-700 transition-colors">
               ⇄ Transfer

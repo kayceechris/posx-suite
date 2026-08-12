@@ -239,8 +239,7 @@ async def transfer_table(table_id: str, transfer_data: TableTransferRequest, cur
         raise HTTPException(status_code=404, detail="Table not found")
 
     is_owner = table.get("waiter_id") == current_user.id
-    is_privileged = current_user.role in ["admin", "manager"]
-    if not is_owner and not is_privileged:
+    if not is_owner and not has_perm(current_user, "transfer_tables"):
         raise HTTPException(status_code=403, detail="Not authorized to transfer this table")
 
     new_waiter_id = transfer_data.new_waiter_id

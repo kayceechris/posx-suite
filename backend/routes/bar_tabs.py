@@ -106,7 +106,7 @@ async def transfer_bar_tab(tab_id: str, transfer_data: dict, current_user: User 
     tab = await db.bar_tabs.find_one({"id": tab_id}, {"_id": 0})
     if not tab:
         raise HTTPException(status_code=404, detail="Bar tab not found")
-    if tab.get("staff_id") != current_user.id and not has_perm(current_user, "manage_bar_tabs"):
+    if tab.get("staff_id") != current_user.id and not has_perm(current_user, "manage_bar_tabs", "transfer_tables"):
         raise HTTPException(status_code=403, detail="Not authorized to transfer this bar tab")
     new_staff_id = transfer_data.get("new_staff_id")
     new_staff = await db.users.find_one({"id": new_staff_id}, {"_id": 0})
