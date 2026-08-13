@@ -181,8 +181,13 @@ function tableStatus(entity, userId, isBarTab, reservation) {
     const ownerKey = isBarTab ? "staff_id" : "waiter_id";
     return String(entity[ownerKey]) === String(userId) ? "mine" : "occupied";
   }
+  // entity.status is the backend's authoritative lock decision (only true
+  // within the RESERVATION_LOCK_HOURS window before the booking) - do NOT
+  // also flip to "reserved" just because reservationMap has *some* future
+  // entry for this table. getUpcomingReservations returns anything up to
+  // 7 days out, so a booking for tomorrow (or later) would otherwise lock
+  // the table a full day+ early, blocking normal seating for no reason.
   if (entity.status === "reserved") return "reserved";
-  if (reservation) return "reserved";
   return "available";
 }
 
@@ -212,7 +217,11 @@ function EntityCard({ entity, userId, userRole, userPermissions, isBarTab, reser
     status === "available" ? "Available" :
     status === "occupied" ? "Occupied" : "Reserved";
 
-  const urgencyColor = status === "reserved" && reservation
+  // Shown on "available" tables too (not just locked "reserved" ones) so a
+  // table with a booking later today/this week still gets the small
+  // colour-coded heads-up dot + hover tooltip, without prematurely
+  // treating the table as locked/unavailable.
+  const urgencyColor = (status === "available" || status === "reserved") && reservation
     ? RESERVATION_URGENCY_COLORS[reservationUrgency(reservation.date, reservation.time)]
     : null;
   // A reservation that's been seated flips the table to occupied/mine, but the
