@@ -1209,22 +1209,35 @@ function InvoiceTrackingView() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [page, setPage] = useState(1);
   const [viewInv, setViewInv] = useState(null);
   const PAGE = 25;
 
   const load = () => {
     setLoading(true);
-    api.getInvoices().then(setData).catch(console.error).finally(() => setLoading(false));
+    // The backend only returns settled orders within the last `days_back`
+    // days (open/credit orders are always included regardless of age) - if
+    // the user picks a start date further back than that default window,
+    // widen the request so settled invoices in that range aren't silently
+    // missing from the results being filtered below.
+    const daysBack = start
+      ? Math.max(60, Math.ceil((Date.now() - new Date(start).getTime()) / 86400000) + 1)
+      : undefined;
+    api.getInvoices(daysBack).then(setData).catch(console.error).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
-  useEffect(() => { setPage(1); }, [search, statusFilter]);
+  useEffect(() => { load(); }, [start]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1); }, [search, statusFilter, start, end]);
 
   const invoices = (data?.invoices || []).filter((inv) => {
     const matchSearch = !search || (inv.order_number || "").toLowerCase().includes(search.toLowerCase()) ||
       (inv.customer_name || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || inv.invoice_status === statusFilter;
-    return matchSearch && matchStatus;
+    const invDate = localDateStr(new Date(inv.created_at));
+    const matchStart = !start || invDate >= start;
+    const matchEnd = !end || invDate <= end;
+    return matchSearch && matchStatus && matchStart && matchEnd;
   });
 
   const totalPagesInv = Math.max(1, Math.ceil(invoices.length / PAGE));
@@ -1292,11 +1305,19 @@ function InvoiceTrackingView() {
             </div>
           )}
 
+          <DateBar start={start} end={end} onStart={setStart} onEnd={setEnd} />
+
           <div className="flex gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 max-w-xs">
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order # or customer…"
                 className="w-full pl-4 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none bg-white dark:bg-gray-800 dark:text-white" />
             </div>
+            {(start || end) && (
+              <button onClick={() => { setStart(""); setEnd(""); }}
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                Clear dates
+              </button>
+            )}
             {["all", "open", "settled"].map((f) => (
               <button key={f} onClick={() => setStatusFilter(f)}
                 className={cn("px-4 py-2 rounded-xl text-sm font-semibold capitalize transition-colors",

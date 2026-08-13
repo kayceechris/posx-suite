@@ -371,7 +371,7 @@ export const api = {
     const qs = params.toString();
     return request(`/api/accounts/cash-flow${qs ? `?${qs}` : ""}`);
   },
-  getInvoices: () => request("/api/accounts/invoices"),
+  getInvoices: (daysBack) => request(`/api/accounts/invoices${daysBack ? `?days_back=${daysBack}` : ""}`),
 
   // Deposits
   getDeposits: () => request("/api/deposits"),
