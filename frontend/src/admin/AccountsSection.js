@@ -1372,7 +1372,7 @@ function InvoiceTrackingView() {
               <div className="space-y-1">
                 {viewInv.items.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-200">{item.qty || item.quantity}× {item.name}</span>
+                    <span className="text-gray-700 dark:text-gray-200">{item.qty || item.quantity}× {item.product_name || item.name}</span>
                     <span className="font-semibold text-gray-900 dark:text-white tabular-nums">{formatCurrency((item.price || 0) * (item.qty || item.quantity || 1))}</span>
                   </div>
                 ))}
