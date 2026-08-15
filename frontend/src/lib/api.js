@@ -266,6 +266,31 @@ export const api = {
   deleteStore: (id) =>
     request(`/api/stores/${id}`, { method: "DELETE" }),
 
+  // Mother Store — Mother-side (Linked Businesses + incoming requisitions)
+  getLinkedBusinesses: () => request("/api/linked-businesses"),
+  createLinkedBusiness: (data) =>
+    request("/api/linked-businesses", { method: "POST", body: JSON.stringify(data) }),
+  updateLinkedBusiness: (id, data) =>
+    request(`/api/linked-businesses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteLinkedBusiness: (id) =>
+    request(`/api/linked-businesses/${id}`, { method: "DELETE" }),
+  getMotherRequisitions: (status) =>
+    request(`/api/mother-requisitions${status ? `?status=${status}` : ""}`),
+  approveMotherRequisition: (id) =>
+    request(`/api/mother-requisitions/${id}/approve`, { method: "PUT" }),
+  rejectMotherRequisition: (id) =>
+    request(`/api/mother-requisitions/${id}/reject`, { method: "PUT" }),
+  retryMotherRequisitionDelivery: (id) =>
+    request(`/api/mother-requisitions/${id}/retry-delivery`, { method: "PUT" }),
+
+  // Mother Store — Business-side (connection settings + outbound requests)
+  getMotherConnection: () => request("/api/mother-connection"),
+  setMotherConnection: (data) =>
+    request("/api/mother-connection", { method: "PUT", body: JSON.stringify(data) }),
+  sendMotherRequest: (data) =>
+    request("/api/mother/request", { method: "POST", body: JSON.stringify(data) }),
+  getMyMotherRequests: () => request("/api/mother/requests"),
+
   // Waste / Spoilage
   getWasteEntries: (outlet_id) =>
     request(`/api/waste${outlet_id ? `?outlet_id=${outlet_id}` : ""}`),

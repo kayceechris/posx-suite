@@ -95,6 +95,7 @@ async def get_stock(
                 # so the Stock Levels view can show a tag without an
                 # extra lookup per item.
                 "home_store": ing.get("home_store"),
+                "sku": ing.get("sku"),
             })
         elif pid:
             prod = prod_map.get(pid, {})
@@ -106,6 +107,7 @@ async def get_stock(
                 "category": "",
                 "cost_price": prod.get("cost_price", 0),
                 "selling_price": prod.get("price", 0),
+                "sku": prod.get("sku"),
             })
         else:
             result.append({**s, "subject_name": "(unlinked)"})

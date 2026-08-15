@@ -28,6 +28,9 @@ const BarTabsAdminSection  = lazy(() => import("../admin/BarTabsAdminSection"));
 const ReservationsSection  = lazy(() => import("../admin/ReservationsSection"));
 const SettingsSection      = lazy(() => import("../admin/SettingsSection"));
 const PurchasesSection     = lazy(() => import("../admin/PurchasesSection"));
+const LinkedBusinessesSection  = lazy(() => import("../admin/LinkedBusinessesSection"));
+const MotherRequestsSection    = lazy(() => import("../admin/MotherRequestsSection"));
+const MyMotherRequestsSection  = lazy(() => import("../admin/MyMotherRequestsSection"));
 
 // Hold raw import promises so we can also kick them off on idle. React's
 // lazy() runs the import the first time the component is rendered, but we
@@ -47,6 +50,9 @@ const ADMIN_CHUNK_IMPORTS = [
   () => import("../admin/SettingsSection"),
   () => import("../admin/PurchasesSection"),
   () => import("../admin/VoidOrdersSection"),
+  () => import("../admin/LinkedBusinessesSection"),
+  () => import("../admin/MotherRequestsSection"),
+  () => import("../admin/MyMotherRequestsSection"),
 ];
 function prefetchAdminChunks() {
   const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 800));
@@ -108,6 +114,9 @@ const EXPANDABLE = {
     { id: "main-store", label: "Main Store" },
     { id: "transfer-record", label: "Transfer Record" },
     { id: "create-store", label: "Create Store" },
+    { id: "linked-businesses", label: "Linked Businesses" },
+    { id: "mother-requests", label: "Mother Requests" },
+    { id: "my-mother-requests", label: "My Mother Requests" },
   ],
   purchases: [
     { id: "pending", label: "Pending Orders" },
@@ -124,6 +133,7 @@ const EXPANDABLE = {
     { id: "currencies", label: "Currencies" }, { id: "payment-types", label: "Payment Types" },
     { id: "tax", label: "Tax" }, { id: "printer-groups", label: "Printer Groups" },
     { id: "label-printer", label: "Label Printer" }, { id: "print-bridge", label: "Print Bridge" },
+    { id: "mother-store", label: "Mother Store Connection" },
     { id: "danger", label: "Data Management" },
   ],
   accounts: [
@@ -178,6 +188,9 @@ const SUB_ITEM_PERMISSION = {
   "stores.main-store":          "view_stores",
   "stores.transfer-record":     "view_transfer_record",
   "stores.create-store":        "create_store",
+  "stores.linked-businesses":   "manage_inventory",
+  "stores.mother-requests":     "manage_inventory",
+  "stores.my-mother-requests":  "view_inventory",
   // ── Products ────────────────────────────────────────────────────────────────
   "products.create-product":    "create_product",
   "products.groups":            "manage_groups",
@@ -587,7 +600,12 @@ export default function AdminPage() {
                 <ProductsSection view={subViews.products} onViewChange={(v) => handleSubClick("products", v)} />
               )}
               {activeSection === "inventory" && <InventorySection view={subViews.inventory} />}
-              {activeSection === "stores" && <InventorySection view={subViews.stores === "create-store" ? "stores" : subViews.stores} />}
+              {activeSection === "stores" && subViews.stores === "linked-businesses" && <LinkedBusinessesSection />}
+              {activeSection === "stores" && subViews.stores === "mother-requests" && <MotherRequestsSection />}
+              {activeSection === "stores" && subViews.stores === "my-mother-requests" && <MyMotherRequestsSection />}
+              {activeSection === "stores" && !["linked-businesses", "mother-requests", "my-mother-requests"].includes(subViews.stores) && (
+                <InventorySection view={subViews.stores === "create-store" ? "stores" : subViews.stores} />
+              )}
               {activeSection === "customers" && <CustomersSection />}
               {activeSection === "orders" && subViews.orders !== "void-orders" && <OrdersSection />}
               {activeSection === "orders" && subViews.orders === "void-orders" && <VoidOrdersSection />}

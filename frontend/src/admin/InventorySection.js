@@ -2071,6 +2071,11 @@ function ReceiveStockModal({ mode = "ingredient", catalog, ingredients, outlets,
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none">
                 <option value="kitchen">Kitchen</option>
                 <option value="bar">Bar</option>
+                {/* Normal businesses never need this — Main holds no stock
+                    of its own. Kept as an option for a Mother Store
+                    deployment, which has no Kitchen/Bar and receives
+                    real stock into Main directly. */}
+                <option value="main">Main Store</option>
               </select>
             </div>
             <div>
@@ -2527,6 +2532,13 @@ function MainStoreView() {
   const [rollup, setRollup] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [motherConfigured, setMotherConfigured] = useState(false);
+  const [showRequestMother, setShowRequestMother] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    api.getMotherConnection().then((c) => setMotherConfigured(!!c.configured)).catch(() => {});
+  }, []);
 
   const loadStock = () => {
     setLoading(true);
@@ -2543,6 +2555,7 @@ function MainStoreView() {
             key,
             subject_name: row.subject_name || row.ingredient_name || row.product_name,
             unit: row.unit,
+            sku: row.sku || null,
             qty: 0,
             min: 0,
           };
@@ -2584,12 +2597,20 @@ function MainStoreView() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {motherConfigured && (
+            <button onClick={() => setShowRequestMother(true)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors">
+              <Plus size={16} /> <span className="hidden sm:inline">Request from Mother</span>
+            </button>
+          )}
           <button onClick={loadStock}
             className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
             <RefreshCw size={15} /> <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
@@ -2685,6 +2706,140 @@ function MainStoreView() {
           )}
         </div>
       )}
+
+      {showRequestMother && (
+        <RequestFromMotherModal
+          lowItems={rollup.filter((x) => x.qty <= x.min)}
+          onClose={() => setShowRequestMother(false)}
+          onSent={() => {
+            setShowRequestMother(false);
+            setToast({ msg: "Request sent to Mother Store.", type: "success" });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Request from Mother Store ─────────────────────────────────────────────────
+// Pre-fills from whichever rows Main Store's rollup already flags Low —
+// that combined Kitchen+Bar signal IS the restock trigger. Only items
+// tagged with a SKU can be requested (Mother matches deliveries by SKU
+// across the two separate deployments, not by local database id).
+
+function RequestFromMotherModal({ lowItems, onClose, onSent }) {
+  const [outlets, setOutlets] = useState([]);
+  const [outletId, setOutletId] = useState("");
+  const [store, setStore] = useState("kitchen");
+  const [notes, setNotes] = useState("");
+  const [rows, setRows] = useState(
+    lowItems.filter((x) => x.sku).map((x) => ({
+      sku: x.sku, name: x.subject_name, quantity: Math.max(1, Math.ceil(x.min - x.qty)) || 1,
+    }))
+  );
+  const skippedNoSku = lowItems.filter((x) => !x.sku);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.getOutlets().then((o) => { setOutlets(o); if (o.length > 0) setOutletId(o[0].id); }).catch(() => {});
+  }, []);
+
+  const setQty = (sku, val) => setRows((prev) => prev.map((r) => r.sku === sku ? { ...r, quantity: val } : r));
+  const removeRow = (sku) => setRows((prev) => prev.filter((r) => r.sku !== sku));
+
+  const handleSubmit = async () => {
+    const items = rows
+      .map((r) => ({ sku: r.sku, name: r.name, quantity_requested: parseFloat(r.quantity) || 0 }))
+      .filter((r) => r.quantity_requested > 0);
+    if (items.length === 0) { setError("Add at least one item with a quantity greater than 0."); return; }
+    if (!outletId) { setError("Pick which outlet this delivery should land at."); return; }
+    setSaving(true); setError("");
+    try {
+      await api.sendMotherRequest({ items, destination_store: store, destination_outlet_id: outletId, notes: notes || null });
+      onSent();
+    } catch (err) {
+      setError(err.message || "Failed to send request");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">Request from Mother Store</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Pre-filled from items currently below minimum</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">{error}</div>}
+
+          {skippedNoSku.length > 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300">
+              {skippedNoSku.length} low item{skippedNoSku.length > 1 ? "s" : ""} skipped (no SKU set, so Mother can't match {skippedNoSku.length > 1 ? "them" : "it"}): {skippedNoSku.map((x) => x.subject_name).join(", ")}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Deliver Into</label>
+              <select value={store} onChange={(e) => setStore(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500">
+                <option value="kitchen">Kitchen</option>
+                <option value="bar">Bar</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Outlet</label>
+              <select value={outletId} onChange={(e) => setOutletId(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500">
+                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Items</label>
+            {rows.length === 0 ? (
+              <p className="text-sm text-gray-400">No SKU-tagged items are currently low.</p>
+            ) : (
+              <div className="space-y-2">
+                {rows.map((r) => (
+                  <div key={r.sku} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-xl p-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{r.name}</p>
+                      <p className="text-[11px] text-gray-400 font-mono">{r.sku}</p>
+                    </div>
+                    <input type="number" min="0" step="1" value={r.quantity}
+                      onChange={(e) => setQty(r.sku, e.target.value)}
+                      className="w-20 px-2 py-1.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-lg text-sm text-center focus:outline-none focus:border-indigo-500" />
+                    <button onClick={() => removeRow(r.sku)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Notes (optional)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-indigo-500 resize-none" />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <button onClick={onClose} className="px-4 py-2.5 border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+          <button onClick={handleSubmit} disabled={saving || rows.length === 0}
+            className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {saving ? "Sending…" : "Send Request"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2940,6 +3095,9 @@ function AddStockModal({ mode = "ingredient", catalog = [], outlets = [], initia
   // add brand new items to their inventory without needing access to the
   // Products section.
   const [newName, setNewName] = useState("");
+  // Cross-deployment matching code (e.g. for Mother Store deliveries) —
+  // optional, only offered when creating a brand new ingredient here.
+  const [newSku, setNewSku] = useState("");
   const isNew = subjectId === "__new__";
   const [expiryDate, setExpiryDate] = useState("");
   // Main Store is global — the backend normalizes outlet_id to
@@ -3041,6 +3199,7 @@ function AddStockModal({ mode = "ingredient", catalog = [], outlets = [], initia
           cost_price: 0,
           active: true,
           home_store: targetStore,
+          sku: newSku.trim() || null,
         });
         resolvedId = created.id;
         resolvedName = created.name;
@@ -3184,6 +3343,20 @@ function AddStockModal({ mode = "ingredient", catalog = [], outlets = [], initia
               <p className="mt-1 text-[10px] text-gray-400">
                 Tagged as <strong>Home Store: {storeLabel}</strong>. Pick the unit and quantity below — both are required.
               </p>
+            </div>
+          )}
+
+          {isNew && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                SKU (optional)
+              </label>
+              <input
+                value={newSku}
+                onChange={(e) => setNewSku(e.target.value)}
+                placeholder="e.g. RICE-50KG — shared code across linked stores"
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+              />
             </div>
           )}
 

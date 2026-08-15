@@ -5,6 +5,7 @@ import { useBusiness } from "../context/BusinessContext";
 import { useAuth } from "../context/AuthContext";
 import PrintBridgeSettings from "../components/PrintBridgeSettings";
 import MobilePrinterScanner from "../components/MobilePrinterScanner";
+import MotherConnectionSettings from "../components/MotherConnectionSettings";
 
 const INPUT = "w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500";
 const LABEL = "block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5";
@@ -1860,6 +1861,7 @@ const VIEWS = {
   "printer-groups": PrinterGroupsSettings,
   "label-printer": LabelPrinterSettings,
   "print-bridge": PrintBridgeSettings,
+  "mother-store": MotherConnectionSettings,
   "danger": DangerZoneSettings,
 };
 

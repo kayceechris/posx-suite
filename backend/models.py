@@ -94,6 +94,11 @@ class Product(BaseModel):
     markup_percentage: float = 0.0
     price: float
     barcode: Optional[str] = None
+    # Cross-deployment matching code — shared between a business's catalog
+    # and Mother Store's, so a delivery from Mother can find "the same
+    # item" across two entirely separate databases. Distinct from barcode
+    # (a POS-scan-at-checkout concept) even though both are free-text codes.
+    sku: Optional[str] = None
     image: Optional[str] = None
     description: Optional[str] = None
     active: bool = True
@@ -112,6 +117,7 @@ class ProductCreate(BaseModel):
     markup_percentage: float = 0.0
     price: float
     barcode: Optional[str] = None
+    sku: Optional[str] = None
     image: Optional[str] = None
     description: Optional[str] = None
     terminal_prices: List[TerminalPrice] = Field(default_factory=list)
@@ -132,6 +138,8 @@ class Ingredient(BaseModel):
     # items out of the bar picker, etc. None = no restriction (legacy
     # default, behaves as 'any store').
     home_store: Optional[str] = None  # 'main' | 'kitchen' | 'bar' | None
+    # See Product.sku — same cross-deployment matching purpose.
+    sku: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -143,6 +151,7 @@ class IngredientCreate(BaseModel):
     cost_price: float = 0.0
     active: bool = True
     home_store: Optional[str] = None
+    sku: Optional[str] = None
 
 
 # ==================== STOCK MODELS ====================
@@ -810,3 +819,87 @@ class ReservationCreate(BaseModel):
     time: str
     duration: int = 90
     notes: Optional[str] = None
+
+
+# ==================== MOTHER STORE MODELS ====================
+# A Mother Store is a separate deployment of this same codebase, used
+# purely as a central warehouse (no POS/Tables/KDS use, no Kitchen/Bar of
+# its own). One or more regular business deployments each requisition
+# stock from Mother when running low. See backend/routes/mother.py.
+
+class LinkedBusiness(BaseModel):
+    """Mother-side: one business Mother supplies. The shared link key is
+    used in BOTH directions (the business presents it when creating a
+    requisition; Mother presents the same value when pushing a delivery
+    back), so Mother has to keep the plaintext too, not just a hash —
+    unlike a normal login credential, this is a bidirectional shared
+    secret, not something only ever verified one-way. link_key_hash is
+    kept alongside it purely so incoming-call verification (get_linked_
+    business in auth.py) is an indexed hash lookup rather than scanning
+    every linked business's plaintext key on every request. Neither
+    field is ever returned by the list/get endpoints — only once, in the
+    creation response."""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    base_url: str
+    link_key: str
+    link_key_hash: str
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class LinkedBusinessCreate(BaseModel):
+    name: str
+    base_url: str
+
+
+class MotherRequisitionItem(BaseModel):
+    sku: str
+    name: str
+    quantity_requested: float
+
+
+class MotherRequisition(BaseModel):
+    """Mother-side record of one business's request. destination_store /
+    destination_outlet_id describe where on the BUSINESS's side the
+    delivery should land — Mother relays them back opaquely on delivery,
+    it doesn't need to understand the business's own outlet structure."""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    linked_business_id: str
+    items: List[MotherRequisitionItem]
+    destination_store: str  # "kitchen" | "bar"
+    destination_outlet_id: str
+    notes: Optional[str] = None
+    status: str = "pending"  # pending | approved | rejected | delivered | delivery_failed
+    delivery_error: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    decided_at: Optional[datetime] = None
+
+
+class MotherRequisitionCreate(BaseModel):
+    items: List[MotherRequisitionItem]
+    destination_store: str
+    destination_outlet_id: str
+    notes: Optional[str] = None
+
+
+class MotherConnectionUpdate(BaseModel):
+    """Business-side: where and how to reach our Mother. link_key is kept
+    server-side only — GET never returns it, so the settings page can
+    show 'connected' without re-exposing the secret."""
+    base_url: str
+    link_key: str
+
+
+class ReceiveFromMotherRequest(BaseModel):
+    """Business-side: the payload Mother pushes on delivery. Bundles every
+    item from the requisition into one call — checked and credited
+    atomically (if any SKU fails to resolve, nothing is credited) so a
+    requisition's delivery status is a single delivered/failed outcome,
+    not a per-item mix."""
+    mother_requisition_id: str
+    items: List[MotherRequisitionItem]
+    store: str  # "kitchen" | "bar"
+    outlet_id: str

@@ -41,7 +41,7 @@ async def update_ingredient(ingredient_id: str, data: dict, current_user: User =
     existing = await db.ingredients.find_one({"id": ingredient_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Ingredient not found")
-    allowed = {"name", "unit", "category", "cost_price", "active", "home_store"}
+    allowed = {"name", "unit", "category", "cost_price", "active", "home_store", "sku"}
     update = {k: v for k, v in data.items() if k in allowed}
     if update:
         await db.ingredients.update_one({"id": ingredient_id}, {"$set": update})

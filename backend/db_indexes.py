@@ -60,6 +60,9 @@ async def ensure_indexes(db):
     await db.products.create_index([("category", ASCENDING)])
     await db.products.create_index([("name", ASCENDING)])
     await db.ingredients.create_index([("name", ASCENDING)])
+    # SKU — optional, only set on items tagged for Mother Store matching.
+    await db.products.create_index([("sku", ASCENDING)], sparse=True)
+    await db.ingredients.create_index([("sku", ASCENDING)], sparse=True)
 
     # ── Customers ───────────────────────────────────────────────────────────
     await db.customers.create_index([("phone", ASCENDING)])
@@ -81,3 +84,12 @@ async def ensure_indexes(db):
     # ── Reservations ────────────────────────────────────────────────────────
     await db.reservations.create_index([("date", ASCENDING)])
     await db.reservations.create_index([("outlet_id", ASCENDING), ("date", ASCENDING)])
+
+    # ── Mother Store: linked businesses / cross-deployment requisitions ─────
+    # link_key_hash is how an incoming Business→Mother call is identified —
+    # this is the hottest lookup on every Mother-side link-key request.
+    await db.linked_businesses.create_index([("link_key_hash", ASCENDING)], unique=True)
+    await db.mother_requisitions.create_index([("linked_business_id", ASCENDING), ("created_at", DESCENDING)])
+    await db.mother_requisitions.create_index([("status", ASCENDING), ("created_at", DESCENDING)])
+    # Idempotency guard for receive_from_mother's duplicate-delivery check.
+    await db.stock_movements.create_index([("mother_requisition_id", ASCENDING)], sparse=True)

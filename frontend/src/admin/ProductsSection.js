@@ -332,7 +332,7 @@ const EMPTY_FORM = {
   name: "", category_id: "", brand_id: "", unit_id: "",
   outlet_id: "", terminal_id: "",
   cost_price: "", markup_percentage: "", price: "",
-  barcode: "", image: "", description: "",
+  barcode: "", sku: "", image: "", description: "",
   active: true, terminal_prices: [],
 };
 
@@ -372,6 +372,7 @@ function ProductModal({ mode, product, groups, brands, units, outlets, terminals
         markup_percentage: product.markup_percentage ?? "",
         price: product.price ?? "",
         barcode: product.barcode || "",
+        sku: product.sku || "",
         image: product.image || "",
         description: product.description || "",
         active: product.active !== false,
@@ -454,6 +455,7 @@ function ProductModal({ mode, product, groups, brands, units, outlets, terminals
       markup_percentage: parseFloat(form.markup_percentage) || 0,
       price: parseFloat(form.price) || 0,
       barcode: form.barcode.trim() || null,
+      sku: form.sku.trim() || null,
       image: form.image.trim() || null,
       description: form.description.trim() || null,
       active: form.active,
@@ -638,6 +640,13 @@ function ProductModal({ mode, product, groups, brands, units, outlets, terminals
           <label className={label}>Barcode</label>
           <input value={form.barcode} onChange={(e) => f("barcode", e.target.value)}
             className={input} placeholder="Scan or type barcode" />
+        </div>
+
+        {/* SKU — cross-deployment matching code, e.g. for Mother Store deliveries */}
+        <div>
+          <label className={label}>SKU (optional)</label>
+          <input value={form.sku} onChange={(e) => f("sku", e.target.value)}
+            className={input} placeholder="e.g. RICE-50KG — shared code across linked stores" />
         </div>
 
         {/* Image */}
