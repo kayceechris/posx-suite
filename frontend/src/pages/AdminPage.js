@@ -304,6 +304,20 @@ export default function AdminPage() {
     fetchNotifs();
     const notifTimer = setInterval(fetchNotifs, 30000);
 
+    // Ensure the three default stores (main/kitchen/bar) exist. A
+    // deployment that only ever had "main" created (pre-dating
+    // kitchen/bar, or a partial init) would otherwise silently never
+    // get kitchen/bar auto-created, breaking anything that depends on
+    // them existing as real Store records (e.g. the stock Transfer
+    // modal's destination picker). init-stores only creates whichever
+    // of the three are missing, so this is safe to call on every load.
+    api.getStores().then((s) => {
+      const existingIds = new Set(s.map((x) => x.id));
+      if (["main", "kitchen", "bar"].some((id) => !existingIds.has(id))) {
+        api.initStores().catch(() => {});
+      }
+    }).catch(() => {});
+
     // Warm every admin chunk in the background so the first click into
     // Users / Reports / etc. is instant instead of waiting on a chunk
     // download.

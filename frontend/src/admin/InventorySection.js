@@ -3445,8 +3445,17 @@ function StoresView() {
 
   useEffect(() => {
     api.getStores().then(s => {
-      if (s.length === 0) {
-        // Auto-initialize default stores for existing deployments
+      // Auto-initialize whichever of the three default stores (main/
+      // kitchen/bar) are missing — not just when the list is totally
+      // empty. A deployment that only ever had "main" created (e.g.
+      // before kitchen/bar existed, or a partial init) would otherwise
+      // never get kitchen/bar auto-created, silently breaking anything
+      // that depends on them existing as real Store records (like the
+      // Transfer modal's destination picker). init-stores is per-store
+      // idempotent, so this is safe to call whenever any are missing.
+      const existingIds = new Set(s.map(x => x.id));
+      const missingDefaults = ["main", "kitchen", "bar"].some(id => !existingIds.has(id));
+      if (missingDefaults) {
         setInitializing(true);
         api.initStores()
           .then(() => loadStores())
