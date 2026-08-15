@@ -2508,6 +2508,11 @@ function MainStoreView() {
   const canReceiveStock = userHasPermission(user, "receive_stock") || userHasPermission(user, "add_stock");
 
   const [stock, setStock] = useState([]);
+  // Kitchen + Bar quantities, summed across every outlet's rows and keyed
+  // by ingredient_id||product_id — Main Store never sells/serves directly,
+  // it only feeds Kitchen/Bar, so whether Main actually needs restocking
+  // has to be judged against the combined picture, not Main's row alone.
+  const [elsewhere, setElsewhere] = useState({});
   const [catalog, setCatalog] = useState([]);   // ingredients OR products
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2523,8 +2528,26 @@ function MainStoreView() {
 
   const loadStock = () => {
     setLoading(true);
-    Promise.all([api.getStock(null, "main"), loadCatalog().catch(() => [])])
-      .then(([s, c]) => { setStock(s); setCatalog(c); })
+    Promise.all([
+      api.getStock(null, "main"),
+      api.getStock(null, "kitchen").catch(() => []),
+      api.getStock(null, "bar").catch(() => []),
+      loadCatalog().catch(() => []),
+    ])
+      .then(([s, kitchen, bar, c]) => {
+        setStock(s);
+        setCatalog(c);
+        const combined = {};
+        for (const row of [...kitchen, ...bar]) {
+          const key = row.ingredient_id || row.product_id;
+          if (!key) continue;
+          const entry = combined[key] || { qty: 0, min: 0 };
+          entry.qty += parseFloat(row.quantity) || 0;
+          entry.min += parseFloat(row.min_quantity) || 0;
+          combined[key] = entry;
+        }
+        setElsewhere(combined);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -2540,8 +2563,25 @@ function MainStoreView() {
       .catch(console.error);
   }, [isProductMode]); // eslint-disable-line
 
+  // Business-wide combined figures per row — Main's own quantity plus
+  // whatever's sitting in every outlet's Kitchen + Bar stores right now.
+  const combinedFor = (item) => {
+    const key = item.ingredient_id || item.product_id;
+    const extra = elsewhere[key] || { qty: 0, min: 0 };
+    const mainQty = parseFloat(item.quantity) || 0;
+    const mainMin = parseFloat(item.min_quantity) || 10;
+    return {
+      elsewhereQty: extra.qty,
+      combinedQty: mainQty + extra.qty,
+      combinedMin: mainMin + extra.min,
+    };
+  };
+
   const totalUnits = stock.reduce((s, x) => s + (parseFloat(x.quantity) || 0), 0);
-  const lowCount = stock.filter((s) => parseFloat(s.quantity) <= parseFloat(s.min_quantity || 10)).length;
+  const restockCount = stock.filter((s) => {
+    const { combinedQty, combinedMin } = combinedFor(s);
+    return combinedQty <= combinedMin;
+  }).length;
   const filtered = stock.filter((s) => !search || (s.subject_name || s.ingredient_name || s.product_name || "").toLowerCase().includes(search.toLowerCase()));
 
   const PAGE_SIZE = 25;
@@ -2599,7 +2639,7 @@ function MainStoreView() {
         {[
           { label: SUBJECT_LABEL_PLURAL, value: stock.length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
           { label: "Total Units", value: totalUnits.toLocaleString(), color: "text-gray-900 dark:text-white", bg: "bg-gray-50 dark:bg-gray-800" },
-          { label: "Low Stock", value: lowCount, color: lowCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: lowCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
+          { label: "Needs Restock", value: restockCount, color: restockCount > 0 ? "text-orange-500" : "text-green-600 dark:text-green-400", bg: restockCount > 0 ? "bg-orange-50 dark:bg-orange-900/20" : "bg-green-50 dark:bg-green-900/20" },
         ].map((c) => (
           <div key={c.label} className={cn("rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center", c.bg)}>
             <p className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">{c.label}</p>
@@ -2640,7 +2680,9 @@ function MainStoreView() {
             <thead>
               <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
                 <th className="text-left px-4 py-3">{SUBJECT_LABEL}</th>
-                <th className="text-center px-3 py-3">Qty</th>
+                <th className="text-center px-3 py-3">Main Qty</th>
+                <th className="text-center px-3 py-3">Kitchen + Bar</th>
+                <th className="text-center px-3 py-3">Total</th>
                 <th className="text-center px-3 py-3">Unit</th>
                 <th className="text-center px-3 py-3">Min</th>
                 <th className="text-left px-3 py-3">Batch</th>
@@ -2651,17 +2693,20 @@ function MainStoreView() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {pagedRows.map((item, i) => {
-                const low = parseFloat(item.quantity) <= parseFloat(item.min_quantity || 10);
+                const { elsewhereQty, combinedQty, combinedMin } = combinedFor(item);
+                const low = combinedQty <= combinedMin;
                 const expired = item.expiry_date && new Date(item.expiry_date) < new Date();
                 const expiring = !expired && item.expiry_date && ((new Date(item.expiry_date) - new Date()) / 86400000) <= 30;
                 return (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white text-sm">{item.subject_name || item.ingredient_name || item.product_name}</td>
+                    <td className="px-3 py-3 text-center text-gray-700 dark:text-gray-200">{item.quantity}</td>
+                    <td className="px-3 py-3 text-center text-gray-500 dark:text-gray-400">{elsewhereQty}</td>
                     <td className="px-3 py-3 text-center">
-                      <span className={cn("font-black text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{item.quantity}</span>
+                      <span className={cn("font-black text-sm", low ? "text-orange-500" : "text-gray-900 dark:text-white")}>{combinedQty}</span>
                     </td>
                     <td className="px-3 py-3 text-center text-xs text-gray-500 dark:text-gray-400">{item.unit || "—"}</td>
-                    <td className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{item.min_quantity || 10}</td>
+                    <td className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{combinedMin}</td>
                     <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{item.batch_number || "—"}</td>
                     <td className="px-3 py-3 text-xs">
                       {item.expiry_date
@@ -2689,7 +2734,7 @@ function MainStoreView() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">No {SUBJECT_LABEL_PLURAL.toLowerCase()} found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={10} className="px-6 py-10 text-center text-gray-400 text-sm">No {SUBJECT_LABEL_PLURAL.toLowerCase()} found</td></tr>}
             </tbody>
           </table>
 
