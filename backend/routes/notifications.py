@@ -13,8 +13,6 @@ router = APIRouter(prefix="/api")
 @router.get("/notifications/summary")
 async def get_notifications_summary(current_user: User = Depends(get_current_user)):
     """In-app badge counts — polled by the frontend every 30 s."""
-    pending_reqs = await db.requisitions.count_documents({"status": "pending"})
-
     low_stock = await db.stock.count_documents({
         "$expr": {"$and": [
             {"$gt": ["$min_quantity", 0]},
@@ -52,7 +50,6 @@ async def get_notifications_summary(current_user: User = Depends(get_current_use
             pass
 
     return {
-        "pending_requisitions": pending_reqs,
         "low_stock": low_stock,
         "todays_orders": todays_orders,
         "pending_purchases": pending_purchases,

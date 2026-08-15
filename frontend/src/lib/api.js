@@ -256,30 +256,6 @@ export const api = {
     });
   },
 
-  // Bulk requisition: each CSV row becomes a Main → to_store transfer.
-  // Quantities must already exist at from_store (default 'main'); rows
-  // for ingredients that don't exist there are skipped with an error.
-  requisitionStockCsv: (outlet_id, to_store, file, from_store = "main") => {
-    const token = localStorage.getItem("posx_token");
-    const form = new FormData();
-    form.append("outlet_id", outlet_id);
-    form.append("to_store", to_store);
-    form.append("from_store", from_store);
-    form.append("file", file);
-    return fetch(`${BASE_URL}/api/stock/requisition-csv`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    }).then(async (res) => {
-      if (!res.ok) {
-        let detail = `HTTP ${res.status}`;
-        try { const b = await res.json(); detail = b.detail || detail; } catch (_) {}
-        throw new Error(detail);
-      }
-      return res.json();
-    });
-  },
-
   // Stores management (global — not outlet-scoped)
   initStores: () => request("/api/init-stores", { method: "POST" }),
   getStores: () => request("/api/stores"),
@@ -289,27 +265,6 @@ export const api = {
     request(`/api/stores/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteStore: (id) =>
     request(`/api/stores/${id}`, { method: "DELETE" }),
-
-  // Requisitions
-  getRequisitions: (outlet_id, status) => {
-    const params = new URLSearchParams();
-    if (outlet_id) params.set("outlet_id", outlet_id);
-    if (status) params.set("status", status);
-    const qs = params.toString();
-    return request(`/api/requisitions${qs ? `?${qs}` : ""}`);
-  },
-  createRequisition: (data) =>
-    request("/api/requisitions", { method: "POST", body: JSON.stringify(data) }),
-  updateRequisition: (id, data) =>
-    request(`/api/requisitions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  approveRequisition: (id) =>
-    request(`/api/requisitions/${id}/approve`, { method: "PUT" }),
-  rejectRequisition: (id) =>
-    request(`/api/requisitions/${id}/reject`, { method: "PUT" }),
-  fulfillRequisition: (id, overrides) =>
-    request(`/api/requisitions/${id}/fulfill`, { method: "PUT", body: JSON.stringify({ overrides: overrides || {} }) }),
-  deleteRequisition: (id) =>
-    request(`/api/requisitions/${id}`, { method: "DELETE" }),
 
   // Waste / Spoilage
   getWasteEntries: (outlet_id) =>

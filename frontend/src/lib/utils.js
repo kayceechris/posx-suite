@@ -135,7 +135,7 @@ const PERMISSION_IMPLIES = {
     "view_inventory", "manage_stock_count", "update_stock", "add_stock",
     "receive_stock", "transfer_stock", "low_stock_alerts",
     "view_reorder_alerts", "record_waste", "view_stock_valuation",
-    "view_consolidated_stock", "manage_requisitions",
+    "view_consolidated_stock",
     // Store Management items live under Inventory in most roles' mental
     // model — grant view + transfer-history when the umbrella is held.
     "view_stores", "view_transfer_record",

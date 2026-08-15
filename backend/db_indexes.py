@@ -45,11 +45,10 @@ async def ensure_indexes(db):
     await db.stock.create_index([("product_id", ASCENDING), ("outlet_id", ASCENDING), ("store", ASCENDING)])
     await db.stock.create_index([("outlet_id", ASCENDING), ("store", ASCENDING)])
 
-    # ── Stock movements / waste / requisitions ──────────────────────────────
+    # ── Stock movements / waste ──────────────────────────────────────────────
     await db.stock_movements.create_index([("created_at", DESCENDING)])
     await db.stock_movements.create_index([("outlet_id", ASCENDING), ("created_at", DESCENDING)])
     await db.waste.create_index([("created_at", DESCENDING)])
-    await db.requisitions.create_index([("status", ASCENDING), ("created_at", DESCENDING)])
 
     # ── Auth / users — login path ───────────────────────────────────────────
     await db.users.create_index([("username", ASCENDING)], unique=False)

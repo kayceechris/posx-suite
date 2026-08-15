@@ -291,7 +291,7 @@ async def seed_data(force: bool = Query(False)):
         await db.products.insert_one(_insert(p.model_dump()))
         products.append(p)
         # Food products stock in kitchen store; drink products stock in bar store.
-        # Main store starts empty — stock is added there manually then pushed via requisitions.
+        # Stock is received directly into Kitchen/Bar — Main Store is a combined rollup, never stocked directly.
         dest_store = "bar" if cat.id in drink_cat_ids else "kitchen"
         for outlet, qty in [(outlet_main, rng.randint(30, 150)), (outlet_bar, rng.randint(10, 60))]:
             s = Stock(product_id=p.id, outlet_id=outlet.id, store=dest_store, quantity=qty, min_quantity=10)

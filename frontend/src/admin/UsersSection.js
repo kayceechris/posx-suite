@@ -26,8 +26,8 @@ const PERMISSION_MODULES = [
     permissions: [
       { id: "view_inventory",          label: "View Stock Levels" },
       { id: "manage_stock_count",      label: "Manage Stock Count" },
-      { id: "add_stock",               label: "Add Stock (quick add to Main Store)" },
-      { id: "receive_stock",           label: "Receive Stock (bulk delivery to Main Store)" },
+      { id: "add_stock",               label: "Add Stock (quick add to Kitchen/Bar)" },
+      { id: "receive_stock",           label: "Receive Stock (bulk delivery to Kitchen/Bar)" },
       { id: "update_stock",            label: "Update Stock (qty / min / batch / expiry)" },
       { id: "transfer_stock",          label: "Transfer Stock (between stores)" },
       { id: "low_stock_alerts",        label: "Low Stock Alerts" },
@@ -35,7 +35,6 @@ const PERMISSION_MODULES = [
       { id: "record_waste",            label: "Record Waste / Spoilage" },
       { id: "view_stock_valuation",    label: "View Stock Valuation" },
       { id: "view_consolidated_stock", label: "View Consolidated Stock" },
-      { id: "manage_requisitions",     label: "Manage Requisitions" },
     ],
   },
   {

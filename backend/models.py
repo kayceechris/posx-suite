@@ -214,44 +214,6 @@ class StockMovementCreate(BaseModel):
     notes: Optional[str] = None
 
 
-# ==================== REQUISITION MODELS ====================
-
-class RequisitionItem(BaseModel):
-    # Either product_id OR ingredient_id is set, matching the polymorphic
-    # Stock model. product_name is kept as a denormalized display label so
-    # historical / fulfilled requisitions still read sensibly.
-    product_id: Optional[str] = None
-    ingredient_id: Optional[str] = None
-    product_name: str
-    quantity_requested: int
-    quantity_fulfilled: int = 0
-    unit_id: Optional[str] = None
-
-
-class Requisition(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    outlet_id: str
-    from_store: str                  # "kitchen" | "bar"
-    to_store: str = "main"
-    items: List[RequisitionItem]
-    notes: Optional[str] = None
-    status: str = "pending"          # pending | approved | fulfilled | rejected
-    created_by: str
-    created_by_name: Optional[str] = None
-    fulfilled_by: Optional[str] = None
-    fulfilled_by_name: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    fulfilled_at: Optional[datetime] = None
-
-
-class RequisitionCreate(BaseModel):
-    outlet_id: str
-    from_store: str
-    items: List[RequisitionItem]
-    notes: Optional[str] = None
-
-
 # ==================== STORE MODELS ====================
 
 class Store(BaseModel):

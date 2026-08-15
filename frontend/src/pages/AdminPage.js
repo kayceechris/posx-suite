@@ -26,7 +26,6 @@ const AccountsSection      = lazy(() => import("../admin/AccountsSection"));
 const TablesSection        = lazy(() => import("../admin/TablesSection"));
 const BarTabsAdminSection  = lazy(() => import("../admin/BarTabsAdminSection"));
 const ReservationsSection  = lazy(() => import("../admin/ReservationsSection"));
-const RequisitionsSection  = lazy(() => import("../admin/RequisitionsSection"));
 const SettingsSection      = lazy(() => import("../admin/SettingsSection"));
 const PurchasesSection     = lazy(() => import("../admin/PurchasesSection"));
 
@@ -45,7 +44,6 @@ const ADMIN_CHUNK_IMPORTS = [
   () => import("../admin/TablesSection"),
   () => import("../admin/BarTabsAdminSection"),
   () => import("../admin/ReservationsSection"),
-  () => import("../admin/RequisitionsSection"),
   () => import("../admin/SettingsSection"),
   () => import("../admin/PurchasesSection"),
   () => import("../admin/VoidOrdersSection"),
@@ -101,7 +99,6 @@ const EXPANDABLE = {
     { id: "stock", label: "Stock Levels" },
     { id: "stock-count", label: "Stock Count" },
     { id: "update-stock", label: "Update Stock" },
-    { id: "requisitions", label: "Requisitions" },
     { id: "reorder", label: "Reorder Alerts" },
     { id: "waste", label: "Waste Recording" },
     { id: "valuation", label: "Stock Valuation" },
@@ -173,7 +170,6 @@ const SUB_ITEM_PERMISSION = {
   "inventory.stock":            "view_inventory",
   "inventory.stock-count":      "manage_stock_count",
   "inventory.update-stock":     "update_stock",
-  "inventory.requisitions":     "manage_requisitions",
   "inventory.reorder":          "view_reorder_alerts",
   "inventory.waste":            "record_waste",
   "inventory.valuation":        "view_stock_valuation",
@@ -267,7 +263,6 @@ const SUB_ITEM_REQUIRES_CAP = {
   // Ingredient-only inventory pages
   "stores.main-store":        "hasIngredients",
   "stores.create-store":      "hasIngredients",
-  "inventory.requisitions":   "hasIngredients",
   "inventory.waste":          "hasIngredients",  // ingredient waste — keep simple in retail
 };
 
@@ -285,7 +280,7 @@ export default function AdminPage() {
   const bellRef = useRef(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [notifSummary, setNotifSummary] = useState({ pending_requisitions: 0, low_stock: 0, todays_orders: 0, pending_purchases: 0, upcoming_reservations: 0 });
+  const [notifSummary, setNotifSummary] = useState({ low_stock: 0, todays_orders: 0, pending_purchases: 0, upcoming_reservations: 0 });
   const [preFillPO, setPreFillPO] = useState(null);
 
   const isPrivileged = user?.role === "admin" || user?.role === "manager";
@@ -401,9 +396,9 @@ export default function AdminPage() {
                   >
                     <Icon size={18} />
                     <span className="flex-1 text-left font-medium">{item.label}</span>
-                    {item.id === "inventory" && (notifSummary.low_stock > 0 || notifSummary.pending_requisitions > 0) && (
+                    {item.id === "inventory" && notifSummary.low_stock > 0 && (
                       <span className="ml-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                        {Math.min(notifSummary.low_stock + notifSummary.pending_requisitions, 99) || "99+"}
+                        {Math.min(notifSummary.low_stock, 99) || "99+"}
                       </span>
                     )}
                     {item.id === "purchases" && notifSummary.pending_purchases > 0 && (
@@ -422,29 +417,20 @@ export default function AdminPage() {
 
                   {isExpanded && subItems.length > 0 && (
                     <div className="ml-4 mb-1 border-l border-gray-700 pl-3">
-                      {subItems.map((sub) => {
-                        const isReqs = item.id === "inventory" && sub.id === "requisitions";
-                        const reqBadge = isReqs && notifSummary.pending_requisitions > 0;
-                        return (
-                          <button
-                            key={sub.id}
-                            onClick={() => handleSubClick(item.id, sub.id)}
-                            className={cn(
-                              "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors mb-0.5",
-                              subViews[item.id] === sub.id
-                                ? "bg-gray-700 text-white"
-                                : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                            )}
-                          >
-                            <span className="flex-1 text-left">{sub.label}</span>
-                            {reqBadge && (
-                              <span className="min-w-[16px] h-4 px-1 bg-amber-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-                                {notifSummary.pending_requisitions > 99 ? "99+" : notifSummary.pending_requisitions}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                      {subItems.map((sub) => (
+                        <button
+                          key={sub.id}
+                          onClick={() => handleSubClick(item.id, sub.id)}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors mb-0.5",
+                            subViews[item.id] === sub.id
+                              ? "bg-gray-700 text-white"
+                              : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                          )}
+                        >
+                          <span className="flex-1 text-left">{sub.label}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </React.Fragment>
@@ -491,9 +477,9 @@ export default function AdminPage() {
                 className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 <Bell size={17} />
-                {(notifSummary.pending_requisitions > 0 || notifSummary.low_stock > 0 || notifSummary.pending_purchases > 0 || notifSummary.upcoming_reservations > 0) && (
+                {(notifSummary.low_stock > 0 || notifSummary.pending_purchases > 0 || notifSummary.upcoming_reservations > 0) && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-                    {Math.min(notifSummary.pending_requisitions + notifSummary.low_stock + notifSummary.pending_purchases + notifSummary.upcoming_reservations, 99)}
+                    {Math.min(notifSummary.low_stock + notifSummary.pending_purchases + notifSummary.upcoming_reservations, 99)}
                   </span>
                 )}
               </button>
@@ -503,7 +489,7 @@ export default function AdminPage() {
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <p className="text-sm font-bold text-gray-900 dark:text-white">Alerts</p>
                   </div>
-                  {notifSummary.pending_requisitions === 0 && notifSummary.low_stock === 0 && notifSummary.pending_purchases === 0 && notifSummary.upcoming_reservations === 0 ? (
+                  {notifSummary.low_stock === 0 && notifSummary.pending_purchases === 0 && notifSummary.upcoming_reservations === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-gray-400">No active alerts</p>
                   ) : (
                     <div className="py-1">
@@ -520,21 +506,6 @@ export default function AdminPage() {
                             <p className="text-xs text-gray-400">{notifSummary.upcoming_reservations} table{notifSummary.upcoming_reservations !== 1 ? "s" : ""} reserved within 2 hours</p>
                           </div>
                           <span className="min-w-[20px] h-5 px-1.5 bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.upcoming_reservations > 99 ? "99+" : notifSummary.upcoming_reservations}</span>
-                        </button>
-                      )}
-                      {notifSummary.pending_requisitions > 0 && (
-                        <button
-                          onClick={() => { setBellOpen(false); setActiveSection("inventory"); setExpandedSection("inventory"); setSubViews((s) => ({ ...s, inventory: "requisitions" })); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
-                        >
-                          <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <ClipboardList size={15} className="text-amber-600 dark:text-amber-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Pending Requisitions</p>
-                            <p className="text-xs text-gray-400">{notifSummary.pending_requisitions} awaiting approval</p>
-                          </div>
-                          <span className="min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{notifSummary.pending_requisitions > 99 ? "99+" : notifSummary.pending_requisitions}</span>
                         </button>
                       )}
                       {notifSummary.low_stock > 0 && (
@@ -601,8 +572,7 @@ export default function AdminPage() {
               {activeSection === "products" && (
                 <ProductsSection view={subViews.products} onViewChange={(v) => handleSubClick("products", v)} />
               )}
-              {activeSection === "inventory" && subViews.inventory !== "requisitions" && <InventorySection view={subViews.inventory} />}
-              {activeSection === "inventory" && subViews.inventory === "requisitions" && <RequisitionsSection />}
+              {activeSection === "inventory" && <InventorySection view={subViews.inventory} />}
               {activeSection === "stores" && <InventorySection view={subViews.stores === "create-store" ? "stores" : subViews.stores} />}
               {activeSection === "customers" && <CustomersSection />}
               {activeSection === "orders" && subViews.orders !== "void-orders" && <OrdersSection />}

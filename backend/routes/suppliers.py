@@ -76,7 +76,7 @@ async def create_purchase_order(po_data: PurchaseOrderCreate, background_tasks: 
     count = await db.purchase_orders.count_documents({})
     po_dict = po_data.model_dump()
     status = po_dict.pop("status", None) or "pending"
-    po_dict["type"] = "external"  # always external — internal transfers use requisitions
+    po_dict["type"] = "external"  # always external — internal moves use stock transfers
     po = PurchaseOrder(**po_dict, status=status, po_number=f"PO{count + 1:06d}", created_by=current_user.id)
     doc = po.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
@@ -93,31 +93,44 @@ async def create_purchase_order(po_data: PurchaseOrderCreate, background_tasks: 
 async def update_purchase_order(po_id: str, po_data: dict, current_user: User = Depends(get_current_user)):
     if not _can_manage_purchases(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
+    existing_po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not existing_po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
     update_fields = {k: v for k, v in po_data.items() if k not in ("id", "created_at", "po_number")}
+
+    # Credit stock only on the transition INTO "received" — a PO that's
+    # already received and gets PUT again (e.g. an unrelated notes edit
+    # that happens to resend status: "received") must not double-credit
+    # the same delivery into Kitchen/Bar a second time.
+    if update_fields.get("status") == "received" and existing_po.get("status") != "received":
+        outlet_id = update_fields.get("outlet_id") or existing_po.get("outlet_id")
+        store = update_fields.get("store")
+        if not outlet_id:
+            raise HTTPException(status_code=400, detail="This purchase order has no outlet set — cannot receive stock")
+        if store not in ("kitchen", "bar"):
+            raise HTTPException(status_code=400, detail="Choose a destination store (Kitchen or Bar) to receive this order into")
+        for item in existing_po.get("items", []):
+            if item.get("product_id") and item.get("quantity"):
+                qty = int(item["quantity"])
+                stock_filter = {"product_id": item["product_id"], "outlet_id": outlet_id, "store": store}
+                stock_existing = await db.stock.find_one(stock_filter, {"_id": 0})
+                if stock_existing:
+                    await db.stock.update_one(stock_filter, {"$inc": {"quantity": qty}})
+                else:
+                    await db.stock.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "product_id": item["product_id"],
+                        "outlet_id": outlet_id,
+                        "store": store,
+                        "quantity": qty,
+                        "min_quantity": 10,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    })
+
     result = await db.purchase_orders.update_one({"id": po_id}, {"$set": update_fields})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Purchase order not found")
-
-    if update_fields.get("status") == "received":
-        po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
-        if po:
-            for item in po.get("items", []):
-                if item.get("product_id") and item.get("quantity"):
-                    qty = int(item["quantity"])
-                    stock_filter = {"product_id": item["product_id"], "store": "main"}
-                    existing = await db.stock.find_one(stock_filter, {"_id": 0})
-                    if existing:
-                        await db.stock.update_one(stock_filter, {"$inc": {"quantity": qty}})
-                    else:
-                        await db.stock.insert_one({
-                            "id": str(uuid.uuid4()),
-                            "product_id": item["product_id"],
-                            "outlet_id": "",
-                            "store": "main",
-                            "quantity": qty,
-                            "min_quantity": 10,
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        })
 
     updated = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
     return updated

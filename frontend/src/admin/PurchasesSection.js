@@ -52,8 +52,8 @@ const UNITS = ["pcs", "carton", "kg", "g", "litre", "dozen", "box", "pack", "bag
 
 const EMPTY_ITEM = { product_id: "", description: "", quantity: 1, unit: "pcs", unit_cost: "", total: 0 };
 
-function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreated }) {
-  const [form, setForm] = useState({ supplier_id: "", notes: "" });
+function NewPOModal({ suppliers, products, units, outlets, initialItems, onClose, onCreated }) {
+  const [form, setForm] = useState({ supplier_id: "", outlet_id: outlets?.[0]?.id || "", notes: "" });
   const [items, setItems] = useState(initialItems?.length ? initialItems : [{ ...EMPTY_ITEM }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -81,11 +81,13 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
 
   const handleSubmit = async () => {
     if (!form.supplier_id) { setError("Please select a supplier"); return; }
+    if (!form.outlet_id) { setError("Please select an outlet"); return; }
     if (items.some((it) => !it.description.trim())) { setError("All items need a description"); return; }
     setSaving(true); setError("");
     try {
       await api.createPurchaseOrder({
         supplier_id: form.supplier_id,
+        outlet_id: form.outlet_id,
         type: "external",
         notes: form.notes,
         status: "pending",
@@ -132,6 +134,18 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
                 className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-400 appearance-none">
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Outlet</label>
+            <div className="relative">
+              <select value={form.outlet_id} onChange={(e) => setForm((f) => ({ ...f, outlet_id: e.target.value }))}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:border-blue-400 appearance-none">
+                <option value="">Select outlet</option>
+                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -223,22 +237,30 @@ function NewPOModal({ suppliers, products, units, initialItems, onClose, onCreat
   );
 }
 
-function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
+function PODetailModal({ po, suppliers, outlets, canApprove, onClose, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(po.status);
+  const [receiving, setReceiving] = useState(false);
+  const [receiveStore, setReceiveStore] = useState("kitchen");
+  const [error, setError] = useState("");
   const supplierName = suppliers.find((s) => s.id === po.supplier_id)?.name || "—";
+  const outletName = outlets.find((o) => o.id === po.outlet_id)?.name || "—";
   const fmtDate = (s) => s ? new Date(s).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" }) : "";
 
-  const updateStatus = async (newStatus) => {
-    setSaving(true);
+  const updateStatus = async (newStatus, extra = {}) => {
+    setSaving(true); setError("");
     try {
-      await api.updatePurchaseOrder(po.id, { status: newStatus });
+      await api.updatePurchaseOrder(po.id, { status: newStatus, ...extra });
       setStatus(newStatus);
       onUpdated();
+    } catch (err) {
+      setError(err.message || "Failed to update purchase order");
     } finally {
       setSaving(false);
     }
   };
+
+  const confirmReceive = () => updateStatus("received", { store: receiveStore });
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -254,9 +276,11 @@ function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={status} />
             <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-              Main Store
+              {outletName}
             </span>
           </div>
+
+          {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">{error}</div>}
 
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">Supplier</p>
@@ -302,11 +326,35 @@ function PODetailModal({ po, suppliers, canApprove, onClose, onUpdated }) {
                     <Clock size={12} /> Awaiting approval from an authorised user
                   </p>
                 )}
-                {status === "approved" && (
-                  <button onClick={() => updateStatus("received")} disabled={saving}
+                {status === "approved" && !receiving && (
+                  <button onClick={() => setReceiving(true)} disabled={saving}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">
                     <CheckCircle2 size={14} /> Mark as Received
                   </button>
+                )}
+                {status === "approved" && receiving && (
+                  <div className="w-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-bold text-gray-600 dark:text-gray-300">Receive into which store?</p>
+                    <div className="flex gap-2">
+                      {["kitchen", "bar"].map((s) => (
+                        <button key={s} onClick={() => setReceiveStore(s)}
+                          className={cn("px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors",
+                            receiveStore === s ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300")}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={confirmReceive} disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                        <CheckCircle2 size={14} /> Confirm — Receive into {receiveStore === "kitchen" ? "Kitchen" : "Bar"}
+                      </button>
+                      <button onClick={() => setReceiving(false)} disabled={saving}
+                        className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {(status === "pending" || status === "approved") && (
                   <button onClick={() => updateStatus("cancelled")} disabled={saving}
@@ -331,6 +379,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
+  const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [newPOInitialItems, setNewPOInitialItems] = useState(null);
@@ -339,12 +388,13 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getPurchaseOrders(), api.getSuppliers(), api.getProducts(), api.getUnits()])
-      .then(([all, s, pr, u]) => {
+    Promise.all([api.getPurchaseOrders(), api.getSuppliers(), api.getProducts(), api.getUnits(), api.getOutlets()])
+      .then(([all, s, pr, u, o]) => {
         setPOs(statusFilter ? all.filter((p) => statusFilter.includes(p.status)) : all);
         setSuppliers(s);
         setProducts(pr.filter((pr) => pr.active !== false));
         setUnits(u);
+        setOutlets(o);
       })
       .catch((err) => {
         setToast({ msg: `Failed to load: ${err.message || "Network error"}`, type: "error" });
@@ -371,6 +421,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
   }, [preFillPO, products]);
 
   const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || "—";
+  const outletName = (id) => outlets.find((o) => o.id === id)?.name || "—";
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this purchase order?")) return;
@@ -463,7 +514,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                   Supplier: <span className="font-medium text-gray-700 dark:text-gray-300">{supplierName(po.supplier_id)}</span>
-                  <span className="ml-2 text-xs text-gray-400">→ Main Store</span>
+                  <span className="ml-2 text-xs text-gray-400">→ {outletName(po.outlet_id)}</span>
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">{po.items?.length || 0} item{po.items?.length !== 1 ? "s" : ""} · {formatCurrency(po.total)}</p>
               </div>
@@ -502,6 +553,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
           suppliers={suppliers}
           products={products}
           units={units}
+          outlets={outlets}
           initialItems={newPOInitialItems}
           onClose={() => { setShowNew(false); setNewPOInitialItems(null); }}
           onCreated={() => {
@@ -517,6 +569,7 @@ function OrdersView({ statusFilter, title, emptyMsg, icon: Icon, accentColor, pr
         <PODetailModal
           po={detail}
           suppliers={suppliers}
+          outlets={outlets}
           canApprove={canApprove}
           onClose={() => setDetail(null)}
           onUpdated={() => { setDetail(null); load(); }}

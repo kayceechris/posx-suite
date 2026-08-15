@@ -58,53 +58,6 @@ async def _send(payload: dict):
 
 # ── Public senders ─────────────────────────────────────────────────────────────
 
-async def send_new_requisition_email(requisition: dict):
-    if not _enabled():
-        return
-    items_html = "".join(
-        f"<tr style='border-bottom:1px solid #f1f5f9;'>"
-        f"<td style='padding:8px 12px;font-size:14px;color:#374151;'>{i.get('product_name', '—')}</td>"
-        f"<td style='padding:8px 12px;font-size:14px;color:#374151;text-align:center;'>{i.get('quantity_requested', 0)}</td>"
-        f"</tr>"
-        for i in requisition.get("items", [])
-    )
-    body = f"""
-      <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">New Requisition Request</h2>
-      <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">A stock requisition is awaiting your review.</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:20px;">
-        <tr>
-          <td style="padding:12px 16px;">
-            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Requested By</p>
-            <p style="margin:0;font-size:14px;font-weight:600;color:#111827;">{requisition.get('created_by_name', '—')}</p>
-          </td>
-          <td style="padding:12px 16px;">
-            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Store</p>
-            <p style="margin:0;font-size:14px;font-weight:600;color:#111827;">{requisition.get('from_store', '—').title()} Store</p>
-          </td>
-          <td style="padding:12px 16px;">
-            <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Status</p>
-            <p style="margin:0;font-size:14px;font-weight:600;color:#d97706;">Pending</p>
-          </td>
-        </tr>
-      </table>
-      <h3 style="margin:0 0 8px;font-size:14px;font-weight:600;color:#374151;">Items Requested</h3>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:16px;">
-        <tr style="background:#f1f5f9;">
-          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;">Product</th>
-          <th style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;">Qty</th>
-        </tr>
-        {items_html}
-      </table>
-      <p style="margin:0;font-size:13px;color:#6b7280;">Log in to POSx Suite to approve or reject this requisition.</p>
-    """
-    await _send({
-        "from": FROM_EMAIL,
-        "to": _recipients(),
-        "subject": f"New Requisition — {requisition.get('from_store', '').title()} Store | POSx Suite",
-        "html": _base_html("New Requisition", body),
-    })
-
-
 async def send_new_order_email(order: dict):
     if not _enabled():
         return
@@ -182,7 +135,7 @@ async def send_low_stock_email(low_items: list):
         </tr>
         {rows_html}
       </table>
-      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Log in to POSx Suite to create a purchase order or transfer stock via requisitions.</p>
+      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Log in to POSx Suite to create a purchase order or transfer stock between stores.</p>
     """
     await _send({
         "from": FROM_EMAIL,
@@ -261,8 +214,6 @@ async def send_daily_digest_email(db):
     ]):
         totals = {"count": row["count"], "revenue": row["revenue"]}
 
-    pending_reqs = await db.requisitions.count_documents({"status": "pending"})
-
     # Low stock
     low_rows = []
     async for s in db.stock.find(
@@ -279,9 +230,10 @@ async def send_daily_digest_email(db):
         for i in low_rows[:10]
     ) or "<tr><td colspan='2' style='padding:12px;text-align:center;color:#6b7280;font-size:13px;'>All items adequately stocked ✓</td></tr>"
 
-    pending_color = "#d97706" if pending_reqs > 0 else "#94a3b8"
-    pending_bg = "#fffbeb" if pending_reqs > 0 else "#f8fafc"
-    pending_border = "#fde68a" if pending_reqs > 0 else "#e2e8f0"
+    low_count = len(low_rows)
+    pending_color = "#d97706" if low_count > 0 else "#94a3b8"
+    pending_bg = "#fffbeb" if low_count > 0 else "#f8fafc"
+    pending_border = "#fde68a" if low_count > 0 else "#e2e8f0"
 
     body = f"""
       <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">Daily Digest</h2>
@@ -297,9 +249,9 @@ async def send_daily_digest_email(db):
           </td>
           <td style="width:50%;padding-left:8px;">
             <div style="background:{pending_bg};border:1px solid {pending_border};border-radius:8px;padding:16px 20px;">
-              <p style="margin:0 0 4px;font-size:12px;color:{pending_color};text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Pending Requisitions</p>
-              <p style="margin:0;font-size:22px;font-weight:700;color:#111827;">{pending_reqs}</p>
-              <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">awaiting approval</p>
+              <p style="margin:0 0 4px;font-size:12px;color:{pending_color};text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Needs Restock</p>
+              <p style="margin:0;font-size:22px;font-weight:700;color:#111827;">{low_count}</p>
+              <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">items below minimum</p>
             </div>
           </td>
         </tr>
